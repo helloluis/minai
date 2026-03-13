@@ -1,0 +1,55 @@
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../../../../.env.local') });
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+async function migrate() {
+  const client = await pool.connect();
+  try {
+    // Ensure migrations table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS _migrations (
+        name TEXT PRIMARY KEY,
+        applied_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+
+    const migrations = ['001_initial.sql'];
+
+    for (const migration of migrations) {
+      const { rows } = await client.query(
+        'SELECT 1 FROM _migrations WHERE name = $1',
+        [migration]
+      );
+
+      if (rows.length === 0) {
+        console.log(`Applying migration: ${migration}`);
+        const sql = readFileSync(join(__dirname, migration), 'utf-8');
+        await client.query(sql);
+        await client.query(
+          'INSERT INTO _migrations (name) VALUES ($1)',
+          [migration]
+        );
+        console.log(`Applied: ${migration}`);
+      } else {
+        console.log(`Already applied: ${migration}`);
+      }
+    }
+
+    console.log('All migrations complete.');
+  } catch (err) {
+    console.error('Migration failed:', err);
+    process.exit(1);
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+migrate();

@@ -1,0 +1,107 @@
+// ─── Models ───
+
+export type LLMMode = 'auto' | 'fast' | 'deep';
+export type ModelId = 'qwen-turbo-latest' | 'qwen-plus-latest';
+export type MessageRole = 'user' | 'assistant' | 'system';
+
+// ─── Database Entities ───
+
+export interface User {
+  id: string;
+  session_token: string;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface UserBalance {
+  id: string;
+  user_id: string;
+  balance_usd: number;
+  free_tokens_remaining: number;
+  updated_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  user_id: string;
+  title: string;
+  pinned: boolean;
+  pin_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
+  model: ModelId | null;
+  input_tokens: number;
+  output_tokens: number;
+  token_cost_usd: number;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface UserMemory {
+  id: string;
+  user_id: string;
+  key: string;
+  value: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  amount_usd: number;
+  tx_hash: string | null;
+  status: string;
+  created_at: string;
+}
+
+// ─── Streaming ───
+
+export type StreamChunkType = 'start' | 'thinking' | 'chunk' | 'usage' | 'done' | 'error';
+
+export interface StreamChunk {
+  type: StreamChunkType;
+  content?: string;
+  messageId?: string;
+  model?: ModelId;
+  usage?: TokenUsage;
+  error?: string;
+}
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
+}
+
+// ─── API Types ───
+
+export interface SendMessageRequest {
+  content: string;
+  mode: LLMMode;
+  images?: string[]; // base64 encoded
+}
+
+export interface ConversationListItem {
+  id: string;
+  title: string;
+  pinned: boolean;
+  pin_order: number;
+  updated_at: string;
+  last_message?: string;
+}
+
+export interface SessionResponse {
+  user: Pick<User, 'id' | 'created_at'>;
+  balance: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
+}
