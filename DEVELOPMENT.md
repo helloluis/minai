@@ -52,12 +52,17 @@ minai/
 │   │       ├── services/
 │   │       │   ├── db.ts       PostgreSQL queries (pg pool)
 │   │       │   ├── router.ts   Auto/Fast/Deep LLM routing
+│   │       │   ├── compaction.ts  Context compaction (summarize old messages)
+│   │       │   ├── memory.ts   User memory extraction (language, preferences)
+│   │       │   ├── tools.ts    Tool definitions + executors (crypto, search)
+│   │       │   ├── tool-runner.ts  Pattern-based tool detection + execution
 │   │       │   └── providers/
 │   │       │       ├── types.ts      Provider interface
 │   │       │       └── dashscope.ts  Alibaba Cloud Qwen provider
 │   │       └── migrations/
-│   │           ├── 001_initial.sql   Full schema
-│   │           └── run.ts            Migration runner
+│   │           ├── 001_initial.sql           Full schema
+│   │           ├── 002_user_memory_unique.sql  Unique constraint
+│   │           └── run.ts                    Migration runner
 │   └── web/                    Next.js 15 frontend (port 3002)
 │       └── src/
 │           ├── app/
@@ -137,22 +142,23 @@ Run migrations: `pnpm db:migrate`
 - Balance bar with pie chart
 - Zustand state management
 
-### Phase 2: Billing, Balance & Token Tracking — TODO
-- Deduct token costs from user balance after each response
-- Free tier: consume `free_tokens_remaining` before charging balance
-- Balance UI: real-time updates, pie chart for free tokens
-- Mock deposit button ($0.10 increments)
-- Payment records in `payments` table
+### Phase 2: Billing, Balance & Token Tracking — DONE
+- Token cost deduction from balance after each response
+- Free tier: deducts `free_tokens_remaining` before charging balance
+- Balance UI: real-time updates via SSE `usage` event, pie chart for free tokens
+- Mock deposit button ($0.10 increments) in top balance bar
+- Payment records logged to `payments` table
 
-### Phase 3: Compaction, Memory & Tools — TODO
-- Context compaction (fire-and-forget, keep last 8 messages raw)
-- User memory (language preference detection, stored in system prompt)
-- Tools:
-  - `crypto_price` — Binance public API: `GET https://data-api.binance.vision/api/v3/ticker/price`
-  - `crypto_history` — Binance klines: `GET https://data-api.binance.vision/api/v3/klines`
-  - `web_search` — placeholder
-  - `minipay_info` — placeholder
-  - `opera_info` — placeholder
+### Phase 3: Compaction, Memory & Tools — DONE
+- Context compaction: fire-and-forget after each response, keeps last 8 messages raw,
+  compacts older exchanges via Qwen Flash summarization, stored in `compacted_messages`
+- User memory: detects Swahili language preference, extracts facts (name, location,
+  occupation) via LLM, stored in `user_memory` and injected into system prompt
+- Tools (pattern-based detection, results injected as system context):
+  - `crypto_price` — **Live** via Binance API (price + 24h change/high/low/volume)
+  - `crypto_history` — **Live** via Binance klines (daily OHLC, up to 30 days)
+  - `web_search` — placeholder (returns notice that web search is not yet available)
+  - `minipay_info` — static knowledge base about MiniPay wallet
 
 ## Reference
 

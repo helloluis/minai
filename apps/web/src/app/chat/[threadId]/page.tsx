@@ -66,47 +66,49 @@ export default function ChatPage() {
       <Sidebar />
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {!hasMessages && !isStreaming && <WelcomeMessage />}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-4">
+          {!hasMessages && !isStreaming && <WelcomeMessage />}
 
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
 
-        {/* Streaming assistant response */}
-        {isStreaming && (
-          <div className="flex justify-start mb-3">
-            <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-sm">
-              {/* Model badge */}
-              {streamingModel && (
-                <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">
-                  {streamingModel === 'qwen-turbo-latest' ? 'Flash' : 'Plus'}
-                </div>
-              )}
+          {/* Streaming assistant response */}
+          {isStreaming && (
+            <div className="flex justify-start mb-3">
+              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-sm">
+                {/* Model badge */}
+                {streamingModel && (
+                  <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">
+                    {streamingModel === 'qwen3.5-flash' ? 'Flash' : 'Plus'}
+                  </div>
+                )}
 
-              {/* Thinking block */}
-              {streamingThinking && (
-                <ThinkingBlock content={streamingThinking} isActive={!streamingContent} />
-              )}
+                {/* Thinking block */}
+                {streamingThinking && (
+                  <ThinkingBlock content={streamingThinking} isActive={!streamingContent} />
+                )}
 
-              {/* Streaming content */}
-              {streamingContent ? (
-                <div className="message-content leading-relaxed">
-                  {streamingContent}
-                  <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
-                </div>
-              ) : !streamingThinking ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              ) : null}
+                {/* Streaming content */}
+                {streamingContent ? (
+                  <div className="message-content leading-relaxed">
+                    {streamingContent}
+                    <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
+                  </div>
+                ) : !streamingThinking ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       <ChatInput />

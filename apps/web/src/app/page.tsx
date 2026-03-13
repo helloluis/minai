@@ -57,8 +57,8 @@ export default function LandingPage() {
 
         {/* Description */}
         <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
-          Access powerful AI models at a fraction of the cost.
-          Pay only for what you use — starting from $0.10.
+          Pay-as-you-go, fractional pricing. Up to 95% cheaper than
+          other frontier models. Top up with as little as $0.10.
         </p>
 
         {/* Login Button */}

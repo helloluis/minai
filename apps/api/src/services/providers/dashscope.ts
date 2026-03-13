@@ -13,8 +13,8 @@ import type { TokenUsage } from '@minai/shared';
 
 // DashScope pricing per million tokens (Alibaba's actual cost — we mark up in pricing.ts)
 const DASHSCOPE_PRICING: Record<string, { input: number; output: number }> = {
-  'qwen-turbo-latest': { input: 0.10, output: 0.50 },
-  'qwen-plus-latest': { input: 0.50, output: 2.50 },
+  'qwen3.5-flash': { input: 0.10, output: 0.50 },
+  'qwen3.5-plus': { input: 0.50, output: 2.50 },
 };
 
 const CACHE_HIT_MULTIPLIER = 0.1;
@@ -56,7 +56,7 @@ export class DashScopeProvider implements LLMProvider {
   }
 
   private getPricing(model: string) {
-    return DASHSCOPE_PRICING[model] || DASHSCOPE_PRICING['qwen-plus-latest'];
+    return DASHSCOPE_PRICING[model] || DASHSCOPE_PRICING['qwen3.5-plus'];
   }
 
   /**
@@ -229,7 +229,7 @@ export class DashScopeProvider implements LLMProvider {
    */
   async complete(
     messages: ProviderMessage[],
-    model = 'qwen-turbo-latest',
+    model = 'qwen3.5-flash',
     maxTokens = 32
   ): Promise<{ content: string; usage: TokenUsage | null }> {
     const response = await fetch(ENDPOINT, {

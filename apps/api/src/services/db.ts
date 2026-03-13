@@ -151,11 +151,12 @@ export async function createMessage(
   conversationId: string,
   role: string,
   content: string,
-  model?: string
+  model?: string,
+  images?: string[]
 ): Promise<Message> {
   const { rows } = await pool.query<Message>(
-    `INSERT INTO messages (conversation_id, role, content, model) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [conversationId, role, content, model ?? null]
+    `INSERT INTO messages (conversation_id, role, content, model, images) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [conversationId, role, content, model ?? null, images && images.length > 0 ? JSON.stringify(images) : null]
   );
   // Update conversation timestamp
   await pool.query(
@@ -225,6 +226,50 @@ export async function upsertUserMemory(userId: string, key: string, value: strin
      VALUES ($1, $2, $3)
      ON CONFLICT (user_id, key) DO UPDATE SET value = $3, updated_at = now()`,
     [userId, key, value]
+  );
+}
+
+// ─── Compacted Messages ───
+
+export interface CompactedMessage {
+  id: string;
+  conversation_id: string;
+  original_message_ids: string[];
+  compacted_text: string;
+  created_at: string;
+}
+
+export async function getCompactedMessages(conversationId: string): Promise<CompactedMessage[]> {
+  const { rows } = await pool.query<CompactedMessage>(
+    `SELECT * FROM compacted_messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+    [conversationId]
+  );
+  return rows;
+}
+
+export async function createCompactedMessage(
+  conversationId: string,
+  originalMessageIds: string[],
+  compactedText: string
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO compacted_messages (conversation_id, original_message_ids, compacted_text)
+     VALUES ($1, $2, $3)`,
+    [conversationId, originalMessageIds, compactedText]
+  );
+}
+
+// ─── Payments ───
+
+export async function recordPayment(
+  userId: string,
+  amountUsd: number,
+  type: 'deposit' | 'usage',
+  txHash?: string
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO payments (user_id, amount_usd, tx_hash, status) VALUES ($1, $2, $3, $4)`,
+    [userId, amountUsd, txHash ?? null, type === 'deposit' ? 'completed' : 'completed']
   );
 }
 

@@ -1,15 +1,39 @@
 'use client';
 
+import { useState } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
+import { FREE_TOKENS_INITIAL } from '@minai/shared';
+
+function getRemainingColor(remainingPct: number): string {
+  if (remainingPct <= 10) return '#ef4444'; // red
+  if (remainingPct <= 25) return '#f97316'; // orange
+  if (remainingPct <= 35) return '#eab308'; // yellow
+  return '#22c55e'; // green
+}
 
 export function BalanceBar() {
   const session = useChatStore((s) => s.session);
   const toggleSidebar = useChatStore((s) => s.toggleSidebar);
+  const deposit = useChatStore((s) => s.deposit);
+  const [depositing, setDepositing] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   const balance = session?.balance?.balance_usd ?? 0;
   const freeTokens = session?.balance?.free_tokens_remaining ?? 0;
-  // Max is whatever the server gives on signup — avoid dividing by 0
-  const freeTokensPct = freeTokens > 0 ? Math.min(100, Math.round((freeTokens / (session?.balance?.free_tokens_remaining ?? 1)) * 100)) : 0;
+  const usedTokens = FREE_TOKENS_INITIAL - freeTokens;
+  const remainingPct = Math.max(0, Math.round((freeTokens / FREE_TOKENS_INITIAL) * 100));
+  const ringColor = getRemainingColor(remainingPct);
+
+  const handleDeposit = async () => {
+    setDepositing(true);
+    try {
+      await deposit();
+    } catch (err) {
+      console.error('[BalanceBar] Deposit failed:', err);
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   return (
     <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -27,32 +51,81 @@ export function BalanceBar() {
       {/* Center: Brand */}
       <span className="font-semibold text-minai-600">Minai</span>
 
-      {/* Right: Balance */}
+      {/* Right: Balance + Deposit */}
       <div className="flex items-center gap-2">
         {/* Mini pie chart for free tokens */}
-        <div className="relative w-6 h-6" title={`${freeTokens} free tokens remaining`}>
-          <svg viewBox="0 0 36 36" className="w-6 h-6 -rotate-90">
-            <circle
-              cx="18" cy="18" r="14"
-              fill="none"
-              stroke="#e5e7eb"
-              strokeWidth="4"
-              className="dark:stroke-gray-700"
-            />
-            <circle
-              cx="18" cy="18" r="14"
-              fill="none"
-              stroke="#22c55e"
-              strokeWidth="4"
-              strokeDasharray={`${freeTokensPct * 0.88} 88`}
-              strokeLinecap="round"
-            />
-          </svg>
+        <div className="relative">
+          <button
+            onClick={() => setShowTooltip((v) => !v)}
+            onBlur={() => setShowTooltip(false)}
+            className="relative w-7 h-7 flex items-center justify-center"
+            aria-label="Free token usage"
+          >
+            <svg viewBox="0 0 36 36" className="w-7 h-7 -rotate-90">
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke="#e5e7eb"
+                strokeWidth="4"
+                className="dark:stroke-gray-700"
+              />
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke={ringColor}
+                strokeWidth="4"
+                strokeDasharray={`${remainingPct * 0.88} 88`}
+                strokeLinecap="round"
+                className="transition-all duration-500"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-500 dark:text-gray-400">
+              {remainingPct}
+            </span>
+          </button>
+
+          {/* Tooltip */}
+          {showTooltip && (
+            <div className="absolute top-full right-0 mt-2 w-56 p-3 rounded-xl shadow-lg border
+              bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-50 text-xs">
+              <div className="font-semibold text-sm mb-2">Free Token Allocation</div>
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">Used</span>
+                <span className="font-medium">{usedTokens.toLocaleString()} tokens</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-500">Remaining</span>
+                <span className="font-medium" style={{ color: ringColor }}>{freeTokens.toLocaleString()} tokens</span>
+              </div>
+              {/* Progress bar — shows remaining */}
+              <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${remainingPct}%`, backgroundColor: ringColor }}
+                />
+              </div>
+              <div className="text-gray-400 mt-2">
+                {freeTokens > 0
+                  ? `${remainingPct}% of your ${FREE_TOKENS_INITIAL.toLocaleString()} free tokens remaining. After that, usage is charged from your balance.`
+                  : 'Free tokens exhausted. Usage is now charged from your balance.'}
+              </div>
+            </div>
+          )}
         </div>
 
         <span className="text-sm font-medium">
           ${Number(balance).toFixed(2)}
         </span>
+
+        {/* Mock deposit button */}
+        <button
+          onClick={handleDeposit}
+          disabled={depositing}
+          className="ml-1 px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
+          title="Add $0.10 (mock deposit)"
+        >
+          {depositing ? '...' : '+$'}
+        </button>
       </div>
     </div>
   );

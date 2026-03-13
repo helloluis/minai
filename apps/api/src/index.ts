@@ -11,7 +11,10 @@ import { messageRoutes } from './routes/messages.js';
 const port = parseInt(process.env.API_PORT || '3001');
 
 async function start() {
-  const fastify = Fastify({ logger: true });
+  const fastify = Fastify({
+    logger: true,
+    bodyLimit: 30 * 1024 * 1024, // 30 MB — supports 20 MB images as base64
+  });
 
   // CORS — allow Next.js dev server
   await fastify.register(cors, {

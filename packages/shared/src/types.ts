@@ -1,7 +1,11 @@
+// ─── Config ───
+
+export const FREE_TOKENS_INITIAL = 10_000;
+
 // ─── Models ───
 
 export type LLMMode = 'auto' | 'fast' | 'deep';
-export type ModelId = 'qwen-turbo-latest' | 'qwen-plus-latest';
+export type ModelId = 'qwen3.5-flash' | 'qwen3.5-plus';
 export type MessageRole = 'user' | 'assistant' | 'system';
 
 // ─── Database Entities ───
@@ -43,6 +47,7 @@ export interface Message {
   token_cost_usd: number;
   created_at: string;
   deleted_at: string | null;
+  images?: string[]; // base64 data URLs (stored as JSONB in DB)
 }
 
 export interface UserMemory {
@@ -73,6 +78,7 @@ export interface StreamChunk {
   messageId?: string;
   model?: ModelId;
   usage?: TokenUsage;
+  balance?: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
   error?: string;
 }
 

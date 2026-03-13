@@ -28,14 +28,16 @@ export async function messageRoutes(fastify: FastifyInstance) {
       const { id } = request.params;
       const { content, mode, images } = request.body as SendMessageRequest;
 
+      console.log(`[Messages] Received: content="${content.slice(0, 50)}", mode=${mode}, images=${images ? images.length : 0}${images?.[0] ? `, first image: ${images[0].slice(0, 50)}...` : ''}`);
+
       // Verify conversation belongs to user
       const conversation = await db.getConversation(id, request.user.id);
       if (!conversation) {
         return reply.status(404).send({ error: 'Conversation not found' });
       }
 
-      // Store user message
-      await db.createMessage(id, 'user', content);
+      // Store user message (with images if present)
+      await db.createMessage(id, 'user', content, undefined, images);
 
       // Create assistant message placeholder
       const assistantMsg = await db.createMessage(id, 'assistant', '', undefined);

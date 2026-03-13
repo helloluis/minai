@@ -30,6 +30,11 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
 // Auth
 export const login = () => fetchAPI<SessionResponse>('/api/auth/login', { method: 'POST', body: '{}' });
 export const getMe = () => fetchAPI<SessionResponse>('/api/auth/me');
+export const deposit = (amount?: number) =>
+  fetchAPI<{ balance: { balance_usd: number; free_tokens_remaining: number } }>('/api/auth/deposit', {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
 
 // Conversations
 export const getConversations = () => fetchAPI<ConversationListItem[]>('/api/conversations');

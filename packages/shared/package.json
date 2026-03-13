@@ -2,8 +2,16 @@
   "name": "@minai/shared",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/types.ts",
+  "type": "module",
+  "main": "./dist/types.js",
   "types": "./src/types.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"

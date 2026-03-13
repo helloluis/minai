@@ -105,8 +105,21 @@ body {
   margin: 0.25em 0;
 }
 .message-content a {
-  color: #16a34a;
+  color: #3b82f6;
   text-decoration: underline;
+  text-decoration-color: #3b82f680;
+  text-underline-offset: 2px;
+}
+.message-content a:hover {
+  text-decoration-color: #3b82f6;
+}
+/* Links inside user bubbles (white on green background) */
+.message-bubble-user .message-content a {
+  color: #ffffff;
+  text-decoration-color: #ffffff80;
+}
+.message-bubble-user .message-content a:hover {
+  text-decoration-color: #ffffff;
 }
 .message-content blockquote {
   border-left: 3px solid #d1d5db;

@@ -15,7 +15,7 @@ CREATE TABLE user_balances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) NOT NULL,
   balance_usd NUMERIC(12,6) DEFAULT 0,
-  free_tokens_remaining INTEGER DEFAULT 1000,
+  free_tokens_remaining INTEGER DEFAULT 10000,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 

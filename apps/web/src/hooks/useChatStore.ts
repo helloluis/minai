@@ -29,6 +29,7 @@ interface ChatState {
   streamingContent: string;
   streamingThinking: string;
   streamingModel: ModelId | null;
+  streamError: string | null;
 
   // UI
   mode: LLMMode;
@@ -48,6 +49,7 @@ interface ChatState {
   loadMessages: (conversationId: string) => Promise<void>;
   sendMessage: (content: string, images?: string[]) => Promise<void>;
 
+  deposit: (amount?: number) => Promise<void>;
   setMode: (mode: LLMMode) => void;
   toggleSidebar: () => void;
 }
@@ -65,6 +67,7 @@ export const useChatStore = create<ChatState>()(
       streamingContent: '',
       streamingThinking: '',
       streamingModel: null,
+      streamError: null,
       mode: 'auto',
       sidebarOpen: false,
 
@@ -147,6 +150,7 @@ export const useChatStore = create<ChatState>()(
           token_cost_usd: 0,
           created_at: new Date().toISOString(),
           deleted_at: null,
+          images,
         };
 
         set({
@@ -155,6 +159,7 @@ export const useChatStore = create<ChatState>()(
           streamingContent: '',
           streamingThinking: '',
           streamingModel: null,
+          streamError: null,
         });
 
         try {
@@ -171,9 +176,18 @@ export const useChatStore = create<ChatState>()(
               case 'chunk':
                 set((s) => ({ streamingContent: s.streamingContent + (chunk.content as string) }));
                 break;
-              case 'usage':
-                // Update session balance (Phase 2 will handle this properly)
+              case 'usage': {
+                const bal = chunk.balance as { balance_usd: number; free_tokens_remaining: number } | undefined;
+                if (bal) {
+                  set((s) => ({
+                    session: s.session ? {
+                      ...s.session,
+                      balance: { balance_usd: bal.balance_usd, free_tokens_remaining: bal.free_tokens_remaining },
+                    } : s.session,
+                  }));
+                }
                 break;
+              }
               case 'done':
                 break;
               case 'error':
@@ -182,11 +196,12 @@ export const useChatStore = create<ChatState>()(
             }
           }
 
-          // Reload messages from server to get proper IDs
+          // Reload messages from server to get proper IDs (images are persisted in DB)
           await get().loadMessages(activeConversationId);
           await get().loadConversations();
         } catch (err) {
           console.error('[Chat] Send error:', err);
+          set({ streamError: err instanceof Error ? err.message : 'Failed to send message' });
         } finally {
           set({
             isStreaming: false,
@@ -195,6 +210,17 @@ export const useChatStore = create<ChatState>()(
             streamingModel: null,
           });
         }
+      },
+
+      // Billing actions
+      deposit: async (amount?: number) => {
+        const result = await api.deposit(amount);
+        set((s) => ({
+          session: s.session ? {
+            ...s.session,
+            balance: result.balance,
+          } : s.session,
+        }));
       },
 
       // UI actions
