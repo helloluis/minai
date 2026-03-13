@@ -6,6 +6,13 @@ Minai will take advantage of MiniPay's distribution via the Opera browser and us
 
 Customers can deposit stablecoins ($0.10 minimum) which will be added to their balance on the app. This balance will be shown on the interface as they are chatting with Minai.
 
+The key innovation here is a fast-classifier step after receiving the user's prompt. Each user message is initially classified as "simple" or "balanced" or "deep" and passed to the appropriate LLM, i.e.:
+simple = Qwen 3.5 Flash
+balanced = Qwen 3.5 Plus (enabled_thinking=false)
+deep = Qwen 3.5 Plus (enabled_thinking=true)
+
+The classifier should be Qwen 3.5 Flash. We will ask it to look at a given user-prompt, and return as structured-output one of the 3 possible classifications above. We will record the classification in the placeholder record for the rest of the response, then we will fire off the prompt again to the LLM.
+
 The chat interface will be inspired by @helloluis' work on https://github.com/helloluis/beaniebot, which is a mobile responsive personal AI assistant app. It uses multiple LLMs (Qwen 3.5 Flash, Qwen 3.5 Plus, Minimax 2.5) via different providers (Alibaba Cloud, Fireworks) to achieve the highest uptime possible and most efficient token usage possible. (Beaniebot is available on this local env in a folder alongside this current one that we're in.)
 
 For this demo version, we will start with a landing page that says "Login via MiniPay". Clicking that will just create a unique user session so you can start chatting immediately. We'll eventually replace it with a proper MiniPay login workflow, but for now it will just create a unique session every time. This will eventually be replaced by a full user sign-in flow.

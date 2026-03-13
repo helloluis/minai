@@ -262,20 +262,29 @@ async function marketPrice(args: { symbol: string }): Promise<string> {
 
     const price = meta.regularMarketPrice;
     const prevClose = meta.previousClose;
-    const change = price - prevClose;
-    const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+    if (price == null) {
+      return `No current price available for "${symbol}".`;
+    }
+
     const name = meta.longName || meta.shortName || symbol;
     const currency = meta.currency || 'USD';
-
+    const prefix = currency === 'USD' ? '$' : currency + ' ';
     const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    return [
+    const lines = [
       `${name} (${meta.symbol})`,
-      `Price: ${currency === 'USD' ? '$' : currency + ' '}${fmt(price)}`,
-      `Change: ${change >= 0 ? '+' : ''}${fmt(change)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`,
-      `Previous Close: ${currency === 'USD' ? '$' : currency + ' '}${fmt(prevClose)}`,
-      `Exchange: ${meta.exchangeName}`,
-    ].join('\n');
+      `Price: ${prefix}${fmt(price)}`,
+    ];
+
+    if (prevClose != null && prevClose > 0) {
+      const change = price - prevClose;
+      const changePct = (change / prevClose) * 100;
+      lines.push(`Change: ${change >= 0 ? '+' : ''}${fmt(change)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`);
+      lines.push(`Previous Close: ${prefix}${fmt(prevClose)}`);
+    }
+
+    lines.push(`Exchange: ${meta.exchangeName}`);
+    return lines.join('\n');
   } catch (err) {
     console.error(`[Tools] market_price error for ${symbol}:`, err);
     return `Error fetching market data for ${symbol}. Please try again.`;

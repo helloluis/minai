@@ -6,7 +6,8 @@ interface ThinkingBlockProps {
 }
 
 export function ThinkingBlock({ content, isActive }: ThinkingBlockProps) {
-  if (!content) return null;
+  // When active but no content yet, show just the header as a "reasoning starting" indicator
+  if (!content && !isActive) return null;
 
   return (
     <div
@@ -31,20 +32,22 @@ export function ThinkingBlock({ content, isActive }: ThinkingBlockProps) {
         )}
       </div>
 
-      {/* Content */}
-      <div
-        className="px-3 py-2 max-h-32 overflow-y-auto text-gray-500 dark:text-gray-400 text-xs leading-relaxed"
-        style={{
-          maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
-        }}
-      >
-        {content.split('\n').map((line, i) => (
-          <p key={i} className="mb-1">
-            {line.length > 120 ? line.slice(0, 120) + '…' : line}
-          </p>
-        ))}
-      </div>
+      {/* Content — only rendered when there is content */}
+      {content && (
+        <div
+          className="px-3 py-2 max-h-32 overflow-y-auto text-gray-500 dark:text-gray-400 text-xs leading-relaxed"
+          style={{
+            maskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent 100%)',
+          }}
+        >
+          {content.split('\n').map((line, i) => (
+            <p key={i} className="mb-1">
+              {line.length > 120 ? line.slice(0, 120) + '…' : line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

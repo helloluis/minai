@@ -2,7 +2,7 @@
  * LLM Router — handles Auto/Fast/Deep mode routing with tool-use loop
  */
 
-import type { LLMMode, ModelId, StreamChunk, TokenUsage } from '@minai/shared';
+import type { LLMMode, LLMClassification, ModelId, StreamChunk, TokenUsage } from '@minai/shared';
 import type { ProviderMessage, ProviderStreamChunk, ToolDefinition, ToolCallInfo } from './providers/types.js';
 import { DashScopeProvider } from './providers/dashscope.js';
 import { SYSTEM_PROMPT, AUTO_CLASSIFIER_PROMPT } from '../config/system-prompt.js';
@@ -34,11 +34,11 @@ function getProviderTools(): ToolDefinition[] {
 }
 
 /**
- * Classify whether a prompt needs the deep model or can be handled by the fast model.
+ * Classify a prompt into simple / balanced / deep to select the right model and thinking mode.
  */
-async function classifyPrompt(userMessage: string): Promise<'simple' | 'complex'> {
+async function classifyPrompt(userMessage: string): Promise<{ classification: 'simple' | 'balanced' | 'deep'; usage: TokenUsage | null }> {
   try {
-    const { content } = await provider.complete(
+    const { content, usage } = await provider.complete(
       [
         { role: 'system', content: AUTO_CLASSIFIER_PROMPT },
         { role: 'user', content: userMessage },
@@ -46,11 +46,12 @@ async function classifyPrompt(userMessage: string): Promise<'simple' | 'complex'
       MODEL_FAST,
       16
     );
-    const classification = content.trim().toLowerCase();
-    return classification === 'complex' ? 'complex' : 'simple';
+    const raw = content.trim().toLowerCase();
+    const classification = raw === 'deep' ? 'deep' : raw === 'balanced' ? 'balanced' : 'simple';
+    return { classification, usage: usage ?? null };
   } catch (err) {
-    console.error('[Router] Classification failed, defaulting to fast:', err);
-    return 'simple';
+    console.error('[Router] Classification failed, defaulting to simple:', err);
+    return { classification: 'simple', usage: null };
   }
 }
 
@@ -173,30 +174,54 @@ export async function* streamResponse(
   messageId: string,
   images?: string[]
 ): AsyncGenerator<StreamChunk> {
-  // Determine model
+  // Determine model and thinking mode
   let model: ModelId;
+  let enableThinking: boolean;
+  let classification: LLMClassification;
+  let classifierUsage: TokenUsage | null = null;
   if (mode === 'fast') {
     model = MODEL_FAST;
+    enableThinking = false;
+    classification = 'simple';
+  } else if (mode === 'balanced') {
+    model = MODEL_DEEP;
+    enableThinking = false;
+    classification = 'balanced';
   } else if (mode === 'deep') {
     model = MODEL_DEEP;
+    enableThinking = true;
+    classification = 'deep';
   } else {
-    // Auto mode: classify first
-    const classification = await classifyPrompt(userMessage);
-    model = classification === 'complex' ? MODEL_DEEP : MODEL_FAST;
-    console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}`);
+    // Auto mode: 3-way classify → simple / balanced / deep
+    const result = await classifyPrompt(userMessage);
+    classifierUsage = result.usage;
+    classification = result.classification;
+    if (classification === 'deep') {
+      model = MODEL_DEEP;
+      enableThinking = true;
+    } else if (classification === 'balanced') {
+      model = MODEL_DEEP;
+      enableThinking = false;
+    } else {
+      model = MODEL_FAST;
+      enableThinking = false;
+    }
+    console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
   }
 
-  // Emit start event
+  // Emit start event with classification so the client can show the right placeholder
   yield {
     type: 'start',
     messageId,
     model,
+    classification,
   };
 
   // Force deep model for images (only Qwen Plus supports multimodal)
   if (images && images.length > 0 && model !== MODEL_DEEP) {
     console.log(`[Router] Overriding model to ${MODEL_DEEP} for image input`);
     model = MODEL_DEEP;
+    enableThinking = false;
   }
 
   // Build messages
@@ -207,9 +232,8 @@ export async function* streamResponse(
   }
 
   // Stream with tool-use loop
-  const enableThinking = model === MODEL_DEEP;
   const tools = getProviderTools();
-  let totalUsage: TokenUsage | null = null;
+  let totalUsage: TokenUsage | null = classifierUsage ? { ...classifierUsage } : null;
   let iterations = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {

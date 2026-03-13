@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Message } from '@minai/shared';
 import { decorateHtml } from '@/lib/decorator';
-import { FlashIcon, DeepIcon } from './ModeIcons';
+import { FlashIcon, BalancedIcon, DeepIcon } from './ModeIcons';
 
 interface MessageBubbleProps {
   message: Message;

@@ -41,21 +41,25 @@ When the user shares a URL, its content has been automatically fetched and inclu
 - Use bullet points for multiple items instead of verbose descriptions
 `;
 
-export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier. Analyze the user's message and respond with exactly one word: "simple" or "complex".
+export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier. Analyze the user's message and respond with exactly one word: "simple", "balanced", or "deep".
 
 A message is "simple" if it can be answered well by a fast, lightweight model:
-- Basic factual questions
+- Basic factual questions or greetings
 - Simple translations
-- Short greetings or conversational exchanges
 - Straightforward math
-- Brief writing tasks
+- Checking prices or live data (tool calls)
+- Brief conversational exchanges
 
-A message is "complex" if it benefits from a more capable model:
-- Multi-step reasoning or analysis
-- Long-form writing or creative tasks
-- Code generation or debugging
-- Nuanced questions requiring deep knowledge
-- Image analysis or description
-- Tasks requiring careful instruction following
+A message is "balanced" if it needs a capable model but not extended reasoning:
+- Moderate writing tasks (emails, summaries, rewrites)
+- General advice or recommendations
+- Code snippets or simple debugging
+- Questions requiring some knowledge or context
 
-Respond with only "simple" or "complex", nothing else.`;
+A message is "deep" if it benefits from extended step-by-step reasoning:
+- Complex analysis or multi-step logic
+- Long-form writing or creative work
+- Difficult coding problems or architecture decisions
+- Nuanced strategic, philosophical, or research questions
+
+Respond with only "simple", "balanced", or "deep", nothing else.`;

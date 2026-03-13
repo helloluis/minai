@@ -3,12 +3,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { LLMMode } from '@minai/shared';
 import { useChatStore } from '@/hooks/useChatStore';
-import { FlashIcon, DeepIcon, AutoIcon } from './ModeIcons';
+import { FlashIcon, BalancedIcon, DeepIcon, AutoIcon } from './ModeIcons';
 
 const MODES: { value: LLMMode; label: string; description: string; icon: React.ComponentType<{ size?: number }> }[] = [
   { value: 'auto', label: 'Auto', description: 'Automatically chooses the best model', icon: AutoIcon },
   { value: 'fast', label: 'Fast', description: 'Qwen Flash — quick and cheap', icon: FlashIcon },
-  { value: 'deep', label: 'Deep', description: 'Qwen Plus — thorough reasoning', icon: DeepIcon },
+  { value: 'balanced', label: 'Balanced', description: 'Qwen Plus — capable, no deep reasoning', icon: BalancedIcon },
+  { value: 'deep', label: 'Deep', description: 'Qwen Plus — extended reasoning', icon: DeepIcon },
 ];
 
 const MAX_HISTORY = 10;

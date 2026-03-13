@@ -16,7 +16,7 @@ module.exports = {
       name: 'minai-web',
       cwd: './apps/web',
       script: 'node_modules/.bin/next',
-      args: 'start -p 3004',
+      args: 'start -p 3007',
       interpreter: 'none',
       env: {
         NODE_ENV: 'production',

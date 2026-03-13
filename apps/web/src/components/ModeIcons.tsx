@@ -6,6 +6,15 @@ export function FlashIcon({ size = 10 }: { size?: number }) {
   );
 }
 
+export function BalancedIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className="inline-block">
+      <path d="M8 1.5L14.5 8L8 14.5L1.5 8Z" fill="#38bdf8" stroke="#38bdf8" strokeWidth="0.5" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="2" fill="#0ea5e9" />
+    </svg>
+  );
+}
+
 export function DeepIcon({ size = 10 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className="inline-block">
