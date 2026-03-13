@@ -70,8 +70,8 @@ export default function ChatPage() {
         <div className="max-w-3xl mx-auto px-4 py-4">
           {!hasMessages && !isStreaming && <WelcomeMessage />}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+          {messages.map((msg, i) => (
+            <MessageBubble key={msg.id} message={msg} prevMessage={i > 0 ? messages[i - 1] : undefined} />
           ))}
 
           {/* Streaming assistant response */}

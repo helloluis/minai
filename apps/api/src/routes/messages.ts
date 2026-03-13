@@ -56,6 +56,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
       }, 5000);
 
       let fullContent = '';
+      let usedModel: string | null = null;
 
       try {
         for await (const chunk of streamResponse(
@@ -66,6 +67,11 @@ export async function messageRoutes(fastify: FastifyInstance) {
           assistantMsg.id,
           images
         )) {
+          // Capture model from start event
+          if (chunk.type === 'start' && chunk.model) {
+            usedModel = chunk.model;
+          }
+
           // Accumulate content for storage
           if (chunk.type === 'chunk' && chunk.content) {
             fullContent += chunk.content;
@@ -74,11 +80,11 @@ export async function messageRoutes(fastify: FastifyInstance) {
           reply.raw.write(`event: ${chunk.type}\ndata: ${JSON.stringify(chunk)}\n\n`);
         }
 
-        // Update the assistant message with full content
+        // Update the assistant message with full content, model, and actual timestamp
         if (fullContent) {
           await db.pool.query(
-            'UPDATE messages SET content = $2 WHERE id = $1',
-            [assistantMsg.id, fullContent]
+            'UPDATE messages SET content = $2, created_at = NOW(), model = $3 WHERE id = $1',
+            [assistantMsg.id, fullContent, usedModel]
           );
         }
 

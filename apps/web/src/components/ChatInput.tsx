@@ -3,11 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { LLMMode } from '@minai/shared';
 import { useChatStore } from '@/hooks/useChatStore';
+import { FlashIcon, DeepIcon, AutoIcon } from './ModeIcons';
 
-const MODES: { value: LLMMode; label: string; description: string }[] = [
-  { value: 'auto', label: 'Auto', description: 'Automatically chooses the best model' },
-  { value: 'fast', label: 'Fast', description: 'Qwen Flash — quick and cheap' },
-  { value: 'deep', label: 'Deep', description: 'Qwen Plus — thorough reasoning' },
+const MODES: { value: LLMMode; label: string; description: string; icon: React.ComponentType<{ size?: number }> }[] = [
+  { value: 'auto', label: 'Auto', description: 'Automatically chooses the best model', icon: AutoIcon },
+  { value: 'fast', label: 'Fast', description: 'Qwen Flash — quick and cheap', icon: FlashIcon },
+  { value: 'deep', label: 'Deep', description: 'Qwen Plus — thorough reasoning', icon: DeepIcon },
 ];
 
 const MAX_HISTORY = 10;
@@ -182,12 +183,13 @@ export function ChatInput() {
             key={m.value}
             onClick={() => setMode(m.value)}
             title={m.description}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors
+            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors flex items-center gap-1
               ${mode === m.value
                 ? 'bg-minai-100 text-minai-700 dark:bg-minai-900/40 dark:text-minai-400'
                 : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
           >
+            <m.icon size={12} />
             {m.label}
           </button>
         ))}

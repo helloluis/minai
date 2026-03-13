@@ -77,7 +77,53 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['topic'],
     },
   },
+  {
+    name: 'url_fetch',
+    description: 'Fetch and read the text content of a web page URL. Use this when the user shares a link or asks about a specific webpage.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The full URL to fetch (e.g., "https://example.com/page")',
+        },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'market_price',
+    description: 'Get the current price of any stock, ETF, index, commodity, or forex pair using Yahoo Finance symbols. Examples: AAPL, MSFT, TSLA, GOOGL, ^GSPC (S&P 500), ^DJI (Dow Jones), ^IXIC (Nasdaq), GC=F (gold), SI=F (silver), CL=F (WTI crude oil), BZ=F (Brent crude), EURUSD=X (EUR/USD forex). Use this for any non-crypto financial market data.',
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: {
+          type: 'string',
+          description: 'Yahoo Finance symbol (e.g., AAPL, ^GSPC, GC=F, BZ=F, EURUSD=X)',
+        },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'news_search',
+    description: 'Search Google News for recent news articles on any topic. Returns headlines, sources, and publication dates. Use this when the user asks about current events, recent news, or wants to know what is happening with a topic.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The news search query (e.g., "Kenya elections", "Bitcoin regulation", "AI developments")',
+        },
+      },
+      required: ['query'],
+    },
+  },
 ];
+
+// ─── Binance API Endpoints ───
+const SPOT_ENDPOINT = 'https://data-api.binance.vision/api/v3';
+const FUTURES_ENDPOINT = 'https://fapi.binance.com/fapi';
 
 // ─── Tool Executors ───
 
@@ -86,21 +132,28 @@ async function cryptoPrice(args: { symbol: string }): Promise<string> {
   const pair = `${symbol}USDT`;
 
   try {
-    const response = await fetch(
-      `https://data-api.binance.vision/api/v3/ticker/price?symbol=${pair}`
-    );
+    // Try spot market first
+    let response = await fetch(`${SPOT_ENDPOINT}/ticker/price?symbol=${pair}`);
+    let source = 'spot';
+
+    // Fallback to futures if not on spot
+    if (!response.ok) {
+      response = await fetch(`${FUTURES_ENDPOINT}/v2/ticker/price?symbol=${pair}`);
+      source = 'futures';
+    }
 
     if (!response.ok) {
-      return `Could not find price for ${symbol}. It may not be listed on Binance.`;
+      return `Could not find price for ${symbol}. It may not be listed on Binance spot or futures.`;
     }
 
     const data = (await response.json()) as { symbol: string; price: string };
     const price = parseFloat(data.price);
 
-    // Also get 24h change
-    const changeRes = await fetch(
-      `https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${pair}`
-    );
+    // Get 24h change from the same market
+    const changeUrl = source === 'spot'
+      ? `${SPOT_ENDPOINT}/ticker/24hr?symbol=${pair}`
+      : `${FUTURES_ENDPOINT}/v1/ticker/24hr?symbol=${pair}`;
+    const changeRes = await fetch(changeUrl);
 
     if (changeRes.ok) {
       const changeData = (await changeRes.json()) as {
@@ -132,12 +185,19 @@ async function cryptoHistory(args: { symbol: string; days?: number }): Promise<s
   const days = Math.min(args.days ?? 7, 30);
 
   try {
-    const response = await fetch(
-      `https://data-api.binance.vision/api/v3/klines?symbol=${pair}&interval=1d&limit=${days}`
+    // Try spot market first, fallback to futures
+    let response = await fetch(
+      `${SPOT_ENDPOINT}/klines?symbol=${pair}&interval=1d&limit=${days}`
     );
 
     if (!response.ok) {
-      return `Could not find history for ${symbol}. It may not be listed on Binance.`;
+      response = await fetch(
+        `${FUTURES_ENDPOINT}/v1/klines?symbol=${pair}&interval=1d&limit=${days}`
+      );
+    }
+
+    if (!response.ok) {
+      return `Could not find history for ${symbol}. It may not be listed on Binance spot or futures.`;
     }
 
     const data = (await response.json()) as Array<[number, string, string, string, string, ...unknown[]]>;
@@ -162,6 +222,123 @@ async function cryptoHistory(args: { symbol: string; days?: number }): Promise<s
   } catch (err) {
     console.error(`[Tools] crypto_history error for ${symbol}:`, err);
     return `Error fetching history for ${symbol}. Please try again.`;
+  }
+}
+
+async function marketPrice(args: { symbol: string }): Promise<string> {
+  const symbol = args.symbol.toUpperCase();
+
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
+      { headers: { 'User-Agent': 'Minai/1.0' } }
+    );
+
+    if (!response.ok) {
+      return `Could not find market data for "${symbol}". Check the symbol and try again.`;
+    }
+
+    const data = (await response.json()) as {
+      chart: {
+        result: Array<{
+          meta: {
+            symbol: string;
+            shortName?: string;
+            longName?: string;
+            regularMarketPrice: number;
+            previousClose: number;
+            currency: string;
+            exchangeName: string;
+            regularMarketTime: number;
+          };
+        }>;
+      };
+    };
+
+    const meta = data.chart?.result?.[0]?.meta;
+    if (!meta) {
+      return `No data available for "${symbol}".`;
+    }
+
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.previousClose;
+    const change = price - prevClose;
+    const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+    const name = meta.longName || meta.shortName || symbol;
+    const currency = meta.currency || 'USD';
+
+    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    return [
+      `${name} (${meta.symbol})`,
+      `Price: ${currency === 'USD' ? '$' : currency + ' '}${fmt(price)}`,
+      `Change: ${change >= 0 ? '+' : ''}${fmt(change)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`,
+      `Previous Close: ${currency === 'USD' ? '$' : currency + ' '}${fmt(prevClose)}`,
+      `Exchange: ${meta.exchangeName}`,
+    ].join('\n');
+  } catch (err) {
+    console.error(`[Tools] market_price error for ${symbol}:`, err);
+    return `Error fetching market data for ${symbol}. Please try again.`;
+  }
+}
+
+async function newsSearch(args: { query: string }): Promise<string> {
+  try {
+    const params = new URLSearchParams({
+      q: args.query,
+      hl: 'en-US',
+      gl: 'US',
+      ceid: 'US:en',
+    });
+    const response = await fetch(
+      `https://news.google.com/rss/search?${params}`,
+      {
+        headers: { 'User-Agent': 'Minai/1.0' },
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    if (!response.ok) {
+      return `Could not search news for "${args.query}".`;
+    }
+
+    const xml = await response.text();
+
+    // Parse RSS items with simple regex (no XML library needed)
+    const items: { title: string; pubDate: string; source: string }[] = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+
+    while ((match = itemRegex.exec(xml)) !== null && items.length < 8) {
+      const itemXml = match[1];
+      const title = itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '';
+      const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || '';
+
+      // Google News title format: "Headline - Source"
+      const dashIdx = title.lastIndexOf(' - ');
+      const headline = dashIdx > 0 ? title.slice(0, dashIdx) : title;
+      const source = dashIdx > 0 ? title.slice(dashIdx + 3) : 'Unknown';
+
+      // Format date
+      let dateStr = '';
+      if (pubDate) {
+        const d = new Date(pubDate);
+        dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      items.push({ title: headline, pubDate: dateStr, source });
+    }
+
+    if (items.length === 0) {
+      return `No recent news found for "${args.query}".`;
+    }
+
+    return items
+      .map((item, i) => `${i + 1}. ${item.title}\n   Source: ${item.source}${item.pubDate ? ` — ${item.pubDate}` : ''}`)
+      .join('\n\n');
+  } catch (err) {
+    console.error('[Tools] news_search error:', err);
+    return `Error searching news. Please try again.`;
   }
 }
 
@@ -301,6 +478,12 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
       break;
     case 'url_fetch':
       content = await urlFetch(args as { url: string });
+      break;
+    case 'market_price':
+      content = await marketPrice(args as { symbol: string });
+      break;
+    case 'news_search':
+      content = await newsSearch(args as { query: string });
       break;
     default:
       content = `Unknown tool: ${name}`;
