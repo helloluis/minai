@@ -265,7 +265,9 @@ export function MessageBubble({ message, prevMessage, onDelete }: MessageBubbleP
               </span>
             )}
             {message.output_tokens > 0 && (
-              <span>{message.output_tokens} tokens</span>
+              <span title={`${message.input_tokens} in · ${message.output_tokens} out`}>
+                {message.input_tokens + message.output_tokens} tokens
+              </span>
             )}
             {message.token_cost_usd > 0 && (
               <span>${Number(message.token_cost_usd).toFixed(4)}</span>
