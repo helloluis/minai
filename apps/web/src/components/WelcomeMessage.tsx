@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 const messages = [
   { text: 'Hello! How can I help you today?', lang: 'en' },
+  { text: 'Kamusta! Paano kita matutulungan?', lang: 'fil' },
   { text: 'Jambo! Ninaweza kukusaidia vipi leo?', lang: 'sw' },
 ];
 
@@ -40,7 +41,7 @@ export function WelcomeMessage() {
       </div>
 
       <p className="text-sm text-gray-400 mt-4">
-        English & Swahili supported
+        English · Filipino · Swahili
       </p>
     </div>
   );

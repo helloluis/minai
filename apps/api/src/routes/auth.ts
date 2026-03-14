@@ -32,7 +32,14 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/api/auth/me', async (request) => {
     const balance = await db.getBalance(request.user.id);
     return {
-      user: { id: request.user.id, created_at: request.user.created_at },
+      user: {
+        id: request.user.id,
+        created_at: request.user.created_at,
+        email: request.user.email ?? null,
+        display_name: request.user.display_name ?? null,
+        avatar_url: request.user.avatar_url ?? null,
+        google_id: request.user.google_id ?? null,
+      },
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
         free_tokens_remaining: balance?.free_tokens_remaining ?? 0,

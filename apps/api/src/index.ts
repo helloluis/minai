@@ -7,6 +7,9 @@ import { authPlugin } from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
 import { conversationRoutes } from './routes/conversations.js';
 import { messageRoutes } from './routes/messages.js';
+import { noteRoutes } from './routes/notes.js';
+import { settingsRoutes } from './routes/settings.js';
+import { googleAuthRoutes } from './routes/google-auth.js';
 
 const port = parseInt(process.env.API_PORT || '3001');
 
@@ -34,6 +37,9 @@ async function start() {
   await fastify.register(authRoutes);
   await fastify.register(conversationRoutes);
   await fastify.register(messageRoutes);
+  await fastify.register(noteRoutes);
+  await fastify.register(settingsRoutes);
+  await fastify.register(googleAuthRoutes);
 
   // Health check
   fastify.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

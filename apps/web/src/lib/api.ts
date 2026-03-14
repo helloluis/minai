@@ -87,6 +87,60 @@ export const submitFeedback = (
     { method: 'POST', body: JSON.stringify(data) }
   );
 
+// Notes
+export interface Note {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export const getNotes = (conversationId: string) =>
+  fetchAPI<Note[]>(`/api/conversations/${conversationId}/notes`);
+
+export const createNote = (conversationId: string, title?: string, content?: string) =>
+  fetchAPI<Note>(`/api/conversations/${conversationId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ title, content }),
+  });
+
+export const updateNote = (
+  conversationId: string,
+  noteId: string,
+  updates: { title?: string; content?: string; display_order?: number }
+) =>
+  fetchAPI<Note>(`/api/conversations/${conversationId}/notes/${noteId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+
+export const deleteNote = (conversationId: string, noteId: string) =>
+  fetchAPI<{ success: boolean }>(`/api/conversations/${conversationId}/notes/${noteId}`, {
+    method: 'DELETE',
+  });
+
+// Settings / Usage
+export interface DailyUsage {
+  date: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  message_count: number;
+}
+
+export interface UsageResponse {
+  daily: DailyUsage[];
+  totals: { total_input: number; total_output: number; total_cost: number };
+}
+
+export const getUsage = (days = 30) =>
+  fetchAPI<UsageResponse>(`/api/settings/usage?days=${days}`);
+
 // Streaming
 export function streamMessage(
   conversationId: string,

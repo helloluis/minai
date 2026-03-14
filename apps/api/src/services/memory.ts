@@ -56,12 +56,22 @@ async function doExtract(userId: string, userMessage: string): Promise<void> {
       { role: 'user', content: userMessage },
     ];
 
-    const { content } = await provider.complete(messages, MODEL, 128);
-    const trimmed = content.trim();
+    const { content } = await provider.complete(messages, MODEL, 256);
+    // Strip markdown code fences if present
+    const trimmed = content.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
     if (!trimmed || trimmed === '[]') return;
 
-    const memories = JSON.parse(trimmed) as Array<{ key: string; value: string }>;
+    // If the response is truncated, try to close the JSON array before parsing
+    let jsonStr = trimmed;
+    if (!jsonStr.endsWith(']')) {
+      // Remove trailing incomplete object and close the array
+      const lastComplete = jsonStr.lastIndexOf('},');
+      jsonStr = lastComplete > 0 ? jsonStr.slice(0, lastComplete + 1) + ']' : null!;
+    }
+    if (!jsonStr) return;
+
+    const memories = JSON.parse(jsonStr) as Array<{ key: string; value: string }>;
 
     for (const mem of memories) {
       if (mem.key && mem.value) {

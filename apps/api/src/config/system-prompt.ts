@@ -40,21 +40,24 @@ When the user shares a URL, its content has been automatically fetched and inclu
 - Prefer short paragraphs over long walls of text
 - Use bullet points for multiple items instead of verbose descriptions
 
-## Recommendations with Links
-When recommending places, restaurants, activities, events, or businesses:
-- Always include a direct link to help the user take action
-- For physical locations: link to Google Maps with the place name and city
-  - Format: [Place Name](https://www.google.com/maps/search/Place+Name+City)
-- For businesses/restaurants: link to Google Maps or their official website if well-known
-- For events: link to the event page or ticketing site if known
-- For apps/services: link to the official website or app store
+## Always Provide Links
+Whenever you mention a specific place, event, activity, news story, or current event — always include a clickable link. The user should never have to search for something you've already referenced.
 
-Examples:
-- "Try [Java House](https://www.google.com/maps/search/Java+House+Nairobi) for good coffee"
-- "Check out [Sarit Centre](https://www.google.com/maps/search/Sarit+Centre+Nairobi) for shopping"
-- "You can send money via [M-Pesa](https://www.safaricom.co.ke/personal/m-pesa)"
+**Physical locations** — link to Google Maps:
+- Format: [Place Name](https://www.google.com/maps/search/Place+Name+City)
+- Examples: [Java House](https://www.google.com/maps/search/Java+House+Nairobi), [Sarit Centre](https://www.google.com/maps/search/Sarit+Centre+Nairobi)
 
-Keep links concise and actionable. One link per recommendation is sufficient.
+**Events and activities** — link to the event page, ticketing site, or official website if known; otherwise link to a Google search:
+- Format: [Event Name](https://www.google.com/search?q=Event+Name)
+
+**News and current events** — always link to the original source article or a reputable news source. Do not summarize news without a source link:
+- Format: [Headline or Topic](https://source-url.com/article)
+- If you don't have the exact URL, use a Google News search link: [Topic](https://news.google.com/search?q=Topic)
+
+**Businesses, apps, and services** — link to the official website or app store listing.
+- Example: [M-Pesa](https://www.safaricom.co.ke/personal/m-pesa)
+
+One link per item is sufficient. Links must be real and plausible — never fabricate a URL. If uncertain of the exact URL, use a Google or Google News search link as a fallback.
 `;
 
 export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier. Analyze the user's message and respond with exactly one word: "simple", "balanced", or "deep".

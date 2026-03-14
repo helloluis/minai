@@ -57,7 +57,7 @@ export function BalanceBar() {
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+    <div className="relative flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
       {/* Left: Menu button */}
       <button
         onClick={toggleSidebar}
@@ -69,8 +69,8 @@ export function BalanceBar() {
         </svg>
       </button>
 
-      {/* Center: Brand */}
-      <span className="font-semibold text-minai-600">Minai</span>
+      {/* Center: Brand — absolutely centered so it's not affected by asymmetric sides */}
+      <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none">Minai</span>
 
       {/* Right: Pinned + Balance + Deposit */}
       <div className="flex items-center gap-2">

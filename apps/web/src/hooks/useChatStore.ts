@@ -36,7 +36,7 @@ interface ChatState {
 
   // UI
   mode: LLMMode;
-  sidebarOpen: boolean;
+  sidebarWidth: 'closed' | 'normal' | 'expanded';
 
   // Pinned Messages
   pinnedMessages: PinnedMessageWithDetails[];
@@ -59,6 +59,7 @@ interface ChatState {
   deposit: (amount?: number) => Promise<void>;
   setMode: (mode: LLMMode) => void;
   toggleSidebar: () => void;
+  setSidebarWidth: (width: 'closed' | 'normal' | 'expanded') => void;
 
   // Pinned messages actions
   loadPinnedMessages: () => Promise<void>;
@@ -82,7 +83,7 @@ export const useChatStore = create<ChatState>()(
       streamingClassification: null,
       streamError: null,
       mode: 'auto',
-      sidebarOpen: false,
+      sidebarWidth: 'closed' as const,
       pinnedMessages: [],
       pinnedMenuOpen: false,
 
@@ -242,7 +243,10 @@ export const useChatStore = create<ChatState>()(
 
       // UI actions
       setMode: (mode: LLMMode) => set({ mode }),
-      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+      toggleSidebar: () => set((s) => ({
+        sidebarWidth: s.sidebarWidth === 'closed' ? 'normal' : 'closed',
+      })),
+      setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
       // Pinned messages actions
       loadPinnedMessages: async () => {

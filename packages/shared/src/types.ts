@@ -14,6 +14,10 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 export interface User {
   id: string;
   session_token: string;
+  google_id: string | null;
+  email: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
   created_at: string;
   deleted_at: string | null;
 }
@@ -135,6 +139,6 @@ export interface ConversationListItem {
 }
 
 export interface SessionResponse {
-  user: Pick<User, 'id' | 'created_at'>;
+  user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id'>;
   balance: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
 }

@@ -48,6 +48,7 @@ export default function ChatPage() {
     activeConversationId,
     selectConversation,
     loadPinnedMessages,
+    sidebarWidth,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -129,8 +130,11 @@ export default function ChatPage() {
     return <StreamingPlaceholder label="Classifying" />;
   }
 
+  // On desktop, push content right when sidebar is open (w-72 = 288px)
+  const contentMargin = sidebarWidth !== 'closed' ? 'lg:pl-72' : '';
+
   return (
-    <div className="flex flex-col h-screen">
+    <div className={`flex flex-col h-screen transition-[padding] duration-200 ease-in-out ${contentMargin}`}>
       <BalanceBar />
       <Sidebar />
       <PinnedMessagesMenu />

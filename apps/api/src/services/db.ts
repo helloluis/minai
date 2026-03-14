@@ -41,7 +41,7 @@ export async function createBalance(userId: string): Promise<UserBalance> {
 
 export async function getBalance(userId: string): Promise<UserBalance | null> {
   const { rows } = await pool.query<UserBalance>(
-    `SELECT * FROM user_balances WHERE user_id = $1`,
+    `SELECT *, balance_usd::float AS balance_usd FROM user_balances WHERE user_id = $1`,
     [userId]
   );
   return rows[0] ?? null;
@@ -360,6 +360,179 @@ export async function createFeedback(
      RETURNING *`,
     [messageId, userId, feedbackText, originalPrompt, originalResponse]
   );
+  return rows[0];
+}
+
+// ─── Notes ───
+
+export interface Note {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export async function getNotes(conversationId: string, userId: string): Promise<Note[]> {
+  const { rows } = await pool.query<Note>(
+    `SELECT * FROM notes
+     WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL
+     ORDER BY display_order ASC, created_at ASC`,
+    [conversationId, userId]
+  );
+  return rows;
+}
+
+export async function createNote(
+  conversationId: string,
+  userId: string,
+  title = '',
+  content = ''
+): Promise<Note> {
+  const { rows: [{ next_order }] } = await pool.query<{ next_order: number }>(
+    `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+     FROM notes WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+    [conversationId, userId]
+  );
+  const { rows } = await pool.query<Note>(
+    `INSERT INTO notes (conversation_id, user_id, title, content, display_order)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [conversationId, userId, title, content, next_order]
+  );
+  return rows[0];
+}
+
+export async function updateNote(
+  id: string,
+  userId: string,
+  updates: { title?: string; content?: string; display_order?: number }
+): Promise<Note | null> {
+  const sets: string[] = ['updated_at = now()'];
+  const values: unknown[] = [id, userId];
+  let i = 3;
+  if (updates.title !== undefined)         { sets.push(`title = $${i++}`);         values.push(updates.title); }
+  if (updates.content !== undefined)       { sets.push(`content = $${i++}`);       values.push(updates.content); }
+  if (updates.display_order !== undefined) { sets.push(`display_order = $${i++}`); values.push(updates.display_order); }
+
+  const { rows } = await pool.query<Note>(
+    `UPDATE notes SET ${sets.join(', ')}
+     WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL RETURNING *`,
+    values
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteNote(id: string, userId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE notes SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+    [id, userId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+export async function findUserByGoogleId(googleId: string): Promise<User | null> {
+  const { rows } = await pool.query<User>(
+    `SELECT * FROM users WHERE google_id = $1 AND deleted_at IS NULL`,
+    [googleId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function linkGoogleAccount(
+  userId: string,
+  googleId: string,
+  email: string,
+  displayName: string,
+  avatarUrl: string
+): Promise<User> {
+  const { rows } = await pool.query<User>(
+    `UPDATE users SET google_id = $2, email = $3, display_name = $4, avatar_url = $5
+     WHERE id = $1 RETURNING *`,
+    [userId, googleId, email, displayName, avatarUrl]
+  );
+  return rows[0];
+}
+
+export interface GoogleTokens {
+  access_token: string;
+  refresh_token: string | null;
+  token_expiry: string | null;
+  scopes: string | null;
+}
+
+export async function saveGoogleTokens(
+  userId: string,
+  accessToken: string,
+  refreshToken: string | null,
+  tokenExpiry: Date | null,
+  scopes: string | null
+): Promise<void> {
+  await pool.query(`
+    INSERT INTO google_tokens (user_id, access_token, refresh_token, token_expiry, scopes, updated_at)
+    VALUES ($1, $2, $3, $4, $5, now())
+    ON CONFLICT (user_id) DO UPDATE SET
+      access_token = EXCLUDED.access_token,
+      refresh_token = COALESCE(EXCLUDED.refresh_token, google_tokens.refresh_token),
+      token_expiry = EXCLUDED.token_expiry,
+      scopes = EXCLUDED.scopes,
+      updated_at = now()
+  `, [userId, accessToken, refreshToken, tokenExpiry, scopes]);
+}
+
+export async function getGoogleTokens(userId: string): Promise<GoogleTokens | null> {
+  const { rows } = await pool.query<GoogleTokens>(
+    `SELECT access_token, refresh_token, token_expiry, scopes FROM google_tokens WHERE user_id = $1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+// ─── Token usage ──────────────────────────────────────────────────────────────
+
+export interface DailyUsage {
+  date: string; // YYYY-MM-DD
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  message_count: number;
+}
+
+export async function getTokenUsageByDay(userId: string, days = 30): Promise<DailyUsage[]> {
+  const { rows } = await pool.query<DailyUsage>(`
+    SELECT
+      DATE(m.created_at)::text AS date,
+      SUM(m.input_tokens)::int AS input_tokens,
+      SUM(m.output_tokens)::int AS output_tokens,
+      SUM(m.token_cost_usd)::float AS cost_usd,
+      COUNT(*)::int AS message_count
+    FROM messages m
+    JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.user_id = $1
+      AND m.role = 'assistant'
+      AND m.deleted_at IS NULL
+      AND m.created_at >= NOW() - INTERVAL '1 day' * $2
+    GROUP BY DATE(m.created_at)
+    ORDER BY date ASC
+  `, [userId, days]);
+  return rows;
+}
+
+export async function getTotalUsage(userId: string): Promise<{ total_input: number; total_output: number; total_cost: number }> {
+  const { rows } = await pool.query(`
+    SELECT
+      COALESCE(SUM(m.input_tokens), 0)::int AS total_input,
+      COALESCE(SUM(m.output_tokens), 0)::int AS total_output,
+      COALESCE(SUM(m.token_cost_usd), 0)::float AS total_cost
+    FROM messages m
+    JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.user_id = $1 AND m.role = 'assistant' AND m.deleted_at IS NULL
+  `, [userId]);
   return rows[0];
 }
 

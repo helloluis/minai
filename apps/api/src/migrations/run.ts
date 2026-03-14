@@ -20,7 +20,14 @@ async function migrate() {
       )
     `);
 
-    const migrations = ['001_initial.sql', '002_user_memory_unique.sql', '003_message_images.sql'];
+    const migrations = [
+      '001_initial.sql',
+      '002_user_memory_unique.sql',
+      '003_message_images.sql',
+      '004_message_feedback.sql',
+      '005_notebooks_notes.sql',
+      '006_google_auth.sql',
+    ];
 
     for (const migration of migrations) {
       const { rows } = await client.query(

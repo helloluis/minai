@@ -19,6 +19,12 @@ const MODEL_FAST: ModelId = 'qwen3.5-flash';
 const MODEL_DEEP: ModelId = 'qwen3.5-plus';
 const MAX_TOOL_ITERATIONS = 10;
 
+// Classifier config — switch via env vars
+const CLASSIFIER_PROVIDER = process.env.CLASSIFIER_PROVIDER ?? 'dashscope'; // 'dashscope' | 'ollama'
+const CLASSIFIER_COMPARE = process.env.CLASSIFIER_COMPARE === 'true';        // run both, log disagreements
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen3.5:0.8B';
+
 /**
  * Convert our tool definitions to OpenAI-compatible format for the provider.
  */
@@ -33,10 +39,16 @@ function getProviderTools(): ToolDefinition[] {
   }));
 }
 
-/**
- * Classify a prompt into simple / balanced / deep to select the right model and thinking mode.
- */
-async function classifyPrompt(userMessage: string): Promise<{ classification: 'simple' | 'balanced' | 'deep'; usage: TokenUsage | null }> {
+type ClassifyResult = { classification: 'simple' | 'balanced' | 'deep'; usage: TokenUsage | null };
+
+function parseClassification(raw: string): 'simple' | 'balanced' | 'deep' {
+  const s = raw.trim().toLowerCase();
+  return s === 'deep' ? 'deep' : s === 'balanced' ? 'balanced' : 'simple';
+}
+
+/** Classify via DashScope (qwen3.5-flash) */
+async function classifyWithDashscope(userMessage: string): Promise<ClassifyResult & { latencyMs: number }> {
+  const t0 = Date.now();
   try {
     const { content, usage } = await provider.complete(
       [
@@ -46,13 +58,83 @@ async function classifyPrompt(userMessage: string): Promise<{ classification: 's
       MODEL_FAST,
       16
     );
-    const raw = content.trim().toLowerCase();
-    const classification = raw === 'deep' ? 'deep' : raw === 'balanced' ? 'balanced' : 'simple';
-    return { classification, usage: usage ?? null };
+    const latencyMs = Date.now() - t0;
+    return { classification: parseClassification(content), usage: usage ?? null, latencyMs };
   } catch (err) {
-    console.error('[Router] Classification failed, defaulting to simple:', err);
-    return { classification: 'simple', usage: null };
+    const latencyMs = Date.now() - t0;
+    console.error('[Router:dashscope] Classification failed:', err);
+    return { classification: 'simple', usage: null, latencyMs };
   }
+}
+
+/** Classify via local Ollama */
+async function classifyWithOllama(userMessage: string): Promise<ClassifyResult & { latencyMs: number }> {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: [
+          { role: 'system', content: AUTO_CLASSIFIER_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        max_tokens: 16,
+        temperature: 0,
+        stream: false,
+      }),
+    });
+    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const content = data.choices?.[0]?.message?.content ?? '';
+    const latencyMs = Date.now() - t0;
+    return { classification: parseClassification(content), usage: null, latencyMs };
+  } catch (err) {
+    const latencyMs = Date.now() - t0;
+    console.error('[Router:ollama] Classification failed, falling back to dashscope:', err);
+    // Fall back to dashscope on Ollama error
+    const fallback = await classifyWithDashscope(userMessage);
+    return { ...fallback, latencyMs: latencyMs + fallback.latencyMs };
+  }
+}
+
+/**
+ * Classify a prompt into simple / balanced / deep.
+ * Uses CLASSIFIER_PROVIDER env var to select the backend.
+ * If CLASSIFIER_COMPARE=true, runs both in parallel and logs disagreements.
+ */
+async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
+  const preview = userMessage.slice(0, 60).replace(/\n/g, ' ');
+
+  if (CLASSIFIER_COMPARE) {
+    // Run both in parallel — use the configured provider's result, log any disagreement
+    const [primary, secondary] = CLASSIFIER_PROVIDER === 'ollama'
+      ? await Promise.all([classifyWithOllama(userMessage), classifyWithDashscope(userMessage)])
+      : await Promise.all([classifyWithDashscope(userMessage), classifyWithOllama(userMessage)]);
+
+    const agree = primary.classification === secondary.classification;
+    const primaryName = CLASSIFIER_PROVIDER === 'ollama' ? 'ollama' : 'dashscope';
+    const secondaryName = CLASSIFIER_PROVIDER === 'ollama' ? 'dashscope' : 'ollama';
+
+    console.log(
+      `[Classifier] "${preview}" → ${primary.classification} (${primaryName} ${primary.latencyMs}ms) | ` +
+      `${secondary.classification} (${secondaryName} ${secondary.latencyMs}ms) | ${agree ? '✓ agree' : '⚠ DISAGREE'}`
+    );
+
+    return { classification: primary.classification, usage: primary.usage };
+  }
+
+  // Single provider
+  if (CLASSIFIER_PROVIDER === 'ollama') {
+    const result = await classifyWithOllama(userMessage);
+    console.log(`[Classifier:ollama] "${preview}" → ${result.classification} (${result.latencyMs}ms)`);
+    return { classification: result.classification, usage: result.usage };
+  }
+
+  const result = await classifyWithDashscope(userMessage);
+  console.log(`[Classifier:dashscope] "${preview}" → ${result.classification} (${result.latencyMs}ms)`);
+  return { classification: result.classification, usage: result.usage };
 }
 
 /**
