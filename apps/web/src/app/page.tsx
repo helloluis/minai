@@ -51,15 +51,29 @@ export default function LandingPage() {
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-minai-600 mb-2">Minai</h1>
           <p className="text-gray-500 dark:text-gray-400 text-lg">
-            Frontier AI for everyone
+            An Assistant for Assistants
           </p>
         </div>
 
-        {/* Description */}
-        <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
-          Pay-as-you-go, fractional pricing. Up to 95% cheaper than
-          other frontier models. Top up with as little as $0.10.
-        </p>
+        {/* Feature bullets */}
+        <ul className="text-gray-600 dark:text-gray-300 mb-8 text-left space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-minai-500 mt-0.5">•</span>
+            <span>Pay-as-you-go, no subscription fees, top-up with as little as $0.10</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-minai-500 mt-0.5">•</span>
+            <span>Multimodal frontier-grade AI at 1/10th of the price</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-minai-500 mt-0.5">•</span>
+            <span>Calendar, PDFs, Image generation, and other common tools</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-minai-500 mt-0.5">•</span>
+            <span>Build with us ❤️ Earn tokens when you suggest a great feature</span>
+          </li>
+        </ul>
 
         {/* Login Button */}
         <button
