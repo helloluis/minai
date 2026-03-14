@@ -96,7 +96,7 @@ function NotebookRow({
         className={`flex items-center gap-1.5 px-3 py-2.5 cursor-pointer group transition-colors
           ${isActive
             ? 'bg-minai-600 dark:bg-minai-600'
-            : 'hover:bg-gray-50 dark:hover:bg-gray-900'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
           }`}
       >
         <span className={`flex-shrink-0 cursor-grab active:cursor-grabbing leading-none px-0.5 text-base
