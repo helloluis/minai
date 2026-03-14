@@ -4,7 +4,8 @@ export const FREE_TOKENS_INITIAL = 10_000;
 
 // ─── Models ───
 
-export type LLMMode = 'auto' | 'fast' | 'deep';
+export type LLMMode = 'auto' | 'fast' | 'balanced' | 'deep';
+export type LLMClassification = 'simple' | 'balanced' | 'deep';
 export type ModelId = 'qwen3.5-flash' | 'qwen3.5-plus';
 export type MessageRole = 'user' | 'assistant' | 'system';
 
@@ -102,6 +103,7 @@ export interface StreamChunk {
   content?: string;
   messageId?: string;
   model?: ModelId;
+  classification?: LLMClassification;
   usage?: TokenUsage;
   balance?: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
   error?: string;

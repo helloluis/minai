@@ -11,7 +11,7 @@ import * as db from './db.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
-const KEEP_RECENT = 8; // Keep this many recent messages uncompacted
+const KEEP_RECENT = 6; // Keep this many recent messages uncompacted
 const MODEL = 'qwen3.5-flash'; // Use cheapest model for summarization
 
 const COMPACTION_PROMPT = `You are a conversation summarizer. Given a sequence of messages from a conversation, produce a brief summary that captures:
@@ -47,7 +47,7 @@ async function compactConversation(conversationId: string): Promise<void> {
   const alreadyCompactedIds = new Set(existing.flatMap((c) => c.original_message_ids));
   const newToCompact = toCompact.filter((m) => !alreadyCompactedIds.has(m.id));
 
-  if (newToCompact.length < 4) {
+  if (newToCompact.length < 2) {
     return; // Not enough new messages to justify compaction
   }
 

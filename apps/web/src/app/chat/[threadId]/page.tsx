@@ -11,6 +11,25 @@ import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
 
+function AnimatedDots() {
+  return (
+    <span className="inline-flex items-center gap-0.5 ml-0.5">
+      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+      <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+    </span>
+  );
+}
+
+function StreamingPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-gray-400 text-sm">
+      <span>{label}</span>
+      <AnimatedDots />
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
@@ -24,6 +43,8 @@ export default function ChatPage() {
     streamingContent,
     streamingThinking,
     streamingModel,
+    streamingClassification,
+    mode,
     activeConversationId,
     selectConversation,
     loadPinnedMessages,
@@ -74,6 +95,40 @@ export default function ChatPage() {
     return undefined;
   };
 
+  // Determine what placeholder to show while streaming
+  function getStreamingBody() {
+    if (streamingContent) {
+      return (
+        <>
+          {streamingThinking && (
+            <ThinkingBlock content={streamingThinking} isActive={false} />
+          )}
+          <div className="message-content leading-relaxed">
+            {streamingContent}
+            <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
+          </div>
+        </>
+      );
+    }
+
+    const classification = streamingClassification;
+    const knownDeep = classification === 'deep' || (!classification && mode === 'deep');
+
+    if (knownDeep) {
+      return <ThinkingBlock content={streamingThinking} isActive={true} />;
+    }
+
+    if (classification === 'simple' || (!classification && mode === 'fast')) {
+      return <StreamingPlaceholder label="Processing" />;
+    }
+
+    if (classification === 'balanced' || (!classification && mode === 'balanced')) {
+      return <StreamingPlaceholder label="Working" />;
+    }
+
+    return <StreamingPlaceholder label="Classifying" />;
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <BalanceBar />
@@ -89,6 +144,7 @@ export default function ChatPage() {
             <MessageBubble
               key={msg.id}
               message={msg}
+              prevMessage={index > 0 ? messages[index - 1] : undefined}
               previousUserMessage={msg.role === 'assistant' ? getPreviousUserMessage(index) : undefined}
             />
           ))}
@@ -97,31 +153,12 @@ export default function ChatPage() {
           {isStreaming && (
             <div className="flex justify-start mb-3">
               <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-sm">
-                {/* Model badge */}
                 {streamingModel && (
                   <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">
                     {streamingModel === 'qwen3.5-flash' ? 'Flash' : 'Plus'}
                   </div>
                 )}
-
-                {/* Thinking block */}
-                {streamingThinking && (
-                  <ThinkingBlock content={streamingThinking} isActive={!streamingContent} />
-                )}
-
-                {/* Streaming content */}
-                {streamingContent ? (
-                  <div className="message-content leading-relaxed">
-                    {streamingContent}
-                    <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
-                  </div>
-                ) : !streamingThinking ? (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                ) : null}
+                {getStreamingBody()}
               </div>
             </div>
           )}

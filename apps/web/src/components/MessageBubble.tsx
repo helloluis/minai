@@ -4,11 +4,30 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Message } from '@minai/shared';
 import { decorateHtml } from '@/lib/decorator';
 import { MessageActions } from './MessageActions';
+import { FlashIcon, BalancedIcon, DeepIcon } from './ModeIcons';
 
 interface MessageBubbleProps {
   message: Message;
+  prevMessage?: Message;
   previousUserMessage?: Message;
   onDelete?: (id: string) => void;
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${min}:${ss}`;
+}
+
+function formatDuration(startIso: string, endIso: string): string | null {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms <= 500 || isNaN(ms)) return null;
+  const secs = Math.round(ms / 1000);
+  return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
 }
 
 function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
@@ -189,8 +208,11 @@ function parseCells(row: string): string[] {
   return row.split('|').slice(1, -1).map((c: string) => c.trim());
 }
 
-export function MessageBubble({ message, previousUserMessage, onDelete }: MessageBubbleProps) {
+export function MessageBubble({ message, prevMessage, previousUserMessage, onDelete }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const duration = !isUser && prevMessage?.created_at
+    ? formatDuration(prevMessage.created_at, message.created_at)
+    : null;
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const closeLightbox = useCallback(() => setLightboxSrc(null), []);
 
@@ -215,12 +237,7 @@ export function MessageBubble({ message, previousUserMessage, onDelete }: Messag
             : 'bg-gray-100 dark:bg-gray-800 rounded-bl-md'
           }`}
       >
-        {/* Model badge for assistant messages */}
-        {!isUser && message.model && (
-          <div className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">
-            {message.model === 'qwen3.5-flash' ? 'Flash' : 'Plus'}
-          </div>
-        )}
+        {/* Model badge removed — icon now in footer */}
 
         {/* Attached images */}
         {message.images && message.images.length > 0 && (
@@ -243,12 +260,35 @@ export function MessageBubble({ message, previousUserMessage, onDelete }: Messag
           dangerouslySetInnerHTML={{ __html: decorateHtml(renderMarkdown(message.content)) }}
         />
 
-        {/* Token info (small) */}
-        {!isUser && message.output_tokens > 0 && (
+        {/* User message timestamp */}
+        {isUser && message.created_at && (
+          <div className="text-[10px] text-white/50 mt-1.5">
+            {formatTime(message.created_at)}
+          </div>
+        )}
+
+        {/* Assistant: model icon, tokens, cost, time, duration */}
+        {!isUser && (message.output_tokens > 0 || message.created_at) && (
           <div className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-2">
-            <span>{message.output_tokens} tokens</span>
+            {message.model && (
+              <span className="flex items-center gap-0.5" title={message.model === 'qwen3.5-flash' ? 'Fast mode' : 'Deep mode'}>
+                {message.model === 'qwen3.5-flash' ? <FlashIcon /> : <DeepIcon />}
+                <span>{message.model === 'qwen3.5-flash' ? 'Fast' : 'Deep'}</span>
+              </span>
+            )}
+            {message.output_tokens > 0 && (
+              <span title={`${message.input_tokens} in · ${message.output_tokens} out`}>
+                {message.input_tokens + message.output_tokens} tokens
+              </span>
+            )}
             {message.token_cost_usd > 0 && (
               <span>${Number(message.token_cost_usd).toFixed(4)}</span>
+            )}
+            {message.created_at && (
+              <span>{formatTime(message.created_at)}</span>
+            )}
+            {duration && (
+              <span>({duration})</span>
             )}
           </div>
         )}

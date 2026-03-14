@@ -8,6 +8,7 @@ import type {
   ProviderMessage,
   ProviderOptions,
   ProviderStreamChunk,
+  ToolCallInfo,
 } from './types.js';
 import type { TokenUsage } from '@minai/shared';
 
@@ -30,6 +31,14 @@ interface DashScopeStreamChunk {
       role?: string;
       content?: string;
       reasoning_content?: string;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
     };
     finish_reason: string | null;
   }>;
@@ -115,7 +124,7 @@ export class DashScopeProvider implements LLMProvider {
   }
 
   async *stream(options: ProviderOptions): AsyncGenerator<ProviderStreamChunk> {
-    const { model, messages, enableThinking = false, temperature = 0.7, maxTokens = 8192 } = options;
+    const { model, messages, enableThinking = false, temperature = 0.7, maxTokens = 8192, tools } = options;
 
     const processedMessages = this.applyCacheMarkers(messages);
 
@@ -130,6 +139,10 @@ export class DashScopeProvider implements LLMProvider {
 
     if (enableThinking) {
       requestBody.enable_thinking = true;
+    }
+
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools;
     }
 
     const response = await fetch(ENDPOINT, {
@@ -162,6 +175,9 @@ export class DashScopeProvider implements LLMProvider {
     const decoder = new TextDecoder();
     let buffer = '';
     const pricing = this.getPricing(model);
+
+    // Accumulate streamed tool calls (they arrive in fragments)
+    const toolCallAccum = new Map<number, { id: string; name: string; arguments: string }>();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -214,6 +230,37 @@ export class DashScopeProvider implements LLMProvider {
 
           if (choice.delta.content) {
             yield { type: 'content', content: choice.delta.content };
+          }
+
+          // Accumulate tool call fragments
+          if (choice.delta.tool_calls) {
+            for (const tc of choice.delta.tool_calls) {
+              const existing = toolCallAccum.get(tc.index);
+              if (existing) {
+                if (tc.function?.arguments) {
+                  existing.arguments += tc.function.arguments;
+                }
+              } else {
+                toolCallAccum.set(tc.index, {
+                  id: tc.id || `call_${tc.index}`,
+                  name: tc.function?.name || '',
+                  arguments: tc.function?.arguments || '',
+                });
+              }
+            }
+          }
+
+          // Emit accumulated tool calls when the model finishes with tool_calls
+          if (choice.finish_reason === 'tool_calls') {
+            const toolCalls: ToolCallInfo[] = [];
+            for (const [, tc] of toolCallAccum) {
+              if (tc.name) {
+                toolCalls.push(tc);
+              }
+            }
+            if (toolCalls.length > 0) {
+              yield { type: 'tool_call', toolCalls };
+            }
           }
         } catch {
           // Skip malformed JSON

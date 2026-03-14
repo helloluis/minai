@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
+  LLMClassification,
   ConversationListItem,
   Message,
   LLMMode,
@@ -30,6 +31,7 @@ interface ChatState {
   streamingContent: string;
   streamingThinking: string;
   streamingModel: ModelId | null;
+  streamingClassification: LLMClassification | null;
   streamError: string | null;
 
   // UI
@@ -77,6 +79,7 @@ export const useChatStore = create<ChatState>()(
       streamingContent: '',
       streamingThinking: '',
       streamingModel: null,
+      streamingClassification: null,
       streamError: null,
       mode: 'auto',
       sidebarOpen: false,
@@ -171,6 +174,7 @@ export const useChatStore = create<ChatState>()(
           streamingContent: '',
           streamingThinking: '',
           streamingModel: null,
+      streamingClassification: null,
           streamError: null,
         });
 
@@ -180,7 +184,7 @@ export const useChatStore = create<ChatState>()(
 
             switch (event) {
               case 'start':
-                set({ streamingModel: chunk.model as ModelId });
+                set({ streamingModel: chunk.model as ModelId, streamingClassification: (chunk.classification as LLMClassification) ?? null });
                 break;
               case 'thinking':
                 set((s) => ({ streamingThinking: s.streamingThinking + (chunk.content as string) }));
@@ -220,6 +224,7 @@ export const useChatStore = create<ChatState>()(
             streamingContent: '',
             streamingThinking: '',
             streamingModel: null,
+      streamingClassification: null,
           });
         }
       },

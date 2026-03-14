@@ -1,9 +1,9 @@
 /**
- * LLM Router — handles Auto/Fast/Deep mode routing
+ * LLM Router — handles Auto/Fast/Deep mode routing with tool-use loop
  */
 
-import type { LLMMode, ModelId, StreamChunk, TokenUsage } from '@minai/shared';
-import type { ProviderMessage } from './providers/types.js';
+import type { LLMMode, LLMClassification, ModelId, StreamChunk, TokenUsage } from '@minai/shared';
+import type { ProviderMessage, ProviderStreamChunk, ToolDefinition, ToolCallInfo } from './providers/types.js';
 import { DashScopeProvider } from './providers/dashscope.js';
 import { SYSTEM_PROMPT, AUTO_CLASSIFIER_PROMPT } from '../config/system-prompt.js';
 import { calculateCost } from '../config/pricing.js';
@@ -11,18 +11,34 @@ import * as db from './db.js';
 import { triggerCompaction, getCompactedContext } from './compaction.js';
 import { extractMemories } from './memory.js';
 import { detectAndExecuteTools } from './tool-runner.js';
+import { executeTool, TOOL_DEFINITIONS } from './tools.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
 const MODEL_FAST: ModelId = 'qwen3.5-flash';
 const MODEL_DEEP: ModelId = 'qwen3.5-plus';
+const MAX_TOOL_ITERATIONS = 10;
 
 /**
- * Classify whether a prompt needs the deep model or can be handled by the fast model.
+ * Convert our tool definitions to OpenAI-compatible format for the provider.
  */
-async function classifyPrompt(userMessage: string): Promise<'simple' | 'complex'> {
+function getProviderTools(): ToolDefinition[] {
+  return TOOL_DEFINITIONS.map((t) => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    },
+  }));
+}
+
+/**
+ * Classify a prompt into simple / balanced / deep to select the right model and thinking mode.
+ */
+async function classifyPrompt(userMessage: string): Promise<{ classification: 'simple' | 'balanced' | 'deep'; usage: TokenUsage | null }> {
   try {
-    const { content } = await provider.complete(
+    const { content, usage } = await provider.complete(
       [
         { role: 'system', content: AUTO_CLASSIFIER_PROMPT },
         { role: 'user', content: userMessage },
@@ -30,11 +46,12 @@ async function classifyPrompt(userMessage: string): Promise<'simple' | 'complex'
       MODEL_FAST,
       16
     );
-    const classification = content.trim().toLowerCase();
-    return classification === 'complex' ? 'complex' : 'simple';
+    const raw = content.trim().toLowerCase();
+    const classification = raw === 'deep' ? 'deep' : raw === 'balanced' ? 'balanced' : 'simple';
+    return { classification, usage: usage ?? null };
   } catch (err) {
-    console.error('[Router] Classification failed, defaulting to fast:', err);
-    return 'simple';
+    console.error('[Router] Classification failed, defaulting to simple:', err);
+    return { classification: 'simple', usage: null };
   }
 }
 
@@ -73,7 +90,8 @@ async function buildMessages(
     });
   }
 
-  // Run tools if the message triggers any
+  // Pre-detect tools from the user message and inject results
+  // This handles the common case without needing a tool-use loop
   const toolResults = await detectAndExecuteTools(currentMessage);
   if (toolResults) {
     messages.push({
@@ -106,7 +124,47 @@ export interface StreamResult {
 }
 
 /**
+ * Execute a single LLM stream pass, yielding chunks to the client.
+ * Returns accumulated tool calls (if any) and content.
+ */
+async function* streamOnce(
+  messages: ProviderMessage[],
+  model: ModelId,
+  enableThinking: boolean,
+  tools?: ToolDefinition[]
+): AsyncGenerator<
+  ProviderStreamChunk,
+  { toolCalls: ToolCallInfo[]; content: string; usage: TokenUsage | null }
+> {
+  let totalUsage: TokenUsage | null = null;
+  let pendingToolCalls: ToolCallInfo[] = [];
+  let content = '';
+
+  for await (const chunk of provider.stream({
+    model,
+    messages,
+    enableThinking,
+    temperature: 0.7,
+    maxTokens: model === MODEL_FAST ? 4096 : 8192,
+    tools,
+  })) {
+    if (chunk.type === 'tool_call' && chunk.toolCalls) {
+      pendingToolCalls = chunk.toolCalls;
+    } else if (chunk.type === 'usage') {
+      totalUsage = chunk.usage!;
+    } else if (chunk.type === 'content') {
+      content += chunk.content || '';
+    }
+    yield chunk;
+  }
+
+  return { toolCalls: pendingToolCalls, content, usage: totalUsage };
+}
+
+/**
  * Stream a response for the given mode, yielding SSE-compatible chunks.
+ * Supports a tool-use loop: if the LLM requests tool calls, we execute them
+ * and let it continue, up to MAX_TOOL_ITERATIONS.
  */
 export async function* streamResponse(
   conversationId: string,
@@ -116,30 +174,54 @@ export async function* streamResponse(
   messageId: string,
   images?: string[]
 ): AsyncGenerator<StreamChunk> {
-  // Determine model
+  // Determine model and thinking mode
   let model: ModelId;
+  let enableThinking: boolean;
+  let classification: LLMClassification;
+  let classifierUsage: TokenUsage | null = null;
   if (mode === 'fast') {
     model = MODEL_FAST;
+    enableThinking = false;
+    classification = 'simple';
+  } else if (mode === 'balanced') {
+    model = MODEL_DEEP;
+    enableThinking = false;
+    classification = 'balanced';
   } else if (mode === 'deep') {
     model = MODEL_DEEP;
+    enableThinking = true;
+    classification = 'deep';
   } else {
-    // Auto mode: classify first
-    const classification = await classifyPrompt(userMessage);
-    model = classification === 'complex' ? MODEL_DEEP : MODEL_FAST;
-    console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}`);
+    // Auto mode: 3-way classify → simple / balanced / deep
+    const result = await classifyPrompt(userMessage);
+    classifierUsage = result.usage;
+    classification = result.classification;
+    if (classification === 'deep') {
+      model = MODEL_DEEP;
+      enableThinking = true;
+    } else if (classification === 'balanced') {
+      model = MODEL_DEEP;
+      enableThinking = false;
+    } else {
+      model = MODEL_FAST;
+      enableThinking = false;
+    }
+    console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
   }
 
-  // Emit start event
+  // Emit start event with classification so the client can show the right placeholder
   yield {
     type: 'start',
     messageId,
     model,
+    classification,
   };
 
   // Force deep model for images (only Qwen Plus supports multimodal)
   if (images && images.length > 0 && model !== MODEL_DEEP) {
     console.log(`[Router] Overriding model to ${MODEL_DEEP} for image input`);
     model = MODEL_DEEP;
+    enableThinking = false;
   }
 
   // Build messages
@@ -149,33 +231,102 @@ export async function* streamResponse(
     console.log(`[Router] Sending ${images.length} image(s) to ${model}, first image size: ${images[0].length} chars`);
   }
 
-  // Stream from provider
-  const enableThinking = model === MODEL_DEEP;
-  let totalUsage: TokenUsage | null = null;
+  // Stream with tool-use loop
+  const tools = getProviderTools();
+  let totalUsage: TokenUsage | null = classifierUsage ? { ...classifierUsage } : null;
+  let iterations = 0;
 
-  for await (const chunk of provider.stream({
-    model,
-    messages,
-    enableThinking,
-    temperature: 0.7,
-    maxTokens: model === MODEL_FAST ? 4096 : 8192,
-  })) {
-    switch (chunk.type) {
-      case 'thinking':
-        yield { type: 'thinking', content: chunk.content };
+  while (iterations < MAX_TOOL_ITERATIONS) {
+    iterations++;
+
+    // Stream one pass
+    const gen = streamOnce(messages, model, enableThinking, tools);
+    let result: { toolCalls: ToolCallInfo[]; content: string; usage: TokenUsage | null };
+
+    // Yield chunks from the generator, capturing the return value
+    while (true) {
+      const { value, done } = await gen.next();
+      if (done) {
+        result = value as { toolCalls: ToolCallInfo[]; content: string; usage: TokenUsage | null };
         break;
-      case 'content':
-        yield { type: 'chunk', content: chunk.content };
-        break;
-      case 'usage':
-        totalUsage = chunk.usage!;
-        break;
-      case 'error':
-        yield { type: 'error', error: chunk.error };
-        return;
-      case 'done':
-        break;
+      }
+
+      const chunk = value as ProviderStreamChunk;
+      switch (chunk.type) {
+        case 'thinking':
+          yield { type: 'thinking', content: chunk.content };
+          break;
+        case 'content':
+          yield { type: 'chunk', content: chunk.content };
+          break;
+        case 'error':
+          yield { type: 'error', error: chunk.error };
+          return;
+        case 'tool_call':
+        case 'usage':
+        case 'done':
+          // Handled via return value or below
+          break;
+      }
     }
+
+    // Accumulate usage
+    if (result.usage) {
+      if (totalUsage) {
+        totalUsage.inputTokens += result.usage.inputTokens;
+        totalUsage.outputTokens += result.usage.outputTokens;
+        totalUsage.cost = (totalUsage.cost || 0) + (result.usage.cost || 0);
+      } else {
+        totalUsage = { ...result.usage };
+      }
+    }
+
+    // If no tool calls, we're done
+    if (result.toolCalls.length === 0) {
+      break;
+    }
+
+    // Execute tool calls and append results to messages
+    console.log(`[Router] Tool loop iteration ${iterations}: ${result.toolCalls.map((t) => t.name).join(', ')}`);
+
+    // Add the assistant message with tool_calls (OpenAI-compatible format)
+    messages.push({
+      role: 'assistant',
+      content: result.content || null,
+      tool_calls: result.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: 'function' as const,
+        function: { name: tc.name, arguments: tc.arguments },
+      })),
+    } as ProviderMessage);
+
+    // Execute each tool and add results
+    for (const tc of result.toolCalls) {
+      try {
+        const args = JSON.parse(tc.arguments);
+        const toolResult = await executeTool(tc.name, args);
+        messages.push({
+          role: 'tool',
+          content: toolResult.content,
+          tool_call_id: tc.id,
+        });
+      } catch (err) {
+        console.error(`[Router] Tool execution error for ${tc.name}:`, err);
+        messages.push({
+          role: 'tool',
+          content: `Error executing ${tc.name}: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          tool_call_id: tc.id,
+        });
+      }
+    }
+
+    // Continue the loop — the next iteration will stream the LLM's response
+    // with tool results in context
+    console.log(`[Router] Continuing with ${result.toolCalls.length} tool result(s) injected`);
+  }
+
+  if (iterations >= MAX_TOOL_ITERATIONS) {
+    console.warn(`[Router] Tool loop hit max iterations (${MAX_TOOL_ITERATIONS})`);
   }
 
   // Calculate token usage, deduct from free tier then balance
