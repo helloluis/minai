@@ -1,7 +1,9 @@
 /**
  * Tool System — provides external data to the LLM via function calling.
- * Phase 3: Binance crypto prices (real), web search (placeholder), MiniPay/Opera info (placeholder).
  */
+
+import * as gcal from './google-calendar.js';
+import * as db from './db.js';
 
 export interface ToolDefinition {
   name: string;
@@ -117,6 +119,199 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ['query'],
+    },
+  },
+
+  // ─── Google Calendar tools ─────────────────────────────────────────────────
+
+  {
+    name: 'calendar_list_calendars',
+    description: 'List all Google calendars the user has access to, including shared client calendars. Shows which calendar is associated with which notebook. Use this first to understand what calendars are available before performing other calendar operations.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'calendar_get_events',
+    description: 'Get events from a Google calendar for a date range. Use this to check a schedule, find an event, or see what is happening on a given day or week.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_id: {
+          type: 'string',
+          description: 'The Google calendar ID (from calendar_list_calendars). Use "primary" for the user\'s own calendar.',
+        },
+        start_date: {
+          type: 'string',
+          description: 'Start date/datetime in ISO format (e.g., "2026-03-20" or "2026-03-20T09:00:00")',
+        },
+        end_date: {
+          type: 'string',
+          description: 'End date/datetime in ISO format (e.g., "2026-03-21" or "2026-03-20T17:00:00")',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of events to return (default 20)',
+        },
+        query: {
+          type: 'string',
+          description: 'Optional text search within event titles and descriptions',
+        },
+      },
+      required: ['calendar_id', 'start_date', 'end_date'],
+    },
+  },
+  {
+    name: 'calendar_create_event',
+    description: 'Create a new event on a Google calendar. Always use the client\'s timezone (from the notebook), not the user\'s local timezone. After creating, show the event link to the user.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_id: {
+          type: 'string',
+          description: 'The Google calendar ID to create the event on',
+        },
+        title: {
+          type: 'string',
+          description: 'Event title',
+        },
+        start: {
+          type: 'string',
+          description: 'Start datetime in ISO format (e.g., "2026-03-20T14:00:00")',
+        },
+        end: {
+          type: 'string',
+          description: 'End datetime in ISO format (e.g., "2026-03-20T15:00:00")',
+        },
+        timezone: {
+          type: 'string',
+          description: 'IANA timezone for the event, e.g. "Africa/Nairobi", "Asia/Manila", "America/New_York". Use the client\'s timezone.',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional event description or agenda',
+        },
+        location: {
+          type: 'string',
+          description: 'Optional location (address or meeting link)',
+        },
+        attendees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of attendee email addresses',
+        },
+        notebook_id: {
+          type: 'string',
+          description: 'Optional notebook (conversation) ID — if provided, the notebook\'s timezone is used automatically',
+        },
+      },
+      required: ['calendar_id', 'title', 'start', 'end'],
+    },
+  },
+  {
+    name: 'calendar_update_event',
+    description: 'Update an existing calendar event. Only include fields you want to change.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_id: {
+          type: 'string',
+          description: 'The Google calendar ID containing the event',
+        },
+        event_id: {
+          type: 'string',
+          description: 'The event ID to update',
+        },
+        title: { type: 'string', description: 'New event title' },
+        start: { type: 'string', description: 'New start datetime (ISO format)' },
+        end: { type: 'string', description: 'New end datetime (ISO format)' },
+        timezone: { type: 'string', description: 'IANA timezone if changing times' },
+        description: { type: 'string', description: 'New description' },
+        location: { type: 'string', description: 'New location' },
+        attendees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Full replacement attendee list (email addresses)',
+        },
+      },
+      required: ['calendar_id', 'event_id'],
+    },
+  },
+  {
+    name: 'calendar_delete_event',
+    description: 'Delete or cancel a calendar event. Attendees will be notified.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_id: {
+          type: 'string',
+          description: 'The Google calendar ID containing the event',
+        },
+        event_id: {
+          type: 'string',
+          description: 'The event ID to delete',
+        },
+      },
+      required: ['calendar_id', 'event_id'],
+    },
+  },
+  {
+    name: 'calendar_find_free_slots',
+    description: 'Find available time slots across one or more calendars on a given day. Use this to schedule meetings — checks all specified calendars for conflicts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of Google calendar IDs to check for conflicts',
+        },
+        date: {
+          type: 'string',
+          description: 'The date to find slots on (ISO format, e.g., "2026-03-20")',
+        },
+        duration_minutes: {
+          type: 'number',
+          description: 'Required meeting duration in minutes (e.g., 30, 60, 90)',
+        },
+        timezone: {
+          type: 'string',
+          description: 'IANA timezone for interpreting working hours (use the client\'s timezone)',
+        },
+        workday_start: {
+          type: 'string',
+          description: 'Working hours start time (e.g., "09:00"), default "09:00"',
+        },
+        workday_end: {
+          type: 'string',
+          description: 'Working hours end time (e.g., "17:00"), default "17:00"',
+        },
+      },
+      required: ['calendar_ids', 'date', 'duration_minutes', 'timezone'],
+    },
+  },
+  {
+    name: 'calendar_associate_notebook',
+    description: 'Associate a Google calendar with a notebook (client). Call this when the user tells you which calendar belongs to which client, or when you can infer the match from the calendar name. Once associated, events created for that notebook will use the right timezone automatically.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calendar_id: {
+          type: 'string',
+          description: 'The Google calendar ID to associate',
+        },
+        notebook_id: {
+          type: 'string',
+          description: 'The notebook (conversation) ID to associate the calendar with',
+        },
+        calendar_name: {
+          type: 'string',
+          description: 'The display name of the calendar',
+        },
+      },
+      required: ['calendar_id', 'notebook_id', 'calendar_name'],
     },
   },
 ];
@@ -465,9 +660,137 @@ async function urlFetch(args: { url: string }): Promise<string> {
   }
 }
 
+// ─── Calendar tool executors ──────────────────────────────────────────────────
+
+async function calendarListCalendars(userId: string): Promise<string> {
+  const calendars = await gcal.listCalendars(userId);
+  if (calendars.length === 0) return 'No calendars found.';
+
+  const lines = calendars.map((c) => {
+    const association = c.notebookName ? ` → Notebook: "${c.notebookName}"` : ' → (not yet linked to a notebook)';
+    const shared = c.isShared ? ' [shared]' : ' [owned]';
+    return `• ${c.name}${shared}${association}\n  ID: ${c.id}${c.timeZone ? `\n  Timezone: ${c.timeZone}` : ''}`;
+  });
+
+  return `Found ${calendars.length} calendar(s):\n\n${lines.join('\n\n')}`;
+}
+
+async function calendarGetEvents(userId: string, args: Record<string, unknown>): Promise<string> {
+  const events = await gcal.getEvents({
+    userId,
+    calendarId: args.calendar_id as string,
+    startDate: args.start_date as string,
+    endDate: args.end_date as string,
+    maxResults: args.max_results as number | undefined,
+    query: args.query as string | undefined,
+  });
+
+  if (events.length === 0) return `No events found between ${args.start_date} and ${args.end_date}.`;
+
+  const lines = events.map((e) => {
+    const parts = [`**${e.title}**`, `  Time: ${e.start} → ${e.end}`];
+    if (e.location) parts.push(`  Location: ${e.location}`);
+    if (e.attendees?.length) parts.push(`  Attendees: ${e.attendees.join(', ')}`);
+    if (e.link) parts.push(`  Link: ${e.link}`);
+    parts.push(`  Event ID: ${e.id}`);
+    return parts.join('\n');
+  });
+
+  return `${events.length} event(s):\n\n${lines.join('\n\n')}`;
+}
+
+async function calendarCreateEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+  // If notebook_id provided, use its timezone automatically
+  let timezone = args.timezone as string | undefined;
+  if (!timezone && args.notebook_id) {
+    timezone = await db.getNotebookTimezone(args.notebook_id as string);
+  }
+  if (!timezone) timezone = 'UTC';
+
+  const result = await gcal.createEvent({
+    userId,
+    calendarId: args.calendar_id as string,
+    title: args.title as string,
+    start: args.start as string,
+    end: args.end as string,
+    timezone,
+    description: args.description as string | undefined,
+    location: args.location as string | undefined,
+    attendees: args.attendees as string[] | undefined,
+  });
+
+  return `Event created successfully:\n\n${result.summary}\n\nEvent ID: ${result.id}`;
+}
+
+async function calendarUpdateEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+  const result = await gcal.updateEvent({
+    userId,
+    calendarId: args.calendar_id as string,
+    eventId: args.event_id as string,
+    title: args.title as string | undefined,
+    start: args.start as string | undefined,
+    end: args.end as string | undefined,
+    timezone: args.timezone as string | undefined,
+    description: args.description as string | undefined,
+    location: args.location as string | undefined,
+    attendees: args.attendees as string[] | undefined,
+  });
+
+  return `Event updated successfully:\n\n${result.summary}\n\nEvent ID: ${result.id}`;
+}
+
+async function calendarDeleteEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+  await gcal.deleteEvent({
+    userId,
+    calendarId: args.calendar_id as string,
+    eventId: args.event_id as string,
+  });
+  return `Event deleted. Attendees have been notified.`;
+}
+
+async function calendarFindFreeSlots(userId: string, args: Record<string, unknown>): Promise<string> {
+  const slots = await gcal.findFreeSlots({
+    userId,
+    calendarIds: args.calendar_ids as string[],
+    date: args.date as string,
+    durationMinutes: args.duration_minutes as number,
+    timezone: args.timezone as string,
+    workdayStart: args.workday_start as string | undefined,
+    workdayEnd: args.workday_end as string | undefined,
+  });
+
+  if (slots.length === 0) {
+    return `No free slots of ${args.duration_minutes} minutes found on ${args.date} within working hours.`;
+  }
+
+  const fmt = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleTimeString('en-US', {
+        timeZone: args.timezone as string,
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      });
+    } catch { return iso; }
+  };
+
+  const lines = slots.map((s, i) => `${i + 1}. ${fmt(s.start)} – ${fmt(s.end)}`);
+  return `Free slots on ${args.date} (${args.timezone}):\n\n${lines.join('\n')}`;
+}
+
+async function calendarAssociateNotebook(userId: string, args: Record<string, unknown>): Promise<string> {
+  await db.associateCalendarWithNotebook(
+    userId,
+    args.notebook_id as string,
+    args.calendar_id as string,
+    args.calendar_name as string,
+  );
+  return `Calendar "${args.calendar_name}" is now linked to this notebook. Future events will use the notebook's timezone automatically.`;
+}
+
 // ─── Tool Executor ───
 
-export async function executeTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+export async function executeTool(name: string, args: Record<string, unknown>, userId?: string): Promise<ToolResult> {
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
@@ -494,6 +817,37 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
     case 'news_search':
       content = await newsSearch(args as { query: string });
       break;
+
+    // Calendar tools — require userId
+    case 'calendar_list_calendars':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarListCalendars(userId);
+      break;
+    case 'calendar_get_events':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarGetEvents(userId, args);
+      break;
+    case 'calendar_create_event':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarCreateEvent(userId, args);
+      break;
+    case 'calendar_update_event':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarUpdateEvent(userId, args);
+      break;
+    case 'calendar_delete_event':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarDeleteEvent(userId, args);
+      break;
+    case 'calendar_find_free_slots':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarFindFreeSlots(userId, args);
+      break;
+    case 'calendar_associate_notebook':
+      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+      content = await calendarAssociateNotebook(userId, args);
+      break;
+
     default:
       content = `Unknown tool: ${name}`;
   }

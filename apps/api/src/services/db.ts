@@ -493,6 +493,61 @@ export async function getGoogleTokens(userId: string): Promise<GoogleTokens | nu
   return rows[0] ?? null;
 }
 
+// ─── Notebook-Calendar associations ──────────────────────────────────────────
+
+export interface CalendarAssociation {
+  calendar_id: string;
+  calendar_name: string;
+  notebook_id: string;
+  notebook_name: string;
+}
+
+export async function getCalendarAssociations(userId: string): Promise<CalendarAssociation[]> {
+  const { rows } = await pool.query<CalendarAssociation>(`
+    SELECT nc.calendar_id, nc.calendar_name, nc.notebook_id, c.title AS notebook_name
+    FROM notebook_calendars nc
+    JOIN conversations c ON c.id = nc.notebook_id
+    WHERE nc.user_id = $1
+  `, [userId]);
+  return rows;
+}
+
+export async function getNotebookForCalendar(
+  userId: string,
+  calendarId: string
+): Promise<{ notebook_id: string; notebook_name: string } | null> {
+  const { rows } = await pool.query(`
+    SELECT nc.notebook_id, c.title AS notebook_name
+    FROM notebook_calendars nc
+    JOIN conversations c ON c.id = nc.notebook_id
+    WHERE nc.user_id = $1 AND nc.calendar_id = $2
+  `, [userId, calendarId]);
+  return rows[0] ?? null;
+}
+
+export async function associateCalendarWithNotebook(
+  userId: string,
+  notebookId: string,
+  calendarId: string,
+  calendarName: string
+): Promise<void> {
+  await pool.query(`
+    INSERT INTO notebook_calendars (user_id, notebook_id, calendar_id, calendar_name)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (user_id, calendar_id) DO UPDATE SET
+      notebook_id   = EXCLUDED.notebook_id,
+      calendar_name = EXCLUDED.calendar_name
+  `, [userId, notebookId, calendarId, calendarName]);
+}
+
+export async function getNotebookTimezone(notebookId: string): Promise<string> {
+  const { rows } = await pool.query<{ timezone: string }>(
+    `SELECT timezone FROM conversations WHERE id = $1`,
+    [notebookId]
+  );
+  return rows[0]?.timezone ?? 'UTC';
+}
+
 // ─── Token usage ──────────────────────────────────────────────────────────────
 
 export interface DailyUsage {
