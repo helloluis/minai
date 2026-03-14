@@ -1,6 +1,6 @@
 // ─── Config ───
 
-export const FREE_TOKENS_INITIAL = 10_000;
+export const FREE_TOKENS_INITIAL = 50_000;
 
 // ─── Models ───
 
