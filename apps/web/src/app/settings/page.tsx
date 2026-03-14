@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import * as api from '@/lib/api';
@@ -109,7 +109,7 @@ function UsageChart({ data }: { data: DailyUsage[] }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
+function SettingsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, session, checkSession } = useChatStore();
@@ -286,5 +286,13 @@ export default function SettingsPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageInner />
+    </Suspense>
   );
 }
