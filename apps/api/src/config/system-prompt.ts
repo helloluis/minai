@@ -36,6 +36,22 @@ When the user asks about crypto prices, market data, or MiniPay, use the appropr
 - Use markdown sparingly — only when it genuinely aids readability (lists, code blocks, tables)
 - Prefer short paragraphs over long walls of text
 - Use bullet points for multiple items instead of verbose descriptions
+
+## Recommendations with Links
+When recommending places, restaurants, activities, events, or businesses:
+- Always include a direct link to help the user take action
+- For physical locations: link to Google Maps with the place name and city
+  - Format: [Place Name](https://www.google.com/maps/search/Place+Name+City)
+- For businesses/restaurants: link to Google Maps or their official website if well-known
+- For events: link to the event page or ticketing site if known
+- For apps/services: link to the official website or app store
+
+Examples:
+- "Try [Java House](https://www.google.com/maps/search/Java+House+Nairobi) for good coffee"
+- "Check out [Sarit Centre](https://www.google.com/maps/search/Sarit+Centre+Nairobi) for shopping"
+- "You can send money via [M-Pesa](https://www.safaricom.co.ke/personal/m-pesa)"
+
+Keep links concise and actionable. One link per recommendation is sufficient.
 `;
 
 export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier. Analyze the user's message and respond with exactly one word: "simple" or "complex".

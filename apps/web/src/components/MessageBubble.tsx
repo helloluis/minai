@@ -3,9 +3,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Message } from '@minai/shared';
 import { decorateHtml } from '@/lib/decorator';
+import { MessageActions } from './MessageActions';
 
 interface MessageBubbleProps {
   message: Message;
+  previousUserMessage?: Message;
   onDelete?: (id: string) => void;
 }
 
@@ -187,7 +189,7 @@ function parseCells(row: string): string[] {
   return row.split('|').slice(1, -1).map((c: string) => c.trim());
 }
 
-export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
+export function MessageBubble({ message, previousUserMessage, onDelete }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const closeLightbox = useCallback(() => setLightboxSrc(null), []);
@@ -195,7 +197,17 @@ export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
   return (
     <>
     {lightboxSrc && <Lightbox src={lightboxSrc} onClose={closeLightbox} />}
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div
+      id={`message-${message.id}`}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}
+    >
+      {/* Message actions for assistant messages - positioned outside bubble */}
+      {!isUser && (
+        <div className="flex-shrink-0 mr-1 self-start mt-1">
+          <MessageActions message={message} previousUserMessage={previousUserMessage} />
+        </div>
+      )}
+
       <div
         className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
           ${isUser

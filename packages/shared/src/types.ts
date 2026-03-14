@@ -68,6 +68,31 @@ export interface Payment {
   created_at: string;
 }
 
+// ─── Pinned Messages ───
+
+export interface PinnedMessageWithDetails {
+  id: string;
+  message_id: string;
+  user_id: string;
+  created_at: string;
+  conversation_id: string;
+  content: string;
+  model: string | null;
+}
+
+// ─── Message Feedback ───
+
+export interface MessageFeedback {
+  id: string;
+  message_id: string;
+  user_id: string;
+  feedback_type: 'thumbs_down';
+  feedback_text: string | null;
+  original_prompt: string;
+  original_response: string;
+  created_at: string;
+}
+
 // ─── Streaming ───
 
 export type StreamChunkType = 'start' | 'thinking' | 'chunk' | 'usage' | 'done' | 'error';

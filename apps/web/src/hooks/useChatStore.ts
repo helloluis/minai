@@ -9,6 +9,7 @@ import type {
   SessionResponse,
   TokenUsage,
   ModelId,
+  PinnedMessageWithDetails,
 } from '@minai/shared';
 import * as api from '@/lib/api';
 
@@ -35,6 +36,10 @@ interface ChatState {
   mode: LLMMode;
   sidebarOpen: boolean;
 
+  // Pinned Messages
+  pinnedMessages: PinnedMessageWithDetails[];
+  pinnedMenuOpen: boolean;
+
   // Actions
   login: () => Promise<void>;
   checkSession: () => Promise<void>;
@@ -52,6 +57,11 @@ interface ChatState {
   deposit: (amount?: number) => Promise<void>;
   setMode: (mode: LLMMode) => void;
   toggleSidebar: () => void;
+
+  // Pinned messages actions
+  loadPinnedMessages: () => Promise<void>;
+  togglePinMessage: (messageId: string) => Promise<boolean>;
+  togglePinnedMenu: () => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -70,6 +80,8 @@ export const useChatStore = create<ChatState>()(
       streamError: null,
       mode: 'auto',
       sidebarOpen: false,
+      pinnedMessages: [],
+      pinnedMenuOpen: false,
 
       // Auth actions
       login: async () => {
@@ -226,6 +238,23 @@ export const useChatStore = create<ChatState>()(
       // UI actions
       setMode: (mode: LLMMode) => set({ mode }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+      // Pinned messages actions
+      loadPinnedMessages: async () => {
+        const pinnedMessages = await api.getPinnedMessages();
+        set({ pinnedMessages });
+      },
+
+      togglePinMessage: async (messageId: string) => {
+        const { activeConversationId } = get();
+        if (!activeConversationId) return false;
+
+        const result = await api.togglePinMessage(activeConversationId, messageId);
+        await get().loadPinnedMessages();
+        return result.pinned;
+      },
+
+      togglePinnedMenu: () => set((s) => ({ pinnedMenuOpen: !s.pinnedMenuOpen })),
     }),
     {
       name: 'minai-chat',

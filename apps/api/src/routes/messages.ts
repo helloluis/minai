@@ -110,4 +110,41 @@ export async function messageRoutes(fastify: FastifyInstance) {
       return { success: true };
     }
   );
+
+  // Toggle pin on message
+  fastify.post<{ Params: { id: string; messageId: string } }>(
+    '/api/conversations/:id/messages/:messageId/pin',
+    async (request) => {
+      const { messageId } = request.params;
+      const isPinned = await db.togglePin(messageId, request.user.id);
+      return { pinned: isPinned };
+    }
+  );
+
+  // Get all pinned messages for user
+  fastify.get('/api/messages/pinned', async (request) => {
+    return db.getPinnedMessages(request.user.id);
+  });
+
+  // Submit feedback for a message
+  fastify.post<{ Params: { id: string; messageId: string } }>(
+    '/api/conversations/:id/messages/:messageId/feedback',
+    async (request) => {
+      const { messageId } = request.params;
+      const { feedback_text, original_prompt, original_response } = request.body as {
+        feedback_text?: string;
+        original_prompt: string;
+        original_response: string;
+      };
+
+      const feedback = await db.createFeedback(
+        messageId,
+        request.user.id,
+        feedback_text ?? null,
+        original_prompt,
+        original_response
+      );
+      return feedback;
+    }
+  );
 }

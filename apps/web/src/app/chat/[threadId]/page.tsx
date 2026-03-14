@@ -9,6 +9,7 @@ import { ChatInput } from '@/components/ChatInput';
 import { MessageBubble } from '@/components/MessageBubble';
 import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
+import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
 
 export default function ChatPage() {
   const params = useParams();
@@ -25,6 +26,7 @@ export default function ChatPage() {
     streamingModel,
     activeConversationId,
     selectConversation,
+    loadPinnedMessages,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -34,9 +36,11 @@ export default function ChatPage() {
     checkSession().then(() => {
       if (!useChatStore.getState().isAuthenticated) {
         router.push('/');
+      } else {
+        loadPinnedMessages();
       }
     });
-  }, [checkSession, router]);
+  }, [checkSession, router, loadPinnedMessages]);
 
   // Load conversation
   useEffect(() => {
@@ -60,18 +64,33 @@ export default function ChatPage() {
 
   const hasMessages = messages.length > 0;
 
+  // Get the previous user message for feedback context
+  const getPreviousUserMessage = (index: number) => {
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        return messages[i];
+      }
+    }
+    return undefined;
+  };
+
   return (
     <div className="flex flex-col h-screen">
       <BalanceBar />
       <Sidebar />
+      <PinnedMessagesMenu />
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-4">
           {!hasMessages && !isStreaming && <WelcomeMessage />}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+          {messages.map((msg, index) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              previousUserMessage={msg.role === 'assistant' ? getPreviousUserMessage(index) : undefined}
+            />
           ))}
 
           {/* Streaming assistant response */}

@@ -11,6 +11,27 @@ function getRemainingColor(remainingPct: number): string {
   return '#22c55e'; // green
 }
 
+function PinnedButton() {
+  const pinnedMessages = useChatStore((s) => s.pinnedMessages);
+  const togglePinnedMenu = useChatStore((s) => s.togglePinnedMenu);
+
+  if (pinnedMessages.length === 0) return null;
+
+  return (
+    <button
+      onClick={togglePinnedMenu}
+      className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      aria-label="Pinned messages"
+    >
+      <span className="text-base">📌</span>
+      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[10px] font-bold
+        bg-minai-500 text-white rounded-full flex items-center justify-center">
+        {pinnedMessages.length}
+      </span>
+    </button>
+  );
+}
+
 export function BalanceBar() {
   const session = useChatStore((s) => s.session);
   const toggleSidebar = useChatStore((s) => s.toggleSidebar);
@@ -51,8 +72,11 @@ export function BalanceBar() {
       {/* Center: Brand */}
       <span className="font-semibold text-minai-600">Minai</span>
 
-      {/* Right: Balance + Deposit */}
+      {/* Right: Pinned + Balance + Deposit */}
       <div className="flex items-center gap-2">
+        {/* Pinned messages button */}
+        <PinnedButton />
+
         {/* Mini pie chart for free tokens */}
         <div className="relative">
           <button

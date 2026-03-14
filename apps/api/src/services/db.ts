@@ -273,6 +273,96 @@ export async function recordPayment(
   );
 }
 
+// ─── Pinned Messages ───
+
+export interface PinnedMessageWithDetails {
+  id: string;
+  message_id: string;
+  user_id: string;
+  created_at: string;
+  conversation_id: string;
+  content: string;
+  model: string | null;
+}
+
+export async function getPinnedMessages(userId: string): Promise<PinnedMessageWithDetails[]> {
+  const { rows } = await pool.query<PinnedMessageWithDetails>(
+    `SELECT pm.id, pm.message_id, pm.user_id, pm.created_at,
+            m.conversation_id, m.content, m.model
+     FROM pinned_messages pm
+     JOIN messages m ON m.id = pm.message_id
+     WHERE pm.user_id = $1 AND m.deleted_at IS NULL
+     ORDER BY pm.created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function isPinned(messageId: string, userId: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM pinned_messages WHERE message_id = $1 AND user_id = $2`,
+    [messageId, userId]
+  );
+  return rows.length > 0;
+}
+
+export async function pinMessage(messageId: string, userId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO pinned_messages (message_id, user_id)
+     VALUES ($1, $2)
+     ON CONFLICT (message_id, user_id) DO NOTHING`,
+    [messageId, userId]
+  );
+}
+
+export async function unpinMessage(messageId: string, userId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `DELETE FROM pinned_messages WHERE message_id = $1 AND user_id = $2`,
+    [messageId, userId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function togglePin(messageId: string, userId: string): Promise<boolean> {
+  const pinned = await isPinned(messageId, userId);
+  if (pinned) {
+    await unpinMessage(messageId, userId);
+    return false;
+  } else {
+    await pinMessage(messageId, userId);
+    return true;
+  }
+}
+
+// ─── Message Feedback ───
+
+export interface MessageFeedbackRow {
+  id: string;
+  message_id: string;
+  user_id: string;
+  feedback_type: string;
+  feedback_text: string | null;
+  original_prompt: string;
+  original_response: string;
+  created_at: string;
+}
+
+export async function createFeedback(
+  messageId: string,
+  userId: string,
+  feedbackText: string | null,
+  originalPrompt: string,
+  originalResponse: string
+): Promise<MessageFeedbackRow> {
+  const { rows } = await pool.query<MessageFeedbackRow>(
+    `INSERT INTO message_feedback (message_id, user_id, feedback_text, original_prompt, original_response)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [messageId, userId, feedbackText, originalPrompt, originalResponse]
+  );
+  return rows[0];
+}
+
 // ─── Pool ───
 
 export { pool };

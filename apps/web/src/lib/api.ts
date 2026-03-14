@@ -4,6 +4,8 @@ import type {
   Conversation,
   Message,
   LLMMode,
+  PinnedMessageWithDetails,
+  MessageFeedback,
 } from '@minai/shared';
 
 // Proxied through Next.js rewrites — same origin, no CORS/cookie issues
@@ -63,6 +65,27 @@ export const deleteMessage = (conversationId: string, messageId: string) =>
   fetchAPI<{ success: boolean }>(`/api/conversations/${conversationId}/messages/${messageId}`, {
     method: 'DELETE',
   });
+
+// Pinned Messages
+export const getPinnedMessages = () =>
+  fetchAPI<PinnedMessageWithDetails[]>('/api/messages/pinned');
+
+export const togglePinMessage = (conversationId: string, messageId: string) =>
+  fetchAPI<{ pinned: boolean }>(
+    `/api/conversations/${conversationId}/messages/${messageId}/pin`,
+    { method: 'POST' }
+  );
+
+// Message Feedback
+export const submitFeedback = (
+  conversationId: string,
+  messageId: string,
+  data: { feedback_text?: string; original_prompt: string; original_response: string }
+) =>
+  fetchAPI<MessageFeedback>(
+    `/api/conversations/${conversationId}/messages/${messageId}/feedback`,
+    { method: 'POST', body: JSON.stringify(data) }
+  );
 
 // Streaming
 export function streamMessage(
