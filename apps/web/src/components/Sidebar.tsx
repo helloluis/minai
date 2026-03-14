@@ -406,6 +406,13 @@ export function Sidebar() {
   const handleDelete = async (id: string) => {
     await deleteConversation(id);
     setSidebarWidth('normal');
+    // Navigate to another notebook, or home if none remain
+    const remaining = conversations.filter(c => c.id !== id);
+    if (remaining.length > 0) {
+      router.push(`/chat/${remaining[0].id}`);
+    } else {
+      router.push('/');
+    }
   };
 
   const handleRename = async (id: string, newTitle: string) => {
