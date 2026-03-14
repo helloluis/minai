@@ -61,6 +61,7 @@ Build and deploy sequentially — **do not run API and web builds in parallel**,
 ssh beanie "cd /var/www/minai \
   && git pull origin main \
   && pnpm install \
+  && pnpm --filter @minai/shared build \
   && pnpm --filter @minai/api build \
   && node apps/api/dist/migrations/run.js \
   && pnpm --filter @minai/web build \
