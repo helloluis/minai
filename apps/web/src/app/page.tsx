@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
+import * as api from '@/lib/api';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -16,9 +17,13 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (isAuthenticated && !checking) {
-      // Already logged in, redirect to chat
-      createConversation().then((id) => {
-        router.push(`/chat/${id}`);
+      // Already logged in — go to most recent conversation, or create one if none exist
+      api.getConversations().then((convs: { id: string }[]) => {
+        if (convs.length > 0) {
+          router.push(`/chat/${convs[0].id}`);
+        } else {
+          createConversation().then((id) => router.push(`/chat/${id}`));
+        }
       });
     }
   }, [isAuthenticated, checking, createConversation, router]);
