@@ -1,5 +1,5 @@
 import { createPublicClient, http, parseAbi, decodeEventLog, getAddress } from 'viem';
-import { celoAlfajores } from 'viem/chains';
+import { celoSepolia } from 'viem/chains';
 import { mnemonicToAccount } from 'viem/accounts';
 import { pool } from './db.js';
 
@@ -16,8 +16,8 @@ export const SUPPORTED_TOKENS: Record<string, { address: `0x${string}`; decimals
 export const DECIMALS_NORMALIZED = 6;
 
 const client = createPublicClient({
-  chain: celoAlfajores,
-  transport: http(process.env.CELO_RPC_URL ?? 'https://alfajores-forno.celo-testnet.org'),
+  chain: celoSepolia,
+  transport: http(process.env.CELO_RPC_URL ?? 'https://forno.celo-sepolia.celo-testnet.org'),
 });
 
 const ERC20_ABI = parseAbi([
