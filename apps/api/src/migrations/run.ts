@@ -28,6 +28,7 @@ async function migrate() {
       '005_notebooks_notes.sql',
       '006_google_auth.sql',
       '007_notebook_calendars.sql',
+      '008_deposit_addresses.sql',
     ];
 
     for (const migration of migrations) {
