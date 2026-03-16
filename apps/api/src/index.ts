@@ -10,6 +10,7 @@ import { messageRoutes } from './routes/messages.js';
 import { noteRoutes } from './routes/notes.js';
 import { settingsRoutes } from './routes/settings.js';
 import { googleAuthRoutes } from './routes/google-auth.js';
+import paymentRoutes from './routes/payment.js';
 
 const port = parseInt(process.env.API_PORT || '3001');
 
@@ -40,6 +41,7 @@ async function start() {
   await fastify.register(noteRoutes);
   await fastify.register(settingsRoutes);
   await fastify.register(googleAuthRoutes);
+  await fastify.register(paymentRoutes);
 
   // Health check
   fastify.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

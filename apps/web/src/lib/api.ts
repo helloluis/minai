@@ -124,6 +124,21 @@ export const deleteNote = (conversationId: string, noteId: string) =>
     method: 'DELETE',
   });
 
+// Payments
+export interface DepositAddress {
+  address: string;
+  network: string;
+  tokens: { symbol: string; contract: string; decimals: number; normalized_decimals: number }[];
+  minimum_deposit_usd: number;
+}
+
+export const getDepositAddress = () => fetchAPI<DepositAddress>('/api/payment/address');
+export const verifyDeposit = (tx_hash: string) =>
+  fetchAPI<{ success: boolean; credited_usd: number; token: string; new_balance_usd: number }>(
+    '/api/payment/verify',
+    { method: 'POST', body: JSON.stringify({ tx_hash }) }
+  );
+
 // Settings / Usage
 export interface DailyUsage {
   date: string;

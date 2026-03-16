@@ -57,6 +57,7 @@ interface ChatState {
   sendMessage: (content: string, images?: string[]) => Promise<void>;
 
   deposit: (amount?: number) => Promise<void>;
+  refreshSession: () => Promise<void>;
   setMode: (mode: LLMMode) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (width: 'closed' | 'normal' | 'expanded') => void;
@@ -239,6 +240,11 @@ export const useChatStore = create<ChatState>()(
             balance: result.balance,
           } : s.session,
         }));
+      },
+
+      refreshSession: async () => {
+        const session = await api.getMe();
+        set({ session });
       },
 
       // UI actions

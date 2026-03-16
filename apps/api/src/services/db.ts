@@ -265,11 +265,14 @@ export async function recordPayment(
   userId: string,
   amountUsd: number,
   type: 'deposit' | 'usage',
-  txHash?: string
+  txHash?: string,
+  paymentMethod: 'mock' | 'celo' = 'mock',
+  token?: string
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO payments (user_id, amount_usd, tx_hash, status) VALUES ($1, $2, $3, $4)`,
-    [userId, amountUsd, txHash ?? null, type === 'deposit' ? 'completed' : 'completed']
+    `INSERT INTO payments (user_id, amount_usd, tx_hash, status, payment_method, token)
+     VALUES ($1, $2, $3, 'completed', $4, $5)`,
+    [userId, amountUsd, txHash ?? null, paymentMethod, token ?? null]
   );
 }
 

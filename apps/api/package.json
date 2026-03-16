@@ -18,7 +18,8 @@
     "fastify-plugin": "^5.1.0",
     "googleapis": "^171.4.0",
     "pg": "^8.13.0",
-    "uuid": "^11.0.0"
+    "uuid": "^11.0.0",
+    "viem": "^2.47.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

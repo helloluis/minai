@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
 import { FREE_TOKENS_INITIAL } from '@minai/shared';
+import { TopUpModal } from './TopUpModal';
 
 function getRemainingColor(remainingPct: number): string {
   if (remainingPct <= 10) return '#ef4444'; // red
@@ -35,26 +36,14 @@ function PinnedButton() {
 export function BalanceBar() {
   const session = useChatStore((s) => s.session);
   const toggleSidebar = useChatStore((s) => s.toggleSidebar);
-  const deposit = useChatStore((s) => s.deposit);
-  const [depositing, setDepositing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [showTopUp, setShowTopUp] = useState(false);
 
   const balance = session?.balance?.balance_usd ?? 0;
   const freeTokens = session?.balance?.free_tokens_remaining ?? 0;
   const usedTokens = FREE_TOKENS_INITIAL - freeTokens;
   const remainingPct = Math.max(0, Math.round((freeTokens / FREE_TOKENS_INITIAL) * 100));
   const ringColor = getRemainingColor(remainingPct);
-
-  const handleDeposit = async () => {
-    setDepositing(true);
-    try {
-      await deposit();
-    } catch (err) {
-      console.error('[BalanceBar] Deposit failed:', err);
-    } finally {
-      setDepositing(false);
-    }
-  };
 
   return (
     <div className="relative flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -141,16 +130,16 @@ export function BalanceBar() {
           ${Number(balance).toFixed(2)}
         </span>
 
-        {/* Mock deposit button */}
         <button
-          onClick={handleDeposit}
-          disabled={depositing}
-          className="ml-1 px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50"
-          title="Add $0.10 (mock deposit)"
+          onClick={() => setShowTopUp(true)}
+          className="ml-1 px-2 py-1 text-xs font-medium rounded-md bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors"
+          title="Top up balance"
         >
-          {depositing ? '...' : '+$'}
+          Top Up
         </button>
       </div>
+
+      {showTopUp && <TopUpModal onClose={() => setShowTopUp(false)} />}
     </div>
   );
 }
