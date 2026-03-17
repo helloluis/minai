@@ -314,6 +314,38 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['calendar_id', 'notebook_id', 'calendar_name'],
     },
   },
+  {
+    name: 'set_preferred_name',
+    description: "Save the user's preferred name so it appears throughout the app. Call this as soon as the user shares their first name. If the user declines to share their name, call this with name=\"boss\".",
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: "The user's first name, or \"boss\" if they declined to share it",
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'suggest_feature',
+    description: "Submit a feature suggestion from the user to the Minai team. The user can earn up to $10 in app credits if their suggestion is accepted. Use this when a user describes a feature they'd like to see, a tool they'd find useful, or an improvement to Minai.",
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'A short title for the feature suggestion (max 100 characters)',
+        },
+        description: {
+          type: 'string',
+          description: "The user's detailed description of the feature they want",
+        },
+      },
+      required: ['title', 'description'],
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -788,6 +820,27 @@ async function calendarAssociateNotebook(userId: string, args: Record<string, un
   return `Calendar "${args.calendar_name}" is now linked to this notebook. Future events will use the notebook's timezone automatically.`;
 }
 
+async function submitFeatureSuggestion(userId: string, args: { title: string; description: string }): Promise<string> {
+  await db.pool.query(
+    `INSERT INTO feature_suggestions (user_id, title, description) VALUES ($1, $2, $3)`,
+    [userId, args.title.slice(0, 100), args.description]
+  );
+  console.log(`[FeatureSuggestion] New suggestion from ${userId}: "${args.title}"`);
+  return JSON.stringify({
+    success: true,
+    message: "Suggestion submitted! The team reviews all submissions and credits are awarded for accepted features.",
+  });
+}
+
+async function setPreferredName(userId: string, args: { name: string }): Promise<string> {
+  const name = args.name?.trim();
+  if (!name) return 'Name is required.';
+  await db.updateUserDisplayName(userId, name);
+  // Rename the user's only default conversation to their name
+  await db.renameDefaultConversation(userId, name);
+  return JSON.stringify({ success: true, name });
+}
+
 // ─── Tool Executor ───
 
 export async function executeTool(name: string, args: Record<string, unknown>, userId?: string): Promise<ToolResult> {
@@ -846,6 +899,16 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'calendar_associate_notebook':
       if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
       content = await calendarAssociateNotebook(userId, args);
+      break;
+
+    case 'set_preferred_name':
+      if (!userId) { content = 'Authentication required.'; break; }
+      content = await setPreferredName(userId, args as { name: string });
+      break;
+
+    case 'suggest_feature':
+      if (!userId) { content = 'Authentication required.'; break; }
+      content = await submitFeatureSuggestion(userId, args as { title: string; description: string });
       break;
 
     default:

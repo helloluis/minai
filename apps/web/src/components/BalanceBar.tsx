@@ -47,6 +47,7 @@ export function BalanceBar() {
 
   const balance = session?.balance?.balance_usd ?? 0;
   const freeCredit = session?.balance?.free_credit_usd ?? 0;
+  const displayName = session?.user?.display_name;
 
   // Total "available" for the ring: free credit + paid balance
   const totalAvailable = freeCredit + balance;
@@ -71,8 +72,10 @@ export function BalanceBar() {
         </svg>
       </button>
 
-      {/* Center: Brand */}
-      <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none">Minai</span>
+      {/* Center: Brand + Name */}
+      <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none whitespace-nowrap">
+        {displayName ? <>Minai <span className="text-gray-400 font-normal">+</span> {displayName}</> : 'Minai'}
+      </span>
 
       {/* Right: Pinned + Balance ring + Top Up */}
       <div className="flex items-center gap-2">

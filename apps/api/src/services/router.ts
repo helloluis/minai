@@ -165,6 +165,14 @@ async function buildMessages(
 
   // Conversation history (recent messages only)
   const history = await db.getMessages(conversationId, 30);
+
+  // On the very first message of a new conversation, if name is unknown, inject a signal
+  const isFirstMessage = history.length === 0;
+  const knowsName = memories.some((m) => m.key === 'name');
+  if (isFirstMessage && !knowsName) {
+    systemPrompt += '\n\n[SYSTEM NOTE: This is the user\'s FIRST message. Follow the "Greeting New Users" instructions above.]';
+  }
+
   for (const msg of history) {
     messages.push({
       role: msg.role as 'user' | 'assistant',
@@ -428,6 +436,9 @@ export async function* streamResponse(
     // Fetch updated balance to send to client
     const updatedBalance = await db.getBalance(userId);
 
+    // Fetch updated user to pick up any display_name set via set_preferred_name tool
+    const updatedUser = await db.getUserById(userId);
+
     yield {
       type: 'usage',
       usage: { ...totalUsage, cost },
@@ -435,6 +446,7 @@ export async function* streamResponse(
         balance_usd: updatedBalance.balance_usd,
         free_credit_usd: updatedBalance.free_credit_usd,
       } : undefined,
+      display_name: updatedUser?.display_name ?? null,
     };
   }
 

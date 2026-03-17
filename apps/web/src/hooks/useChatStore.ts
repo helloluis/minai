@@ -196,14 +196,20 @@ export const useChatStore = create<ChatState>()(
                 break;
               case 'usage': {
                 const bal = chunk.balance as { balance_usd: number; free_credit_usd: number } | undefined;
-                if (bal) {
-                  set((s) => ({
-                    session: s.session ? {
+                const displayName = chunk.display_name as string | null | undefined;
+                set((s) => {
+                  if (!s.session) return {};
+                  return {
+                    session: {
                       ...s.session,
-                      balance: { balance_usd: bal.balance_usd, free_credit_usd: bal.free_credit_usd },
-                    } : s.session,
-                  }));
-                }
+                      ...(bal ? { balance: { balance_usd: bal.balance_usd, free_credit_usd: bal.free_credit_usd } } : {}),
+                      user: {
+                        ...s.session.user,
+                        ...(displayName !== undefined ? { display_name: displayName } : {}),
+                      },
+                    },
+                  };
+                });
                 break;
               }
               case 'done':

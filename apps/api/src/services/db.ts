@@ -29,6 +29,21 @@ export async function getUserBySession(sessionToken: string): Promise<User | nul
   return rows[0] ?? null;
 }
 
+export async function getUserById(userId: string): Promise<User | null> {
+  const { rows } = await pool.query<User>(
+    `SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateUserDisplayName(userId: string, name: string): Promise<void> {
+  await pool.query(
+    `UPDATE users SET display_name = $2 WHERE id = $1`,
+    [userId, name]
+  );
+}
+
 // ─── Balances ───
 
 export async function createBalance(userId: string): Promise<UserBalance> {
@@ -135,6 +150,20 @@ export async function updateConversation(
     [id, userId, ...values]
   );
   return rows[0] ?? null;
+}
+
+// Rename a user's only default-titled conversation when a name is learned
+export async function renameDefaultConversation(userId: string, name: string): Promise<void> {
+  const DEFAULT_TITLES = ['New conversation', 'My Notebook'];
+  await pool.query(
+    `UPDATE conversations
+     SET title = $3, updated_at = now()
+     WHERE user_id = $1
+       AND deleted_at IS NULL
+       AND title = ANY($2::text[])
+       AND (SELECT COUNT(*) FROM conversations WHERE user_id = $1 AND deleted_at IS NULL) = 1`,
+    [userId, DEFAULT_TITLES, name]
+  );
 }
 
 export async function deleteConversation(id: string, userId: string): Promise<boolean> {
