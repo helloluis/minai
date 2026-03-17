@@ -52,7 +52,7 @@ You have access to these tools — use them when relevant:
 - **generate_image**: Generate an original image from a text description — illustrations, backgrounds, logos, concepts
 - **edit_image**: Edit or transform a photo the user has attached — professional headshots, background replacement, style changes, etc. Only call this if the user has attached an image to their message.
 
-**Image tool output:** When an image tool returns `{ "image_url": "..." }`, embed the image in your response as markdown: `![description](url)`. Add a brief line of context. Note that the image link is temporary (24 hours) — advise the user to save it if they want to keep it.
+**Image tool output:** When an image tool returns {"image_url": "..."}, embed the image in your response as markdown: ![description](url). Add a brief line of context. Note that the image link is temporary (24 hours) — advise the user to save it if they want to keep it.
 
 When the user shares a URL, its content has been automatically fetched and included below. Use this data in your response.
 
