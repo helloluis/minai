@@ -93,9 +93,14 @@ export async function deductFreeCredit(userId: string, amount: number): Promise<
 // ─── Conversations ───
 
 export async function createConversation(userId: string, title?: string): Promise<Conversation> {
+  let conversationTitle = title ?? 'New conversation';
+  if (!title) {
+    const user = await getUserById(userId);
+    if (user?.display_name) conversationTitle = user.display_name;
+  }
   const { rows } = await pool.query<Conversation>(
     `INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING *`,
-    [userId, title ?? 'New conversation']
+    [userId, conversationTitle]
   );
   const conv = rows[0];
   // Insert greeting widget as the permanent first message
