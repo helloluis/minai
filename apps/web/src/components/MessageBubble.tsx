@@ -221,6 +221,7 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
   if (message.widget_data) {
     return (
       <div id={`message-${message.id}`} className="flex justify-start mb-3">
+        <div className="flex-shrink-0 mr-1 self-start mt-1 w-7" />
         <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-sm">
           <WidgetRenderer data={message.widget_data} />
         </div>
