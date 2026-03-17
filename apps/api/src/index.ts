@@ -3,6 +3,9 @@ import './env.js'; // Load .env.local before anything else
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import { getUploadsDir } from './services/image-store.js';
 import { authPlugin } from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
 import { conversationRoutes } from './routes/conversations.js';
@@ -45,6 +48,22 @@ async function start() {
 
   // Health check
   fastify.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  // Serve persisted generated images
+  fastify.get('/api/uploads/:filename', async (request, reply) => {
+    const { filename } = request.params as { filename: string };
+    if (!/^[a-f0-9-]{36}\.(jpg|png)$/.test(filename)) {
+      return reply.status(400).send({ error: 'Invalid filename' });
+    }
+    try {
+      const data = await readFile(join(getUploadsDir(), filename));
+      reply.header('Content-Type', filename.endsWith('.jpg') ? 'image/jpeg' : 'image/png');
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      return reply.send(data);
+    } catch {
+      return reply.status(404).send({ error: 'Not found' });
+    }
+  });
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
