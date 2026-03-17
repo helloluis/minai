@@ -12,6 +12,7 @@ import { triggerCompaction, getCompactedContext } from './compaction.js';
 import { extractMemories } from './memory.js';
 import { detectAndExecuteTools } from './tool-runner.js';
 import { executeTool, TOOL_DEFINITIONS } from './tools.js';
+import type { ContextImage } from './tools.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
@@ -141,24 +142,43 @@ async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
  * Build conversation history for the LLM from database messages.
  */
 /** Scan history for the most recent image — user upload or a previously generated /api/uploads/ URL */
-const IMAGE_CONTEXT_LOOKBACK = 6; // only look back this many messages for a context image
+const IMAGE_CONTEXT_LOOKBACK = 6; // only look back this many messages for context images
 
-function findLastContextImage(chatHistory: { images?: string[] | null; content: string }[]): string | undefined {
+/**
+ * Scan recent history for ALL images — both user uploads and generated ones.
+ * Returns newest-first so index 0 = most recent image.
+ */
+function findContextImages(chatHistory: { role: string; images?: string[] | null; content: string }[]): ContextImage[] {
+  const results: ContextImage[] = [];
   const start = Math.max(0, chatHistory.length - IMAGE_CONTEXT_LOOKBACK);
+
   for (let i = chatHistory.length - 1; i >= start; i--) {
     const msg = chatHistory[i];
+
+    // User-uploaded images (base64)
     if (msg.images?.length) {
-      console.log(`[Router] findLastContextImage: found user image at index ${i} (${msg.images[0].slice(0, 40)}...)`);
-      return msg.images[0];
+      results.push({
+        url: msg.images[0],
+        source: 'user',
+        label: `User-uploaded photo (message ${i + 1})`,
+      });
     }
-    const match = msg.content?.match(/!\[[^\]]*\]\((https?:\/\/[^)]+\/api\/uploads\/[^)]+)\)/);
-    if (match) {
-      console.log(`[Router] findLastContextImage: found generated image URL at index ${i}: ${match[1]}`);
-      return match[1];
+
+    // Generated/edited images in assistant messages (persisted URLs)
+    if (msg.role === 'assistant' && msg.content) {
+      const imgMatches = msg.content.matchAll(/!\[[^\]]*\]\((https?:\/\/[^)]+\/api\/uploads\/[^)]+)\)/g);
+      for (const m of imgMatches) {
+        results.push({
+          url: m[1],
+          source: 'generated',
+          label: `AI-generated image (message ${i + 1})`,
+        });
+      }
     }
   }
-  console.log(`[Router] findLastContextImage: no image found in ${chatHistory.length} messages`);
-  return undefined;
+
+  console.log(`[Router] findContextImages: found ${results.length} image(s) — ${results.filter(i => i.source === 'user').length} user, ${results.filter(i => i.source === 'generated').length} generated`);
+  return results;
 }
 
 async function buildMessages(
@@ -166,7 +186,7 @@ async function buildMessages(
   userId: string,
   currentMessage: string,
   images?: string[]
-): Promise<{ messages: ProviderMessage[]; lastContextImage: string | undefined }> {
+): Promise<{ messages: ProviderMessage[]; contextImages: ContextImage[] }> {
   const messages: ProviderMessage[] = [];
 
   // System prompt with user memories
@@ -212,13 +232,13 @@ async function buildMessages(
     });
   }
 
-  // If there's a context image from earlier in the thread but none in the current message,
-  // tell the LLM explicitly so it knows to call edit_image without asking for a re-upload
-  const lastContextImage = findLastContextImage(chatHistory);
-  if (!images?.length && lastContextImage) {
+  // Collect all recent images from thread history (user uploads + generated)
+  const contextImages = findContextImages(chatHistory);
+  if (!images?.length && contextImages.length > 0) {
+    const listing = contextImages.map((img, i) => `  [${i}] ${img.label} (${img.source})`).join('\n');
     messages.push({
       role: 'system',
-      content: '[CONTEXT: An image from earlier in this conversation is pre-loaded and ready. If the user wants to edit, change, or iterate on that image, call the `edit_image` tool with just a prompt — do NOT ask them to re-upload it.]',
+      content: `[IMAGE CONTEXT: The following images from this conversation are pre-loaded and available for editing. The user does NOT need to re-upload.\n${listing}\nIf the user wants to edit, change, or iterate on any of these, call the \`edit_image\` tool. Use the \`image_index\` parameter to specify which image (default 0 = most recent). Do NOT ask the user to re-upload.]`,
     });
   }
 
@@ -238,7 +258,7 @@ async function buildMessages(
     messages.push({ role: 'user', content: currentMessage });
   }
 
-  return { messages, lastContextImage };
+  return { messages, contextImages };
 }
 
 export interface StreamResult {
@@ -347,10 +367,12 @@ export async function* streamResponse(
   }
 
   // Build messages
-  const { messages, lastContextImage } = await buildMessages(conversationId, userId, userMessage, images);
-  // Images available for tools: current-message uploads first, then most recent image in thread
-  const imageContext = images?.length ? images : (lastContextImage ? [lastContextImage] : undefined);
-  console.log(`[Router] imageContext: ${imageContext ? `${imageContext.length} image(s), first=${imageContext[0].slice(0, 60)}` : 'none'}`);
+  const { messages, contextImages } = await buildMessages(conversationId, userId, userMessage, images);
+  // Images available for tools: current-message uploads first, then thread context images
+  const imageContext = images?.length
+    ? images.map((url) => ({ url, source: 'user' as const, label: 'Current message upload' }))
+    : contextImages;
+  console.log(`[Router] imageContext: ${imageContext.length} image(s)${imageContext.length > 0 ? `, first=${imageContext[0].url.slice(0, 60)}` : ''}`);
 
   if (images && images.length > 0) {
     console.log(`[Router] Sending ${images.length} image(s) to ${model}, first image size: ${images[0].length} chars`);

@@ -7,6 +7,12 @@ import * as db from './db.js';
 import * as imageGen from './image-gen.js';
 import { PRICING } from '../config/pricing.js';
 
+export interface ContextImage {
+  url: string;           // base64 data URL or https:// URL
+  source: 'user' | 'generated';
+  label: string;         // human-readable label for the LLM
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -413,13 +419,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'edit_image',
-    description: "Edit or transform an image. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. Call this when the user wants to edit an image — either one they just attached to their current message, OR one that already appeared earlier in the conversation (you do NOT need them to re-upload). If the user refers to 'the photo', 'the image', 'it', or wants to iterate on a previous result, call this tool.",
+    description: "Edit or transform an image. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. Call this when the user wants to edit an image — either one they just attached to their current message, OR one that already appeared earlier in the conversation (you do NOT need them to re-upload). If the user refers to 'the photo', 'the image', 'it', or wants to iterate on a previous result, call this tool. The IMAGE CONTEXT system message lists all available images with their indices.",
     parameters: {
       type: 'object',
       properties: {
         prompt: {
           type: 'string',
           description: 'Clear instruction describing what to change. Examples: "professional headshot with neutral grey background, sharp focus, studio lighting", "replace the background with a beach sunset", "convert to oil painting style".',
+        },
+        image_index: {
+          type: 'number',
+          description: 'Which image to edit from the available context images (see IMAGE CONTEXT). 0 = most recent image (default). Use this to select the user\'s original upload vs. a previously generated image.',
         },
         size: {
           type: 'string',
@@ -949,7 +959,7 @@ async function setPreferredName(userId: string, args: { name: string }): Promise
 
 // ─── Tool Executor ───
 
-export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: string[]): Promise<ToolResult> {
+export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: ContextImage[]): Promise<ToolResult> {
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
@@ -1049,14 +1059,15 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'edit_image': {
       const prompt = args.prompt as string;
       const size = (args.size as string | undefined) ?? '1024*1024';
-      const sourceImage = images?.[0];
-      if (!sourceImage) {
+      const imageIndex = typeof args.image_index === 'number' ? args.image_index : 0;
+      const sourceCtx = images?.[imageIndex] ?? images?.[0];
+      if (!sourceCtx) {
         content = 'No image found. Please attach a photo to your message and try again.';
         break;
       }
-      console.log(`[Tools] Editing image: "${prompt}" (${size})`);
+      console.log(`[Tools] Editing image[${imageIndex}] (${sourceCtx.source}): "${prompt}" (${size})`);
       try {
-        const url = await imageGen.editImage(prompt, sourceImage, size);
+        const url = await imageGen.editImage(prompt, sourceCtx.url, size);
         content = JSON.stringify({ image_url: url, prompt });
         toolCost = PRICING.image_edit_cost_usd;
       } catch (err) {
