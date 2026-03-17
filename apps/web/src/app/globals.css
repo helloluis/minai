@@ -172,3 +172,12 @@ body {
   margin: 0.5em 0;
   color: #6b7280;
 }
+
+.message-content .generated-image {
+  max-width: 100%;
+  max-height: 512px;
+  border-radius: 10px;
+  margin: 0.5em 0;
+  display: block;
+  cursor: zoom-in;
+}

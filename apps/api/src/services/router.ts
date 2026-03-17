@@ -395,7 +395,7 @@ export async function* streamResponse(
     for (const tc of result.toolCalls) {
       try {
         const args = JSON.parse(tc.arguments);
-        const toolResult = await executeTool(tc.name, args, userId);
+        const toolResult = await executeTool(tc.name, args, userId, images);
         messages.push({
           role: 'tool',
           content: toolResult.content,

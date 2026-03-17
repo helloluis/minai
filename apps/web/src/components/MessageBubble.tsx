@@ -169,7 +169,15 @@ function inlineMarkdown(text: string): string {
     return `\x00CODE${idx}\x00`;
   });
 
-  // 2. Extract markdown links [text](url) before escaping
+  // 2a. Extract markdown images ![alt](url) before links
+  const inlineImages: string[] = [];
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
+    const idx = inlineImages.length;
+    inlineImages.push(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt || 'Generated image')}" class="generated-image" />`);
+    return `\x00INLINEIMG${idx}\x00`;
+  });
+
+  // 2b. Extract markdown links [text](url) before escaping
   const links: string[] = [];
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, linkText, url) => {
     const idx = links.length;
@@ -190,9 +198,10 @@ function inlineMarkdown(text: string): string {
     (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
   );
 
-  // 6. Restore inline code and links
+  // 6. Restore inline code, links, and images
   html = html.replace(/\x00CODE(\d+)\x00/g, (_match, idx) => codeSpans[parseInt(idx)]);
   html = html.replace(/\x00LINK(\d+)\x00/g, (_match, idx) => links[parseInt(idx)]);
+  html = html.replace(/\x00INLINEIMG(\d+)\x00/g, (_match, idx) => inlineImages[parseInt(idx)]);
 
   return html;
 }
@@ -271,6 +280,12 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
         <div
           className="message-content"
           dangerouslySetInnerHTML={{ __html: decorateHtml(renderMarkdown(message.content)) }}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'IMG' && target.classList.contains('generated-image')) {
+              setLightboxSrc((target as HTMLImageElement).src);
+            }
+          }}
         />
 
         {/* User message timestamp */}

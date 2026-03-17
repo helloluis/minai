@@ -4,6 +4,7 @@
 
 import * as gcal from './google-calendar.js';
 import * as db from './db.js';
+import * as imageGen from './image-gen.js';
 
 export interface ToolDefinition {
   name: string;
@@ -386,6 +387,45 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: 'open_sidebar',
     description: "Signal the user's interface to open the sidebar so they can see their notebooks and notes.",
     parameters: { type: 'object', properties: {} },
+  },
+
+  // ─── Image tools ──────────────────────────────────────────────────────────
+
+  {
+    name: 'generate_image',
+    description: "Generate an original image from a text description. Use for creating illustrations, backgrounds, concepts, logos, scenes, etc. Do NOT use if the user has uploaded a photo they want edited — use edit_image instead.",
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Detailed description of the image to generate. Be specific about style, lighting, composition, colors.',
+        },
+        size: {
+          type: 'string',
+          description: 'Output dimensions as WIDTHxHEIGHT. Common sizes: "1024*1024" (square), "1792*1024" (landscape), "1024*1792" (portrait). Default: "1024*1024".',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
+    name: 'edit_image',
+    description: "Edit or transform a photo/image the user has uploaded in their message. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. The user MUST have attached an image to their message.",
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Clear instruction describing what to change. Examples: "professional headshot with neutral grey background, sharp focus, studio lighting", "replace the background with a beach sunset", "convert to oil painting style".',
+        },
+        size: {
+          type: 'string',
+          description: 'Output dimensions as WIDTHxHEIGHT. Default: "1024*1024". Use "1024*1792" for portrait, "1792*1024" for landscape.',
+        },
+      },
+      required: ['prompt'],
+    },
   },
 ];
 
@@ -907,7 +947,7 @@ async function setPreferredName(userId: string, args: { name: string }): Promise
 
 // ─── Tool Executor ───
 
-export async function executeTool(name: string, args: Record<string, unknown>, userId?: string): Promise<ToolResult> {
+export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: string[]): Promise<ToolResult> {
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
@@ -988,6 +1028,37 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'open_sidebar':
       content = JSON.stringify({ success: true, __open_sidebar__: true });
       break;
+
+    case 'generate_image': {
+      const prompt = args.prompt as string;
+      const size = (args.size as string | undefined) ?? '1024*1024';
+      console.log(`[Tools] Generating image: "${prompt}" (${size})`);
+      try {
+        const url = await imageGen.generateImage(prompt, size);
+        content = JSON.stringify({ image_url: url, prompt });
+      } catch (err) {
+        content = `Image generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+      break;
+    }
+
+    case 'edit_image': {
+      const prompt = args.prompt as string;
+      const size = (args.size as string | undefined) ?? '1024*1024';
+      const sourceImage = images?.[0];
+      if (!sourceImage) {
+        content = 'No image found. Please attach a photo to your message and try again.';
+        break;
+      }
+      console.log(`[Tools] Editing image: "${prompt}" (${size})`);
+      try {
+        const url = await imageGen.editImage(prompt, sourceImage, size);
+        content = JSON.stringify({ image_url: url, prompt });
+      } catch (err) {
+        content = `Image editing failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+      break;
+    }
 
     default:
       content = `Unknown tool: ${name}`;
