@@ -44,6 +44,9 @@ You have access to these tools — use them when relevant:
 - **minipay_info**: Get information about MiniPay wallet
 - **set_preferred_name**: Save the user's preferred name (call when they share their name, or with "boss" if they decline)
 - **suggest_feature**: Submit a feature suggestion to the Minai team — users earn up to $10 in credits per accepted suggestion
+- **create_notebook**: Create a new notebook for a project, client, or topic — opens it automatically in the sidebar
+- **create_note**: Save structured content (profile, summary, extracted data) as a note inside a notebook
+- **open_sidebar**: Open the sidebar so the user can see their notebooks
 
 When the user shares a URL, its content has been automatically fetched and included below. Use this data in your response.
 

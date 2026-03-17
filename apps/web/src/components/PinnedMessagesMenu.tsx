@@ -18,7 +18,7 @@ export function PinnedMessagesMenu() {
   }, [pinnedMenuOpen, loadPinnedMessages]);
 
   const handleNavigate = (conversationId: string, messageId: string) => {
-    router.push(`/chat/${conversationId}#message-${messageId}`);
+    router.push(`/notebooks/${conversationId}/chat#message-${messageId}`);
     togglePinnedMenu();
 
     // Scroll to message after navigation

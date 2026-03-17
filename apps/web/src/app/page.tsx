@@ -20,9 +20,9 @@ export default function LandingPage() {
       // Already logged in — go to most recent conversation, or create one if none exist
       api.getConversations().then((convs: { id: string }[]) => {
         if (convs.length > 0) {
-          router.push(`/chat/${convs[0].id}`);
+          router.push(`/notebooks/${convs[0].id}/chat`);
         } else {
-          createConversation().then((id) => router.push(`/chat/${id}`));
+          createConversation().then((id) => router.push(`/notebooks/${id}/chat`));
         }
       });
     }
@@ -33,7 +33,7 @@ export default function LandingPage() {
     try {
       await login();
       const id = await createConversation();
-      router.push(`/chat/${id}`);
+      router.push(`/notebooks/${id}/chat`);
     } catch (err) {
       console.error('Login failed:', err);
     } finally {

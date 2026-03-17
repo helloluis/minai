@@ -100,7 +100,7 @@ export interface MessageFeedback {
 
 // ─── Streaming ───
 
-export type StreamChunkType = 'start' | 'thinking' | 'chunk' | 'usage' | 'done' | 'error';
+export type StreamChunkType = 'start' | 'thinking' | 'chunk' | 'usage' | 'done' | 'error' | 'action';
 
 export interface StreamChunk {
   type: StreamChunkType;
@@ -111,6 +111,7 @@ export interface StreamChunk {
   usage?: TokenUsage;
   balance?: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
   display_name?: string | null;
+  actions?: { navigate?: string; open_sidebar?: boolean };
   error?: string;
 }
 

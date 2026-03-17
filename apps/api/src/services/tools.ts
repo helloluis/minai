@@ -346,6 +346,47 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['title', 'description'],
     },
   },
+  {
+    name: 'create_notebook',
+    description: "Create a new notebook for the user. Use this when the user asks to start a new project, client, or topic area. A notebook organizes all related chat, notes, and files together.",
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'The name of the notebook (e.g. the client name, project name, or topic)',
+        },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'create_note',
+    description: "Create a note inside a notebook. Use this to save structured information — a client profile, meeting notes, a summary, extracted data from a screenshot, etc.",
+    parameters: {
+      type: 'object',
+      properties: {
+        notebook_id: {
+          type: 'string',
+          description: 'The ID of the notebook to create the note in',
+        },
+        title: {
+          type: 'string',
+          description: 'A short title for the note',
+        },
+        content: {
+          type: 'string',
+          description: 'The note content in plain text or markdown',
+        },
+      },
+      required: ['notebook_id', 'title', 'content'],
+    },
+  },
+  {
+    name: 'open_sidebar',
+    description: "Signal the user's interface to open the sidebar so they can see their notebooks and notes.",
+    parameters: { type: 'object', properties: {} },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -820,6 +861,29 @@ async function calendarAssociateNotebook(userId: string, args: Record<string, un
   return `Calendar "${args.calendar_name}" is now linked to this notebook. Future events will use the notebook's timezone automatically.`;
 }
 
+async function createNotebook(userId: string, args: { title: string }): Promise<string> {
+  const conversation = await db.createConversation(userId, args.title);
+  return JSON.stringify({
+    success: true,
+    notebook_id: conversation.id,
+    title: conversation.title,
+    __navigate__: `/notebooks/${conversation.id}/chat`,
+    __open_sidebar__: true,
+  });
+}
+
+async function createNoteInNotebook(userId: string, args: { notebook_id: string; title: string; content: string }): Promise<string> {
+  const note = await db.createNote(args.notebook_id, userId, args.title, args.content);
+  return JSON.stringify({
+    success: true,
+    note_id: note.id,
+    notebook_id: args.notebook_id,
+    title: note.title,
+    __navigate__: `/notebooks/${args.notebook_id}/notes/${note.id}`,
+    __open_sidebar__: true,
+  });
+}
+
 async function submitFeatureSuggestion(userId: string, args: { title: string; description: string }): Promise<string> {
   await db.pool.query(
     `INSERT INTO feature_suggestions (user_id, title, description) VALUES ($1, $2, $3)`,
@@ -909,6 +973,20 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'suggest_feature':
       if (!userId) { content = 'Authentication required.'; break; }
       content = await submitFeatureSuggestion(userId, args as { title: string; description: string });
+      break;
+
+    case 'create_notebook':
+      if (!userId) { content = 'Authentication required.'; break; }
+      content = await createNotebook(userId, args as { title: string });
+      break;
+
+    case 'create_note':
+      if (!userId) { content = 'Authentication required.'; break; }
+      content = await createNoteInNotebook(userId, args as { notebook_id: string; title: string; content: string });
+      break;
+
+    case 'open_sidebar':
+      content = JSON.stringify({ success: true, __open_sidebar__: true });
       break;
 
     default:

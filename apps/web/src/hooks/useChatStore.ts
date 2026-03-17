@@ -37,6 +37,8 @@ interface ChatState {
   // UI
   mode: LLMMode;
   sidebarWidth: 'closed' | 'normal' | 'expanded';
+  pendingNavigation: string | null;
+  targetNoteId: string | null;
 
   // Pinned Messages
   pinnedMessages: PinnedMessageWithDetails[];
@@ -61,6 +63,8 @@ interface ChatState {
   setMode: (mode: LLMMode) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (width: 'closed' | 'normal' | 'expanded') => void;
+  setPendingNavigation: (path: string | null) => void;
+  setTargetNoteId: (id: string | null) => void;
 
   // Pinned messages actions
   loadPinnedMessages: () => Promise<void>;
@@ -85,6 +89,8 @@ export const useChatStore = create<ChatState>()(
       streamError: null,
       mode: 'auto',
       sidebarWidth: 'closed' as const,
+      pendingNavigation: null,
+      targetNoteId: null,
       pinnedMessages: [],
       pinnedMenuOpen: false,
 
@@ -212,6 +218,12 @@ export const useChatStore = create<ChatState>()(
                 });
                 break;
               }
+              case 'action': {
+                const actions = chunk.actions as { navigate?: string; open_sidebar?: boolean } | undefined;
+                if (actions?.navigate) set({ pendingNavigation: actions.navigate });
+                if (actions?.open_sidebar) set((s) => ({ sidebarWidth: s.sidebarWidth === 'closed' ? 'normal' : s.sidebarWidth }));
+                break;
+              }
               case 'done':
                 break;
               case 'error':
@@ -259,6 +271,8 @@ export const useChatStore = create<ChatState>()(
         sidebarWidth: s.sidebarWidth === 'closed' ? 'normal' : 'closed',
       })),
       setSidebarWidth: (width) => set({ sidebarWidth: width }),
+      setPendingNavigation: (path) => set({ pendingNavigation: path }),
+      setTargetNoteId: (id) => set({ targetNoteId: id }),
 
       // Pinned messages actions
       loadPinnedMessages: async () => {

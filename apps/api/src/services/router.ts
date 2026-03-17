@@ -400,6 +400,17 @@ export async function* streamResponse(
           content: toolResult.content,
           tool_call_id: tc.id,
         });
+
+        // Emit action chunks for frontend directives embedded in tool results
+        try {
+          const parsed = JSON.parse(toolResult.content);
+          const actions: { navigate?: string; open_sidebar?: boolean } = {};
+          if (parsed.__navigate__) actions.navigate = parsed.__navigate__;
+          if (parsed.__open_sidebar__) actions.open_sidebar = true;
+          if (Object.keys(actions).length > 0) {
+            yield { type: 'action', actions };
+          }
+        } catch { /* not JSON or no action directives */ }
       } catch (err) {
         console.error(`[Router] Tool execution error for ${tc.name}:`, err);
         messages.push({

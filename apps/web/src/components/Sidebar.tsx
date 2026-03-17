@@ -51,6 +51,7 @@ function NotebookRow({
   onSelect,
   onRename,
   onNewNote,
+  onSelectNote,
   onExpandNotes,
   dragProps,
   isDragOver,
@@ -61,6 +62,7 @@ function NotebookRow({
   onSelect: () => void;
   onRename: (newTitle: string) => void;
   onNewNote: () => void;
+  onSelectNote: (noteId: string) => void;
   onExpandNotes: () => void;
   dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: true };
   isDragOver: boolean;
@@ -170,7 +172,7 @@ function NotebookRow({
           {notes.slice(0, 5).map(note => (
             <div
               key={note.id}
-              onClick={onExpandNotes}
+              onClick={() => onSelectNote(note.id)}
               className="flex items-center gap-2 px-9 py-1.5 text-sm cursor-pointer transition-colors
                 text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300
                 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -301,6 +303,8 @@ export function Sidebar() {
     selectConversation,
     deleteConversation,
     updateConversation,
+    targetNoteId,
+    setTargetNoteId,
   } = useChatStore();
 
   const [notesByConv, setNotesByConv] = useState<Record<string, Note[]>>({});
@@ -329,6 +333,16 @@ export function Sidebar() {
       setNotesByConv(prev => ({ ...prev, [activeConversationId]: notes }));
     }).catch(console.error);
   }, [activeConversationId]);
+
+  // Scroll to targetNoteId when sidebar is expanded
+  useEffect(() => {
+    if (!targetNoteId || sidebarWidth !== 'expanded') return;
+    const el = document.getElementById(`note-${targetNoteId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTargetNoteId(null);
+    }
+  }, [targetNoteId, sidebarWidth, setTargetNoteId]);
 
   // ─── Derived state ─────────────────────────────────────────────────────────
 
@@ -395,12 +409,12 @@ export function Sidebar() {
 
   const handleSelectNotebook = async (id: string) => {
     await selectConversation(id);
-    router.push(`/chat/${id}`);
+    router.push(`/notebooks/${id}/chat`);
   };
 
   const handleNew = async () => {
     const id = await createConversation();
-    router.push(`/chat/${id}`);
+    router.push(`/notebooks/${id}/chat`);
   };
 
   const handleDelete = async (id: string) => {
@@ -409,10 +423,14 @@ export function Sidebar() {
     // Navigate to another notebook, or home if none remain
     const remaining = conversations.filter(c => c.id !== id);
     if (remaining.length > 0) {
-      router.push(`/chat/${remaining[0].id}`);
+      router.push(`/notebooks/${remaining[0].id}/chat`);
     } else {
       router.push('/');
     }
+  };
+
+  const handleSelectNote = (convId: string, noteId: string) => {
+    router.push(`/notebooks/${convId}/notes/${noteId}`);
   };
 
   const handleRename = async (id: string, newTitle: string) => {
@@ -538,7 +556,7 @@ export function Sidebar() {
               ) : (
                 <>
                   {expandedNotes.map((note, index) => (
-                    <div key={note.id} className="mb-3">
+                    <div key={note.id} id={`note-${note.id}`} className="mb-3">
                       <NoteCard
                         note={note}
                         conversationId={activeConversationId}
@@ -600,6 +618,7 @@ export function Sidebar() {
                       if (conv.id !== activeConversationId) await handleSelectNotebook(conv.id);
                       handleNewNote(conv.id);
                     }}
+                    onSelectNote={(noteId) => handleSelectNote(conv.id, noteId)}
                     onExpandNotes={() => handleExpandNotes(conv.id)}
                     dragProps={dragProps(index)}
                     isDragOver={overIndex === index}
