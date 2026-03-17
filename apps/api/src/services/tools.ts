@@ -411,7 +411,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'edit_image',
-    description: "Edit or transform a photo/image the user has uploaded in their message. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. The user MUST have attached an image to their message.",
+    description: "Edit or transform an image. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. Call this when the user wants to edit an image — either one they just attached to their current message, OR one that already appeared earlier in the conversation (you do NOT need them to re-upload). If the user refers to 'the photo', 'the image', 'it', or wants to iterate on a previous result, call this tool.",
     parameters: {
       type: 'object',
       properties: {

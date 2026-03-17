@@ -144,10 +144,17 @@ async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
 function findLastContextImage(chatHistory: { images?: string[] | null; content: string }[]): string | undefined {
   for (let i = chatHistory.length - 1; i >= 0; i--) {
     const msg = chatHistory[i];
-    if (msg.images?.length) return msg.images[0];
+    if (msg.images?.length) {
+      console.log(`[Router] findLastContextImage: found user image at index ${i} (${msg.images[0].slice(0, 40)}...)`);
+      return msg.images[0];
+    }
     const match = msg.content?.match(/!\[[^\]]*\]\((https?:\/\/[^)]+\/api\/uploads\/[^)]+)\)/);
-    if (match) return match[1];
+    if (match) {
+      console.log(`[Router] findLastContextImage: found generated image URL at index ${i}: ${match[1]}`);
+      return match[1];
+    }
   }
+  console.log(`[Router] findLastContextImage: no image found in ${chatHistory.length} messages`);
   return undefined;
 }
 
@@ -330,6 +337,7 @@ export async function* streamResponse(
   const { messages, lastContextImage } = await buildMessages(conversationId, userId, userMessage, images);
   // Images available for tools: current-message uploads first, then most recent image in thread
   const imageContext = images?.length ? images : (lastContextImage ? [lastContextImage] : undefined);
+  console.log(`[Router] imageContext: ${imageContext ? `${imageContext.length} image(s), first=${imageContext[0].slice(0, 60)}` : 'none'}`);
 
   if (images && images.length > 0) {
     console.log(`[Router] Sending ${images.length} image(s) to ${model}, first image size: ${images[0].length} chars`);
