@@ -436,6 +436,16 @@ export async function* streamResponse(
           tool_call_id: tc.id,
         });
 
+        // Accumulate any fixed tool costs (e.g. image generation)
+        if (toolResult.cost_usd) {
+          if (totalUsage) {
+            totalUsage.cost = (totalUsage.cost ?? 0) + toolResult.cost_usd;
+          } else {
+            totalUsage = { inputTokens: 0, outputTokens: 0, cost: toolResult.cost_usd };
+          }
+          console.log(`[Router] Tool ${tc.name} added cost: $${toolResult.cost_usd}`);
+        }
+
         // Emit action chunks for frontend directives embedded in tool results
         try {
           const parsed = JSON.parse(toolResult.content);
@@ -467,7 +477,9 @@ export async function* streamResponse(
 
   // Calculate token usage, deduct from free tier then balance
   if (totalUsage) {
-    const cost = calculateCost(model, totalUsage.inputTokens, totalUsage.outputTokens);
+    const tokenCost = calculateCost(model, totalUsage.inputTokens, totalUsage.outputTokens);
+    const toolCostAccum = totalUsage.cost ?? 0; // accumulated fixed tool costs (e.g. image gen)
+    const cost = tokenCost + toolCostAccum;
     await db.updateMessageTokens(messageId, totalUsage.inputTokens, totalUsage.outputTokens, cost);
 
     // Deduct from free credit first ($1.00 USD), then charge balance for remainder

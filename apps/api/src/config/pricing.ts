@@ -12,6 +12,12 @@ export const PRICING = {
 
   // Minimum deposit amount in USD
   min_deposit_usd: 0.10,
+
+  // Image generation — fixed per-image cost (DashScope cost + 2x markup)
+  // qwen-image-2.0: ~0.04 CNY/image → ~$0.006 USD → $0.012 with markup
+  // qwen-image-edit-plus: ~0.06 CNY/image → ~$0.008 USD → $0.016 with markup
+  image_gen_cost_usd: 0.012,
+  image_edit_cost_usd: 0.016,
 } as const;
 
 export function calculateCost(

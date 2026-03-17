@@ -5,6 +5,7 @@
 import * as gcal from './google-calendar.js';
 import * as db from './db.js';
 import * as imageGen from './image-gen.js';
+import { PRICING } from '../config/pricing.js';
 
 export interface ToolDefinition {
   name: string;
@@ -15,6 +16,7 @@ export interface ToolDefinition {
 export interface ToolResult {
   name: string;
   content: string;
+  cost_usd?: number; // additional cost beyond LLM tokens (e.g. image generation)
 }
 
 // ─── Tool Definitions ───
@@ -951,6 +953,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
+  let toolCost: number | undefined;
 
   switch (name) {
     case 'crypto_price':
@@ -1036,6 +1039,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       try {
         const url = await imageGen.generateImage(prompt, size);
         content = JSON.stringify({ image_url: url, prompt });
+        toolCost = PRICING.image_gen_cost_usd;
       } catch (err) {
         content = `Image generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
@@ -1054,6 +1058,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       try {
         const url = await imageGen.editImage(prompt, sourceImage, size);
         content = JSON.stringify({ image_url: url, prompt });
+        toolCost = PRICING.image_edit_cost_usd;
       } catch (err) {
         content = `Image editing failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
@@ -1064,5 +1069,5 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       content = `Unknown tool: ${name}`;
   }
 
-  return { name, content };
+  return { name, content, cost_usd: toolCost };
 }
