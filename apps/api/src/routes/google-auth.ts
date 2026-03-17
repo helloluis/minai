@@ -59,7 +59,8 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
 
       const googleId = profile.id!;
       const email = profile.email ?? '';
-      const displayName = profile.name ?? email;
+      const firstName = (profile.given_name ?? profile.name ?? email).split(' ')[0];
+      const displayName = firstName;
       const avatarUrl = profile.picture ?? '';
 
       // Decode state
@@ -91,6 +92,8 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
           await db.createBalance(newUser.id);
           user = await db.linkGoogleAccount(newUser.id, googleId, email, displayName, avatarUrl);
         }
+        // Seed name memory so the bot skips the ask-for-name greeting flow
+        await db.upsertUserMemory(user.id, 'name', displayName);
       }
       // If user already existed (returning Google user), we have them — fall through to set cookie.
       // If existingUserId points to a different anonymous session, we log in as the Google user.
