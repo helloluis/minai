@@ -45,8 +45,8 @@ export function BalanceBar() {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
 
-  const balance = session?.balance?.balance_usd ?? 0;
-  const freeCredit = session?.balance?.free_credit_usd ?? 0;
+  const balance = Number(session?.balance?.balance_usd ?? 0);
+  const freeCredit = Number(session?.balance?.free_credit_usd ?? 0);
   const displayName = session?.user?.display_name;
 
   // Total "available" for the ring: free credit + paid balance
