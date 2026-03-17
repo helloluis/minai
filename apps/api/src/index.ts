@@ -34,22 +34,12 @@ async function start() {
     secret: process.env.COOKIE_SECRET || 'minai-dev-secret',
   });
 
-  // Auth middleware
-  await fastify.register(authPlugin);
-
-  // Routes
-  await fastify.register(authRoutes);
-  await fastify.register(conversationRoutes);
-  await fastify.register(messageRoutes);
-  await fastify.register(noteRoutes);
-  await fastify.register(settingsRoutes);
-  await fastify.register(googleAuthRoutes);
-  await fastify.register(paymentRoutes);
+  // Public routes (before auth middleware)
 
   // Health check
   fastify.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
-  // Serve persisted generated images
+  // Serve persisted generated images — publicly accessible (no auth required)
   fastify.get('/api/uploads/:filename', async (request, reply) => {
     const { filename } = request.params as { filename: string };
     if (!/^[a-f0-9-]{36}\.(jpg|png)$/.test(filename)) {
@@ -64,6 +54,18 @@ async function start() {
       return reply.status(404).send({ error: 'Not found' });
     }
   });
+
+  // Auth middleware
+  await fastify.register(authPlugin);
+
+  // Routes
+  await fastify.register(authRoutes);
+  await fastify.register(conversationRoutes);
+  await fastify.register(messageRoutes);
+  await fastify.register(noteRoutes);
+  await fastify.register(settingsRoutes);
+  await fastify.register(googleAuthRoutes);
+  await fastify.register(paymentRoutes);
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
