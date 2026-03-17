@@ -141,8 +141,11 @@ async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
  * Build conversation history for the LLM from database messages.
  */
 /** Scan history for the most recent image — user upload or a previously generated /api/uploads/ URL */
+const IMAGE_CONTEXT_LOOKBACK = 6; // only look back this many messages for a context image
+
 function findLastContextImage(chatHistory: { images?: string[] | null; content: string }[]): string | undefined {
-  for (let i = chatHistory.length - 1; i >= 0; i--) {
+  const start = Math.max(0, chatHistory.length - IMAGE_CONTEXT_LOOKBACK);
+  for (let i = chatHistory.length - 1; i >= start; i--) {
     const msg = chatHistory[i];
     if (msg.images?.length) {
       console.log(`[Router] findLastContextImage: found user image at index ${i} (${msg.images[0].slice(0, 40)}...)`);
