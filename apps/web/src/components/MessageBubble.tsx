@@ -5,6 +5,7 @@ import type { Message } from '@minai/shared';
 import { decorateHtml } from '@/lib/decorator';
 import { MessageActions } from './MessageActions';
 import { FlashIcon, BalancedIcon, DeepIcon } from './ModeIcons';
+import { WidgetRenderer } from './WidgetRenderer';
 
 interface MessageBubbleProps {
   message: Message;
@@ -215,6 +216,17 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
     : null;
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const closeLightbox = useCallback(() => setLightboxSrc(null), []);
+
+  // Widget messages render as a plain bubble with no actions or metadata
+  if (message.widget_data) {
+    return (
+      <div id={`message-${message.id}`} className="flex justify-start mb-3">
+        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-sm">
+          <WidgetRenderer data={message.widget_data} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -163,17 +163,18 @@ async function buildMessages(
 
   messages.push({ role: 'system', content: systemPrompt });
 
-  // Conversation history (recent messages only)
+  // Conversation history (recent messages only); skip widget-only messages
   const history = await db.getMessages(conversationId, 30);
+  const chatHistory = history.filter((m) => !m.widget_data);
 
   // On the very first message of a new conversation, if name is unknown, inject a signal
-  const isFirstMessage = history.length === 0;
+  const isFirstMessage = chatHistory.length === 0;
   const knowsName = memories.some((m) => m.key === 'name');
   if (isFirstMessage && !knowsName) {
     systemPrompt += '\n\n[SYSTEM NOTE: This is the user\'s FIRST message. Follow the "Greeting New Users" instructions above.]';
   }
 
-  for (const msg of history) {
+  for (const msg of chatHistory) {
     messages.push({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,

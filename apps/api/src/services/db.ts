@@ -97,7 +97,25 @@ export async function createConversation(userId: string, title?: string): Promis
     `INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING *`,
     [userId, title ?? 'New conversation']
   );
-  return rows[0];
+  const conv = rows[0];
+  // Insert greeting widget as the permanent first message
+  const greetingWidget = {
+    widget_type: 'multi-lingual-greeting',
+    widget_style: 'message',
+    widget_content: [
+      'Hello! How can I help you today?',
+      'Habari! Ninaweza kukusaidia vipi leo?',
+      'Kumusta! Paano kita matutulungan ngayon?',
+      'Bonjour! Comment puis-je vous aider?',
+      '¡Hola! ¿En qué puedo ayudarte hoy?',
+      'Sannu! Yaya zan iya taimaka muku yau?',
+    ],
+  };
+  await pool.query(
+    `INSERT INTO messages (conversation_id, role, content, widget_data) VALUES ($1, 'assistant', '', $2)`,
+    [conv.id, JSON.stringify(greetingWidget)]
+  );
+  return conv;
 }
 
 export async function getConversations(userId: string): Promise<ConversationListItem[]> {

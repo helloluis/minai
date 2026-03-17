@@ -53,6 +53,11 @@ export interface Message {
   created_at: string;
   deleted_at: string | null;
   images?: string[]; // base64 data URLs (stored as JSONB in DB)
+  widget_data?: {
+    widget_type: string;
+    widget_style: string;
+    widget_content: string[];
+  } | null;
 }
 
 export interface UserMemory {
