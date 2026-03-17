@@ -13,8 +13,9 @@ export const authPlugin = fp(async function authPlugin(fastify: FastifyInstance)
   fastify.decorateRequest('user', null as unknown as User);
 
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-    // Skip auth for login route
-    if (request.url === '/api/auth/login' || request.url === '/api/health') {
+    // Skip auth for public routes
+    const publicPrefixes = ['/api/auth/login', '/api/health', '/api/auth/google'];
+    if (publicPrefixes.some(p => request.url.startsWith(p))) {
       return;
     }
 
