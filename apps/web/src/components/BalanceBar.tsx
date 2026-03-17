@@ -122,8 +122,12 @@ export function BalanceBar() {
                   <div className="flex justify-between mb-1">
                     <span className="text-gray-500">Remaining</span>
                     <span className="font-medium" style={{ color: ringColor }}>
-                      ${freeCredit.toFixed(2)} of ${FREE_CREDIT_INITIAL_USD.toFixed(2)}
+                      ${freeCredit.toFixed(6)} of ${FREE_CREDIT_INITIAL_USD.toFixed(2)}
                     </span>
+                  </div>
+                  <div className="flex justify-between mb-2 text-gray-400">
+                    <span>Spent</span>
+                    <span>${(FREE_CREDIT_INITIAL_USD - freeCredit).toFixed(6)}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
                     <div
@@ -138,14 +142,14 @@ export function BalanceBar() {
               ) : (
                 <>
                   <div className="font-semibold text-sm mb-1">Paid Balance</div>
-                  <div className="text-2xl font-bold mb-2">${balance.toFixed(2)}</div>
+                  <div className="text-2xl font-bold mb-2">${balance.toFixed(6)}</div>
                   <div className="text-gray-400">Free credit exhausted. Top up to continue.</div>
                 </>
               )}
               {balance > 0 && freeCredit > 0 && (
                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-gray-400">
                   <span>Paid balance</span>
-                  <span>${balance.toFixed(2)}</span>
+                  <span>${balance.toFixed(6)}</span>
                 </div>
               )}
             </div>
