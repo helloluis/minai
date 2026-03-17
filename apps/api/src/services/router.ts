@@ -140,12 +140,23 @@ async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
 /**
  * Build conversation history for the LLM from database messages.
  */
+/** Scan history for the most recent image — user upload or a previously generated /api/uploads/ URL */
+function findLastContextImage(chatHistory: { images?: string[] | null; content: string }[]): string | undefined {
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    const msg = chatHistory[i];
+    if (msg.images?.length) return msg.images[0];
+    const match = msg.content?.match(/!\[[^\]]*\]\((https?:\/\/[^)]+\/api\/uploads\/[^)]+)\)/);
+    if (match) return match[1];
+  }
+  return undefined;
+}
+
 async function buildMessages(
   conversationId: string,
   userId: string,
   currentMessage: string,
   images?: string[]
-): Promise<ProviderMessage[]> {
+): Promise<{ messages: ProviderMessage[]; lastContextImage: string | undefined }> {
   const messages: ProviderMessage[] = [];
 
   // System prompt with user memories
@@ -207,7 +218,7 @@ async function buildMessages(
     messages.push({ role: 'user', content: currentMessage });
   }
 
-  return messages;
+  return { messages, lastContextImage: findLastContextImage(chatHistory) };
 }
 
 export interface StreamResult {
@@ -316,7 +327,9 @@ export async function* streamResponse(
   }
 
   // Build messages
-  const messages = await buildMessages(conversationId, userId, userMessage, images);
+  const { messages, lastContextImage } = await buildMessages(conversationId, userId, userMessage, images);
+  // Images available for tools: current-message uploads first, then most recent image in thread
+  const imageContext = images?.length ? images : (lastContextImage ? [lastContextImage] : undefined);
 
   if (images && images.length > 0) {
     console.log(`[Router] Sending ${images.length} image(s) to ${model}, first image size: ${images[0].length} chars`);
@@ -395,7 +408,7 @@ export async function* streamResponse(
     for (const tc of result.toolCalls) {
       try {
         const args = JSON.parse(tc.arguments);
-        const toolResult = await executeTool(tc.name, args, userId, images);
+        const toolResult = await executeTool(tc.name, args, userId, imageContext);
         messages.push({
           role: 'tool',
           content: toolResult.content,
