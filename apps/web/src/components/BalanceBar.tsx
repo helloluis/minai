@@ -12,9 +12,9 @@ function getRemainingColor(remainingPct: number): string {
   return '#22c55e'; // green
 }
 
-/** Smart money format: "$5", "$1", "$0.75", "$0.09", "$0.00" */
+/** Smart money format: "$5.00", "$1.00", "$0.75", "$0.09", "$0.00" */
 function formatBalance(usd: number): string {
-  if (usd >= 1) return `$${Math.floor(usd)}`;
+  if (usd >= 10) return `$${Math.floor(usd)}`;
   return `$${usd.toFixed(2)}`;
 }
 
@@ -54,7 +54,7 @@ export function BalanceBar() {
   // Display: show free credit ring while it lasts, then paid balance ring
   const ringMax = freeCredit > 0 ? FREE_CREDIT_INITIAL_USD : Math.max(balance, 0.01);
   const ringValue = freeCredit > 0 ? freeCredit : balance;
-  const remainingPct = Math.max(0, Math.min(100, Math.round((ringValue / ringMax) * 100)));
+  const remainingPct = Math.max(0, Math.min(100, (ringValue / ringMax) * 100));
   const ringColor = freeCredit > 0 ? getRemainingColor(remainingPct) : '#6366f1'; // purple when on paid
 
   const displayAmount = formatBalance(totalAvailable);

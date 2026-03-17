@@ -439,6 +439,7 @@ export async function* streamResponse(
     // Deduct from free credit first ($1.00 USD), then charge balance for remainder
     const freeCreditUsed = await db.deductFreeCredit(userId, cost);
     const chargeableCost = cost - freeCreditUsed;
+    console.log(`[Router] Cost: $${cost.toFixed(6)}, freeCreditUsed: $${freeCreditUsed.toFixed(6)}, chargeable: $${chargeableCost.toFixed(6)}`);
 
     if (chargeableCost > 0) {
       await db.deductBalance(userId, chargeableCost);
@@ -447,6 +448,7 @@ export async function* streamResponse(
 
     // Fetch updated balance to send to client
     const updatedBalance = await db.getBalance(userId);
+    console.log(`[Router] Updated balance: free_credit=$${updatedBalance?.free_credit_usd}, paid=$${updatedBalance?.balance_usd}`);
 
     // Fetch updated user to pick up any display_name set via set_preferred_name tool
     const updatedUser = await db.getUserById(userId);
