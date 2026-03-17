@@ -416,12 +416,11 @@ export async function* streamResponse(
     const cost = calculateCost(model, totalUsage.inputTokens, totalUsage.outputTokens);
     await db.updateMessageTokens(messageId, totalUsage.inputTokens, totalUsage.outputTokens, cost);
 
-    // Deduct free tokens first (based on output tokens), then charge balance for remainder
-    const freeTokensUsed = await db.deductFreeTokens(userId, totalUsage.outputTokens);
-    const chargeableOutputTokens = totalUsage.outputTokens - freeTokensUsed;
+    // Deduct from free credit first ($1.00 USD), then charge balance for remainder
+    const freeCreditUsed = await db.deductFreeCredit(userId, cost);
+    const chargeableCost = cost - freeCreditUsed;
 
-    if (chargeableOutputTokens > 0) {
-      const chargeableCost = calculateCost(model, totalUsage.inputTokens, chargeableOutputTokens);
+    if (chargeableCost > 0) {
       await db.deductBalance(userId, chargeableCost);
       await db.recordPayment(userId, -chargeableCost, 'usage');
     }
@@ -434,7 +433,7 @@ export async function* streamResponse(
       usage: { ...totalUsage, cost },
       balance: updatedBalance ? {
         balance_usd: updatedBalance.balance_usd,
-        free_tokens_remaining: updatedBalance.free_tokens_remaining,
+        free_credit_usd: updatedBalance.free_credit_usd,
       } : undefined,
     };
   }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
-import { FREE_TOKENS_INITIAL } from '@minai/shared';
+import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 import { TopUpModal } from './TopUpModal';
 
 function getRemainingColor(remainingPct: number): string {
@@ -10,6 +10,12 @@ function getRemainingColor(remainingPct: number): string {
   if (remainingPct <= 25) return '#f97316'; // orange
   if (remainingPct <= 35) return '#eab308'; // yellow
   return '#22c55e'; // green
+}
+
+/** Smart money format: "$5", "$1", "$0.75", "$0.09", "$0.00" */
+function formatBalance(usd: number): string {
+  if (usd >= 1) return `$${Math.floor(usd)}`;
+  return `$${usd.toFixed(2)}`;
 }
 
 function PinnedButton() {
@@ -40,10 +46,17 @@ export function BalanceBar() {
   const [showTopUp, setShowTopUp] = useState(false);
 
   const balance = session?.balance?.balance_usd ?? 0;
-  const freeTokens = session?.balance?.free_tokens_remaining ?? 0;
-  const usedTokens = FREE_TOKENS_INITIAL - freeTokens;
-  const remainingPct = Math.max(0, Math.round((freeTokens / FREE_TOKENS_INITIAL) * 100));
-  const ringColor = getRemainingColor(remainingPct);
+  const freeCredit = session?.balance?.free_credit_usd ?? 0;
+
+  // Total "available" for the ring: free credit + paid balance
+  const totalAvailable = freeCredit + balance;
+  // Display: show free credit ring while it lasts, then paid balance ring
+  const ringMax = freeCredit > 0 ? FREE_CREDIT_INITIAL_USD : Math.max(balance, 0.01);
+  const ringValue = freeCredit > 0 ? freeCredit : balance;
+  const remainingPct = Math.max(0, Math.min(100, Math.round((ringValue / ringMax) * 100)));
+  const ringColor = freeCredit > 0 ? getRemainingColor(remainingPct) : '#6366f1'; // purple when on paid
+
+  const displayAmount = formatBalance(totalAvailable);
 
   return (
     <div className="relative flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -58,77 +71,83 @@ export function BalanceBar() {
         </svg>
       </button>
 
-      {/* Center: Brand — absolutely centered so it's not affected by asymmetric sides */}
+      {/* Center: Brand */}
       <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none">Minai</span>
 
-      {/* Right: Pinned + Balance + Deposit */}
+      {/* Right: Pinned + Balance ring + Top Up */}
       <div className="flex items-center gap-2">
-        {/* Pinned messages button */}
         <PinnedButton />
 
-        {/* Mini pie chart for free tokens */}
+        {/* Balance ring */}
         <div className="relative">
           <button
             onClick={() => setShowTooltip((v) => !v)}
-            onBlur={() => setShowTooltip(false)}
-            className="relative w-7 h-7 flex items-center justify-center"
-            aria-label="Free token usage"
+            onBlur={() => setTimeout(() => setShowTooltip(false), 150)}
+            className="relative w-12 h-12 flex items-center justify-center"
+            aria-label="Balance"
           >
-            <svg viewBox="0 0 36 36" className="w-7 h-7 -rotate-90">
+            <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90 absolute inset-0">
               <circle
                 cx="18" cy="18" r="14"
                 fill="none"
                 stroke="#e5e7eb"
-                strokeWidth="4"
+                strokeWidth="3.5"
                 className="dark:stroke-gray-700"
               />
               <circle
                 cx="18" cy="18" r="14"
                 fill="none"
                 stroke={ringColor}
-                strokeWidth="4"
+                strokeWidth="3.5"
                 strokeDasharray={`${remainingPct * 0.88} 88`}
                 strokeLinecap="round"
                 className="transition-all duration-500"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-500 dark:text-gray-400">
-              {remainingPct}
+            <span className="relative z-10 text-[10px] font-bold text-gray-700 dark:text-gray-200 leading-none">
+              {displayAmount}
             </span>
           </button>
 
           {/* Tooltip */}
           {showTooltip && (
-            <div className="absolute top-full right-0 mt-2 w-56 p-3 rounded-xl shadow-lg border
+            <div className="absolute top-full right-0 mt-2 w-60 p-3 rounded-xl shadow-lg border
               bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-50 text-xs">
-              <div className="font-semibold text-sm mb-2">Free Token Allocation</div>
-              <div className="flex justify-between mb-1">
-                <span className="text-gray-500">Used</span>
-                <span className="font-medium">{usedTokens.toLocaleString()} tokens</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-500">Remaining</span>
-                <span className="font-medium" style={{ color: ringColor }}>{freeTokens.toLocaleString()} tokens</span>
-              </div>
-              {/* Progress bar — shows remaining */}
-              <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${remainingPct}%`, backgroundColor: ringColor }}
-                />
-              </div>
-              <div className="text-gray-400 mt-2">
-                {freeTokens > 0
-                  ? `${remainingPct}% of your ${FREE_TOKENS_INITIAL.toLocaleString()} free tokens remaining. After that, usage is charged from your balance.`
-                  : 'Free tokens exhausted. Usage is now charged from your balance.'}
-              </div>
+              {freeCredit > 0 ? (
+                <>
+                  <div className="font-semibold text-sm mb-2">Free Credit</div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-gray-500">Remaining</span>
+                    <span className="font-medium" style={{ color: ringColor }}>
+                      ${freeCredit.toFixed(2)} of ${FREE_CREDIT_INITIAL_USD.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${remainingPct}%`, backgroundColor: ringColor }}
+                    />
+                  </div>
+                  <div className="text-gray-400">
+                    After free credit is used, charges come from your paid balance.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-semibold text-sm mb-1">Paid Balance</div>
+                  <div className="text-2xl font-bold mb-2">${balance.toFixed(2)}</div>
+                  <div className="text-gray-400">Free credit exhausted. Top up to continue.</div>
+                </>
+              )}
+              {balance > 0 && freeCredit > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-gray-400">
+                  <span>Paid balance</span>
+                  <span>${balance.toFixed(2)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        <span className="text-sm font-medium">
-          ${Number(balance).toFixed(2)}
-        </span>
 
         <button
           onClick={() => setShowTopUp(true)}

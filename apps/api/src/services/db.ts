@@ -33,8 +33,8 @@ export async function getUserBySession(sessionToken: string): Promise<User | nul
 
 export async function createBalance(userId: string): Promise<UserBalance> {
   const { rows } = await pool.query<UserBalance>(
-    `INSERT INTO user_balances (user_id, free_tokens_remaining) VALUES ($1, $2) RETURNING *`,
-    [userId, PRICING.free_tokens_initial]
+    `INSERT INTO user_balances (user_id, free_credit_usd) VALUES ($1, $2) RETURNING *`,
+    [userId, PRICING.free_credit_initial_usd]
   );
   return rows[0];
 }
@@ -61,14 +61,14 @@ export async function addBalance(userId: string, amount: number): Promise<void> 
   );
 }
 
-export async function deductFreeTokens(userId: string, tokens: number): Promise<number> {
+export async function deductFreeCredit(userId: string, amount: number): Promise<number> {
   const balance = await getBalance(userId);
   if (!balance) return 0;
 
-  const deducted = Math.min(balance.free_tokens_remaining, tokens);
+  const deducted = Math.min(balance.free_credit_usd, amount);
   if (deducted > 0) {
     await pool.query(
-      `UPDATE user_balances SET free_tokens_remaining = free_tokens_remaining - $2, updated_at = now() WHERE user_id = $1`,
+      `UPDATE user_balances SET free_credit_usd = free_credit_usd - $2, updated_at = now() WHERE user_id = $1`,
       [userId, deducted]
     );
   }

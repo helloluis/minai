@@ -1,6 +1,6 @@
 // ─── Config ───
 
-export const FREE_TOKENS_INITIAL = 50_000;
+export const FREE_CREDIT_INITIAL_USD = 1.00; // $1.00 free credit for every new user
 
 // ─── Models ───
 
@@ -26,7 +26,7 @@ export interface UserBalance {
   id: string;
   user_id: string;
   balance_usd: number;
-  free_tokens_remaining: number;
+  free_credit_usd: number;
   updated_at: string;
 }
 
@@ -109,7 +109,7 @@ export interface StreamChunk {
   model?: ModelId;
   classification?: LLMClassification;
   usage?: TokenUsage;
-  balance?: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
+  balance?: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
   error?: string;
 }
 
@@ -140,5 +140,5 @@ export interface ConversationListItem {
 
 export interface SessionResponse {
   user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id'>;
-  balance: Pick<UserBalance, 'balance_usd' | 'free_tokens_remaining'>;
+  balance: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
 }

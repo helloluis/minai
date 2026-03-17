@@ -195,12 +195,12 @@ export const useChatStore = create<ChatState>()(
                 set((s) => ({ streamingContent: s.streamingContent + (chunk.content as string) }));
                 break;
               case 'usage': {
-                const bal = chunk.balance as { balance_usd: number; free_tokens_remaining: number } | undefined;
+                const bal = chunk.balance as { balance_usd: number; free_credit_usd: number } | undefined;
                 if (bal) {
                   set((s) => ({
                     session: s.session ? {
                       ...s.session,
-                      balance: { balance_usd: bal.balance_usd, free_tokens_remaining: bal.free_tokens_remaining },
+                      balance: { balance_usd: bal.balance_usd, free_credit_usd: bal.free_credit_usd },
                     } : s.session,
                   }));
                 }

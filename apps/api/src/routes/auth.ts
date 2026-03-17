@@ -23,7 +23,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       user: { id: user.id, created_at: user.created_at },
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
-        free_tokens_remaining: balance?.free_tokens_remaining ?? 0,
+        free_credit_usd: balance?.free_credit_usd ?? 0,
       },
     };
   });
@@ -42,7 +42,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       },
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
-        free_tokens_remaining: balance?.free_tokens_remaining ?? 0,
+        free_credit_usd: balance?.free_credit_usd ?? 0,
       },
     };
   });
@@ -63,7 +63,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     return {
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
-        free_tokens_remaining: balance?.free_tokens_remaining ?? 0,
+        free_credit_usd: balance?.free_credit_usd ?? 0,
       },
     };
   });

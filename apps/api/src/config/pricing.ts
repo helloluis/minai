@@ -1,4 +1,4 @@
-import { FREE_TOKENS_INITIAL } from '@minai/shared';
+import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 
 export const PRICING = {
   // USD per million tokens (100% markup on Alibaba Cloud pricing)
@@ -7,8 +7,8 @@ export const PRICING = {
   input_token_price_per_mil_fast: 0.2,
   output_token_price_per_mil_fast: 1,
 
-  // Free output tokens granted to every new user
-  free_tokens_initial: FREE_TOKENS_INITIAL,
+  // Free USD credit granted to every new user
+  free_credit_initial_usd: FREE_CREDIT_INITIAL_USD,
 
   // Minimum deposit amount in USD
   min_deposit_usd: 0.10,
