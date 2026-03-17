@@ -110,6 +110,7 @@ export interface StreamChunk {
   classification?: LLMClassification;
   usage?: TokenUsage;
   balance?: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
+  display_name?: string | null;
   error?: string;
 }
 
