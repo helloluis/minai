@@ -5,7 +5,7 @@ import { addBalance, recordPayment, getBalance } from '../services/db.js';
 export default async function paymentRoutes(fastify: FastifyInstance) {
   // GET /api/payment/address — returns (or creates) the user's deposit address
   fastify.get('/api/payment/address', async (request, reply) => {
-    const userId = (request as any).userId as string | undefined;
+    const userId = request.user?.id;
     if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const address = await getOrCreateDepositAddress(userId);
@@ -27,7 +27,7 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
     '/api/payment/verify',
     { schema: { body: { type: 'object', required: ['tx_hash'], properties: { tx_hash: { type: 'string' } } } } },
     async (request, reply) => {
-      const userId = (request as any).userId as string | undefined;
+      const userId = request.user?.id;
       if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
       const { tx_hash } = request.body;
