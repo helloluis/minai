@@ -21,13 +21,10 @@ export function MultiLingualGreeting({ content }: { content: string[] }) {
   }, []); // stable — content is captured via ref, not deps
 
   return (
-    <div className="h-5 relative overflow-hidden" style={{ minWidth: '14rem' }}>
-      <span
-        className={`absolute inset-0 flex items-center transition-all duration-300
-          ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}
-      >
-        {content[index]}
-      </span>
-    </div>
+    <span
+      className={`transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
+    >
+      {content[index]}
+    </span>
   );
 }
