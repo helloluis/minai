@@ -209,6 +209,16 @@ async function buildMessages(
     });
   }
 
+  // If there's a context image from earlier in the thread but none in the current message,
+  // tell the LLM explicitly so it knows to call edit_image without asking for a re-upload
+  const lastContextImage = findLastContextImage(chatHistory);
+  if (!images?.length && lastContextImage) {
+    messages.push({
+      role: 'system',
+      content: '[CONTEXT: An image from earlier in this conversation is pre-loaded and ready. If the user wants to edit, change, or iterate on that image, call the `edit_image` tool with just a prompt — do NOT ask them to re-upload it.]',
+    });
+  }
+
   // Current user message
   if (images && images.length > 0) {
     messages.push({
@@ -225,7 +235,7 @@ async function buildMessages(
     messages.push({ role: 'user', content: currentMessage });
   }
 
-  return { messages, lastContextImage: findLastContextImage(chatHistory) };
+  return { messages, lastContextImage };
 }
 
 export interface StreamResult {
