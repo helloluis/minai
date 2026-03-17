@@ -129,6 +129,7 @@ export const useChatStore = create<ChatState>()(
         const conversation = await api.createConversation();
         await get().loadConversations();
         set({ activeConversationId: conversation.id, messages: [] });
+        await get().loadMessages(conversation.id);
         return conversation.id;
       },
 
