@@ -151,6 +151,13 @@ function renderMarkdown(text: string): string {
     // Empty line
     if (!line.trim()) { result.push(''); continue; }
 
+    // Block-level image: a line that is just ![alt](url)
+    const blockImg = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (blockImg) {
+      result.push(`<img src="${escapeHtml(blockImg[2])}" alt="${escapeHtml(blockImg[1] || 'Generated image')}" class="generated-image" />`);
+      continue;
+    }
+
     // Regular paragraph
     result.push(`<p>${inlineMarkdown(line)}</p>`);
   }
