@@ -25,6 +25,8 @@ interface ChatState {
 
   // Messages
   messages: Message[];
+  hasMoreMessages: boolean;
+  isLoadingMore: boolean;
 
   // Streaming
   isStreaming: boolean;
@@ -56,6 +58,7 @@ interface ChatState {
   updateConversation: (id: string, updates: Partial<ConversationListItem>) => Promise<void>;
 
   loadMessages: (conversationId: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
   sendMessage: (content: string, images?: string[]) => Promise<void>;
 
   deposit: (amount?: number) => Promise<void>;
@@ -81,6 +84,8 @@ export const useChatStore = create<ChatState>()(
       conversations: [],
       activeConversationId: null,
       messages: [],
+      hasMoreMessages: false,
+      isLoadingMore: false,
       isStreaming: false,
       streamingContent: '',
       streamingThinking: '',
@@ -134,7 +139,7 @@ export const useChatStore = create<ChatState>()(
       },
 
       selectConversation: async (id: string) => {
-        set({ activeConversationId: id, messages: [] });
+        set({ activeConversationId: id, messages: [], hasMoreMessages: false });
         await get().loadMessages(id);
       },
 
@@ -154,8 +159,27 @@ export const useChatStore = create<ChatState>()(
 
       // Message actions
       loadMessages: async (conversationId: string) => {
-        const messages = await api.getMessages(conversationId);
-        set({ messages });
+        const PAGE_SIZE = 40;
+        const messages = await api.getMessages(conversationId, PAGE_SIZE);
+        set({ messages, hasMoreMessages: messages.length >= PAGE_SIZE });
+      },
+
+      loadOlderMessages: async () => {
+        const { activeConversationId, messages, isLoadingMore, hasMoreMessages } = get();
+        if (!activeConversationId || isLoadingMore || !hasMoreMessages || messages.length === 0) return;
+        set({ isLoadingMore: true });
+        try {
+          const PAGE_SIZE = 40;
+          const oldest = messages[0].created_at;
+          const older = await api.getMessages(activeConversationId, PAGE_SIZE, oldest);
+          if (older.length > 0) {
+            set({ messages: [...older, ...messages], hasMoreMessages: older.length >= PAGE_SIZE });
+          } else {
+            set({ hasMoreMessages: false });
+          }
+        } finally {
+          set({ isLoadingMore: false });
+        }
       },
 
       sendMessage: async (content: string, images?: string[]) => {

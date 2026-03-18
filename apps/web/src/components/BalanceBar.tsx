@@ -60,7 +60,7 @@ export function BalanceBar() {
   const displayAmount = formatBalance(totalAvailable);
 
   return (
-    <div className="relative flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+    <div className="sticky top-0 z-30 relative flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
       {/* Left: Menu button */}
       <button
         onClick={toggleSidebar}

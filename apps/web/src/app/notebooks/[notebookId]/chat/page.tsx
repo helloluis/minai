@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import { BalanceBar } from '@/components/BalanceBar';
@@ -39,6 +39,9 @@ export default function NotebookChatPage() {
     isAuthenticated,
     checkSession,
     messages,
+    hasMoreMessages,
+    isLoadingMore,
+    loadOlderMessages,
     isStreaming,
     streamingContent,
     streamingThinking,
@@ -54,6 +57,10 @@ export default function NotebookChatPage() {
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  // Track whether user has manually scrolled away from bottom
+  const isNearBottomRef = useRef(true);
 
   // Check auth
   useEffect(() => {
@@ -73,7 +80,7 @@ export default function NotebookChatPage() {
     }
   }, [notebookId, activeConversationId, selectConversation]);
 
-  // Handle AI-triggered navigation (e.g. after create_notebook tool)
+  // Handle AI-triggered navigation
   useEffect(() => {
     if (pendingNavigation) {
       setPendingNavigation(null);
@@ -81,10 +88,39 @@ export default function NotebookChatPage() {
     }
   }, [pendingNavigation, setPendingNavigation, router]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom only if user is near the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, streamingContent, streamingThinking]);
+
+  // Track scroll position for "scroll to bottom" button and infinite scroll
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distFromBottom < 100;
+
+    // Show scroll-down arrow when user is more than 1 viewport height from bottom
+    setShowScrollDown(distFromBottom > el.clientHeight);
+
+    // Load older messages when scrolled near the top
+    if (el.scrollTop < 200 && hasMoreMessages && !isLoadingMore) {
+      const prevHeight = el.scrollHeight;
+      loadOlderMessages().then(() => {
+        // Preserve scroll position after prepending older messages
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight - prevHeight;
+        });
+      });
+    }
+  }, [hasMoreMessages, isLoadingMore, loadOlderMessages]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   if (!isAuthenticated) {
     return (
@@ -131,8 +167,19 @@ export default function NotebookChatPage() {
       <Sidebar />
       <PinnedMessagesMenu />
 
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto"
+        onScroll={handleScroll}
+      >
         <div className="max-w-3xl mx-auto px-4 py-4">
+          {/* Loading older messages indicator */}
+          {isLoadingMore && (
+            <div className="flex justify-center py-3">
+              <span className="text-xs text-gray-400">Loading older messages…</span>
+            </div>
+          )}
+
           {!hasMessages && !isStreaming && <WelcomeMessage />}
 
           {messages.map((msg, index) => (
@@ -160,6 +207,23 @@ export default function NotebookChatPage() {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Scroll-to-bottom floating button */}
+      {showScrollDown && (
+        <button
+          onClick={scrollToBottom}
+          className="fixed bottom-24 right-6 z-20 w-10 h-10 rounded-full
+            bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900
+            shadow-lg flex items-center justify-center
+            hover:bg-gray-700 dark:hover:bg-gray-300
+            transition-all duration-200 animate-fade-in"
+          aria-label="Scroll to bottom"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
+      )}
 
       <ChatInput />
     </div>
