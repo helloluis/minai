@@ -2,7 +2,8 @@
  * Proactive Calendar Briefing Scheduler
  *
  * Runs every minute, checks which users are due for a briefing (6:45am, 11:45am, 5:45pm local),
- * fetches their next 12-18h of calendar events, formats a summary, and delivers it as a message.
+ * fetches their next 12-18h of calendar events from ALL sub-calendars, formats a grouped
+ * summary, and delivers it as a message.
  */
 
 import * as db from './db.js';
@@ -44,25 +45,45 @@ async function tick() {
   }
 }
 
+interface CalendarEvents {
+  calendarName: string;
+  events: gcal.CalendarEvent[];
+}
+
 async function sendBriefing(
   user: db.BriefingUser,
   bt: { label: string; lookAhead: number },
 ) {
-  // Get calendars linked to notebooks, or fall back to primary calendar
-  const associations = await db.getCalendarAssociations(user.id);
-  const calendars = associations.length > 0
-    ? associations.map((a) => ({ id: a.calendar_id, name: a.calendar_name }))
-    : [{ id: 'primary', name: 'Calendar' }];
+  // Fetch ALL the user's sub-calendars from Google
+  let calendars: gcal.CalendarEntry[];
+  try {
+    calendars = await gcal.listCalendars(user.id);
+  } catch (err) {
+    console.error(`[Briefing] Failed to list calendars for user ${user.id}:`, err);
+    return;
+  }
 
-  // Compute time window in user's timezone
+  // Only include calendars the user owns or has write access to (skip "reader" shared ones
+  // that are just other people's calendars they subscribed to — unless explicitly linked)
+  const associations = await db.getCalendarAssociations(user.id);
+  const linkedIds = new Set(associations.map((a) => a.calendar_id));
+  const relevantCalendars = calendars.filter(
+    (c) => c.accessRole === 'owner' || linkedIds.has(c.id)
+  );
+
+  if (relevantCalendars.length === 0) return;
+
+  // Compute time window
   const now = new Date();
   const startISO = now.toISOString();
   const endDate = new Date(now.getTime() + bt.lookAhead * 60 * 60 * 1000);
   const endISO = endDate.toISOString();
 
-  // Fetch events from all calendars
-  const allEvents: Array<gcal.CalendarEvent & { calendarName: string }> = [];
-  for (const cal of calendars) {
+  // Fetch events from each calendar separately (preserves grouping)
+  const calendarGroups: CalendarEvents[] = [];
+  let totalEvents = 0;
+
+  for (const cal of relevantCalendars) {
     try {
       const events = await gcal.getEvents({
         userId: user.id,
@@ -71,33 +92,28 @@ async function sendBriefing(
         endDate: endISO,
         maxResults: 30,
       });
-      for (const ev of events) {
-        allEvents.push({ ...ev, calendarName: cal.name });
+      if (events.length > 0) {
+        calendarGroups.push({ calendarName: cal.name, events });
+        totalEvents += events.length;
       }
     } catch (err) {
       console.error(`[Briefing] Failed to fetch calendar ${cal.id} for user ${user.id}:`, err);
     }
   }
 
-  // Sort by start time
-  allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-
-  // Format the briefing message
-  const content = formatBriefing(user, bt.label, allEvents, user.timezone);
-
-  // Deliver as an assistant message in the user's notebook
+  // Format and deliver
+  const content = formatBriefing(user, bt.label, calendarGroups, totalEvents, user.timezone);
   await db.createMessage(user.notebook_id, 'assistant', content);
-
-  // Mark briefing as sent
   await db.updateLastBriefing(user.id);
 
-  console.log(`[Briefing] Sent ${bt.label} briefing to ${user.display_name ?? user.email ?? user.id} (${allEvents.length} events)`);
+  console.log(`[Briefing] Sent ${bt.label} briefing to ${user.display_name ?? user.email ?? user.id} (${totalEvents} events across ${calendarGroups.length} calendar(s))`);
 }
 
 function formatBriefing(
   user: db.BriefingUser,
   label: string,
-  events: Array<gcal.CalendarEvent & { calendarName: string }>,
+  groups: CalendarEvents[],
+  totalEvents: number,
   timezone: string,
 ): string {
   const name = user.display_name ?? 'there';
@@ -106,19 +122,30 @@ function formatBriefing(
   const lines: string[] = [];
   lines.push(`**${greeting}, ${name}!** Here's your ${label.toLowerCase()} briefing:\n`);
 
-  if (events.length === 0) {
-    lines.push("You're all clear — no upcoming events in the next few hours. 🎉");
-  } else {
-    for (const ev of events) {
-      const time = formatEventTime(ev, timezone);
-      const calLabel = events.length > 1 ? ` · *${ev.calendarName}*` : '';
-      const location = ev.location ? ` 📍 ${ev.location}` : '';
-      const title = ev.link ? `[${ev.title}](${ev.link})` : ev.title;
-      lines.push(`- **${time}** — ${title}${calLabel}${location}`);
+  if (totalEvents === 0) {
+    lines.push("You're all clear — no upcoming events in the next few hours.");
+    return lines.join('\n');
+  }
+
+  const singleCalendar = groups.length === 1;
+
+  for (const group of groups) {
+    // Show calendar heading when there are multiple calendars
+    if (!singleCalendar) {
+      lines.push(`### ${group.calendarName}`);
     }
 
-    lines.push(`\n${events.length} event${events.length > 1 ? 's' : ''} coming up.`);
+    for (const ev of group.events) {
+      const time = formatEventTime(ev, timezone);
+      const location = ev.location ? ` 📍 ${ev.location}` : '';
+      const title = ev.link ? `[${ev.title}](${ev.link})` : ev.title;
+      lines.push(`- **${time}** — ${title}${location}`);
+    }
+
+    if (!singleCalendar) lines.push(''); // blank line between groups
   }
+
+  lines.push(`${totalEvents} event${totalEvents > 1 ? 's' : ''} coming up.`);
 
   return lines.join('\n');
 }
