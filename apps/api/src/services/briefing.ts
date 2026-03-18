@@ -111,7 +111,8 @@ function formatBriefing(
       const time = formatEventTime(ev, timezone);
       const calLabel = events.length > 1 ? ` · *${ev.calendarName}*` : '';
       const location = ev.location ? ` 📍 ${ev.location}` : '';
-      lines.push(`- **${time}** — ${ev.title}${calLabel}${location}`);
+      const title = ev.link ? `[${ev.title}](${ev.link})` : ev.title;
+      lines.push(`- **${time}** — ${title}${calLabel}${location}`);
     }
 
     lines.push(`\n${events.length} event${events.length > 1 ? 's' : ''} coming up.`);
