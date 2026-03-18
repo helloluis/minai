@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
 import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 import { TopUpModal } from './TopUpModal';
+import { MinaiLogo } from './MinaiLogo';
 
 function getRemainingColor(remainingPct: number): string {
   if (remainingPct <= 10) return '#ef4444'; // red
@@ -73,8 +74,9 @@ export function BalanceBar() {
       </button>
 
       {/* Center: Brand + Name */}
-      <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none whitespace-nowrap">
-        {displayName ? <>Minai <span className="text-gray-400 font-normal">+</span> {displayName}</> : 'Minai'}
+      <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-minai-600 pointer-events-none whitespace-nowrap flex items-center gap-1.5">
+        <MinaiLogo className="w-5 h-5" />
+        {displayName ? <>minai <span className="text-gray-400 font-normal">+</span> {displayName}</> : 'minai'}
       </span>
 
       {/* Right: Pinned + Balance ring + Top Up */}

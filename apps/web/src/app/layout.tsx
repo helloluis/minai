@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Minai — AI for Everyone',
+  title: 'minai — AI for Everyone',
   description: 'Affordable frontier AI for emerging economies',
   icons: {
     icon: '/icon.svg',

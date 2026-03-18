@@ -63,11 +63,11 @@ export function MessageActions({ message, previousUserMessage }: MessageActionsP
             e.stopPropagation();
             setMenuOpen(!menuOpen);
           }}
-          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100
-            hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+          className="p-1 rounded-lg
+            hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           aria-label="Message actions"
         >
-          <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
           </svg>
         </button>

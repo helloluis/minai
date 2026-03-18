@@ -54,7 +54,7 @@ export default function LandingPage() {
       <div className="text-center max-w-md">
         {/* Logo / Brand */}
         <div className="mb-8">
-          <h1 className="text-5xl font-bold text-minai-600 mb-2">Minai</h1>
+          <h1 className="text-5xl font-bold text-minai-600 mb-2">minai</h1>
           <p className="text-gray-500 dark:text-gray-400 text-lg">
             An Assistant for Assistants
           </p>

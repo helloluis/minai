@@ -6,6 +6,7 @@ import { decorateHtml } from '@/lib/decorator';
 import { MessageActions } from './MessageActions';
 import { FlashIcon, BalancedIcon, DeepIcon } from './ModeIcons';
 import { WidgetRenderer } from './WidgetRenderer';
+import { MinaiLogo } from './MinaiLogo';
 
 interface MessageBubbleProps {
   message: Message;
@@ -252,9 +253,10 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
       id={`message-${message.id}`}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}
     >
-      {/* Message actions for assistant messages - positioned outside bubble */}
+      {/* Logo + actions for assistant messages */}
       {!isUser && (
-        <div className="flex-shrink-0 mr-1 self-start mt-1">
+        <div className="flex-shrink-0 mr-1.5 self-start mt-1 flex flex-col items-center gap-1">
+          <MinaiLogo className="w-6 h-6" />
           <MessageActions message={message} previousUserMessage={previousUserMessage} />
         </div>
       )}
