@@ -6,6 +6,7 @@ import cookie from '@fastify/cookie';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { getUploadsDir } from './services/image-store.js';
+import { startBriefingScheduler } from './services/briefing.js';
 import { authPlugin } from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
 import { conversationRoutes } from './routes/conversations.js';
@@ -70,6 +71,7 @@ async function start() {
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`\n🚀 Minai API running on http://localhost:${port}\n`);
+    startBriefingScheduler();
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

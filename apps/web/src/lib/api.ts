@@ -139,7 +139,14 @@ export const verifyDeposit = (tx_hash: string) =>
     { method: 'POST', body: JSON.stringify({ tx_hash }) }
   );
 
-// Settings / Usage
+// Settings
+export const setTimezone = (timezone: string) =>
+  fetchAPI<{ success: boolean }>('/api/settings/timezone', {
+    method: 'PUT',
+    body: JSON.stringify({ timezone }),
+  });
+
+// Usage
 export interface DailyUsage {
   date: string;
   input_tokens: number;

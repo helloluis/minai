@@ -33,6 +33,7 @@ async function migrate() {
       '010_feature_suggestions.sql',
       '011_message_widgets.sql',
       '012_payment_sender.sql',
+      '013_user_timezone_briefing.sql',
     ];
 
     for (const migration of migrations) {

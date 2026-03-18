@@ -646,6 +646,52 @@ export async function getTotalUsage(userId: string): Promise<{ total_input: numb
   return rows[0];
 }
 
+// ─── Timezone & Briefings ────────────────────────────────────────────────────
+
+export async function setUserTimezone(userId: string, timezone: string): Promise<void> {
+  await pool.query('UPDATE users SET timezone = $1 WHERE id = $2', [timezone, userId]);
+}
+
+export interface BriefingUser {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  timezone: string;
+  notebook_id: string;
+}
+
+/**
+ * Find users who:
+ *  - have Google Calendar connected
+ *  - have briefings enabled
+ *  - whose local time is within ±2 minutes of a target HH:MM
+ *  - haven't received a briefing in the last 4 hours
+ * Returns one row per user with their most recently active notebook that has a calendar linked.
+ */
+export async function getUsersDueForBriefing(targetHour: number, targetMinute: number): Promise<BriefingUser[]> {
+  const { rows } = await pool.query<BriefingUser>(`
+    SELECT DISTINCT ON (u.id)
+      u.id, u.email, u.display_name, u.timezone,
+      nc.notebook_id
+    FROM users u
+    JOIN google_tokens gt ON gt.user_id = u.id
+    JOIN notebook_calendars nc ON nc.user_id = u.id
+    JOIN conversations c ON c.id = nc.notebook_id
+    WHERE u.deleted_at IS NULL
+      AND u.briefings_enabled = true
+      AND gt.refresh_token IS NOT NULL
+      AND DATE_PART('hour',   NOW() AT TIME ZONE u.timezone)::int = $1
+      AND ABS(DATE_PART('minute', NOW() AT TIME ZONE u.timezone)::int - $2) <= 2
+      AND (u.last_briefing_at IS NULL OR u.last_briefing_at < NOW() - INTERVAL '4 hours')
+    ORDER BY u.id, c.updated_at DESC
+  `, [targetHour, targetMinute]);
+  return rows;
+}
+
+export async function updateLastBriefing(userId: string): Promise<void> {
+  await pool.query('UPDATE users SET last_briefing_at = NOW() WHERE id = $1', [userId]);
+}
+
 // ─── Pool ───
 
 export { pool };

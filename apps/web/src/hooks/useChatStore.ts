@@ -109,6 +109,9 @@ export const useChatStore = create<ChatState>()(
         try {
           const session = await api.getMe();
           set({ session, isAuthenticated: true });
+          // Sync browser timezone to server (fire-and-forget)
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz) api.setTimezone(tz).catch(() => {});
         } catch {
           set({ session: null, isAuthenticated: false });
         }
