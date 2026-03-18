@@ -48,9 +48,11 @@ async function sendBriefing(
   user: db.BriefingUser,
   bt: { label: string; lookAhead: number },
 ) {
-  // Get all calendars linked to this user
+  // Get calendars linked to notebooks, or fall back to primary calendar
   const associations = await db.getCalendarAssociations(user.id);
-  if (associations.length === 0) return;
+  const calendars = associations.length > 0
+    ? associations.map((a) => ({ id: a.calendar_id, name: a.calendar_name }))
+    : [{ id: 'primary', name: 'Calendar' }];
 
   // Compute time window in user's timezone
   const now = new Date();
@@ -58,22 +60,22 @@ async function sendBriefing(
   const endDate = new Date(now.getTime() + bt.lookAhead * 60 * 60 * 1000);
   const endISO = endDate.toISOString();
 
-  // Fetch events from all linked calendars
+  // Fetch events from all calendars
   const allEvents: Array<gcal.CalendarEvent & { calendarName: string }> = [];
-  for (const assoc of associations) {
+  for (const cal of calendars) {
     try {
       const events = await gcal.getEvents({
         userId: user.id,
-        calendarId: assoc.calendar_id,
+        calendarId: cal.id,
         startDate: startISO,
         endDate: endISO,
         maxResults: 30,
       });
       for (const ev of events) {
-        allEvents.push({ ...ev, calendarName: assoc.calendar_name });
+        allEvents.push({ ...ev, calendarName: cal.name });
       }
     } catch (err) {
-      console.error(`[Briefing] Failed to fetch calendar ${assoc.calendar_id} for user ${user.id}:`, err);
+      console.error(`[Briefing] Failed to fetch calendar ${cal.id} for user ${user.id}:`, err);
     }
   }
 
