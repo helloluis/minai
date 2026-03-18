@@ -1,5 +1,5 @@
 import { createPublicClient, http, parseAbi, decodeEventLog, getAddress } from 'viem';
-import { celoSepolia } from 'viem/chains';
+import { celo } from 'viem/chains';
 import { mnemonicToAccount } from 'viem/accounts';
 import { pool } from './db.js';
 
@@ -8,16 +8,17 @@ import { pool } from './db.js';
 const SEED_PHRASE = process.env.WALLET_SEED!;
 
 export const SUPPORTED_TOKENS: Record<string, { address: `0x${string}`; decimals: number }> = {
-  USDC: { address: '0x01C5C0122039549AD1493B8220cABEdD739BC44E', decimals: 6 },
-  USDT: { address: '0xd077A400968890Eacc75cdc901F0356c943e4fDb', decimals: 18 }, // testnet USDT uses 18dp
+  cUSD:  { address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18 },
+  USDC:  { address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C', decimals: 6 },
+  USDT:  { address: '0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e', decimals: 6 },
 };
 
 // Normalize all token amounts to 6 decimal places (1_000_000 units = $1.00)
 export const DECIMALS_NORMALIZED = 6;
 
 const client = createPublicClient({
-  chain: celoSepolia,
-  transport: http(process.env.CELO_RPC_URL ?? 'https://forno.celo-sepolia.celo-testnet.org'),
+  chain: celo,
+  transport: http(process.env.CELO_RPC_URL ?? 'https://forno.celo.org'),
 });
 
 const ERC20_ABI = parseAbi([
@@ -59,6 +60,7 @@ export interface VerifiedDeposit {
   amount_usd: number;
   token: string;
   tx_hash: string;
+  sender: string;
 }
 
 export async function verifyDeposit(userId: string, txHash: string): Promise<VerifiedDeposit> {
@@ -80,9 +82,18 @@ export async function verifyDeposit(userId: string, txHash: string): Promise<Ver
   const depositAddress = rows[0]?.deposit_address;
   if (!depositAddress) throw new Error('No deposit address found — please reload and try again');
 
-  // Fetch receipt
-  const receipt = await client.getTransactionReceipt({ hash });
-  if (!receipt) throw new Error('Transaction not found on Celo Alfajores');
+  // Fetch receipt with retry (tx may not be indexed yet for direct wallet sends)
+  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>> | null = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      receipt = await client.getTransactionReceipt({ hash });
+      if (receipt) break;
+    } catch {
+      // not found yet
+    }
+    if (attempt < 5) await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (!receipt) throw new Error('Transaction not found on Celo after waiting — please try again in a moment');
   if (receipt.status !== 'success') throw new Error('Transaction did not succeed');
 
   // Scan Transfer logs for a matching token → deposit address
@@ -102,7 +113,7 @@ export async function verifyDeposit(userId: string, txHash: string): Promise<Ver
     }
     if (decoded.eventName !== 'Transfer') continue;
 
-    const { to, value } = decoded.args as { from: string; to: string; value: bigint };
+    const { from, to, value } = decoded.args as { from: string; to: string; value: bigint };
     if (getAddress(to) !== getAddress(depositAddress)) continue;
 
     // Normalize to 6 decimal places
@@ -112,7 +123,7 @@ export async function verifyDeposit(userId: string, txHash: string): Promise<Ver
 
     if (amountUsd < 0.10) throw new Error(`Minimum deposit is $0.10 (received $${amountUsd.toFixed(6)})`);
 
-    return { amount_usd: amountUsd, token: symbol, tx_hash: hash };
+    return { amount_usd: amountUsd, token: symbol, tx_hash: hash, sender: from };
   }
 
   throw new Error('No valid transfer to your deposit address found in this transaction');

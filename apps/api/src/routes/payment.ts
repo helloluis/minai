@@ -11,7 +11,7 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
     const address = await getOrCreateDepositAddress(userId);
     return {
       address,
-      network: 'Celo Sepolia (testnet)',
+      network: 'Celo',
       tokens: Object.entries(SUPPORTED_TOKENS).map(([symbol, { address: contract, decimals }]) => ({
         symbol,
         contract,

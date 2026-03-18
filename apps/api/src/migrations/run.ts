@@ -32,6 +32,7 @@ async function migrate() {
       '009_free_credit.sql',
       '010_feature_suggestions.sql',
       '011_message_widgets.sql',
+      '012_payment_sender.sql',
     ];
 
     for (const migration of migrations) {
