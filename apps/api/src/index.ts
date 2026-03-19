@@ -18,6 +18,9 @@ import { googleAuthRoutes } from './routes/google-auth.js';
 import paymentRoutes from './routes/payment.js';
 import { fileRoutes } from './routes/files.js';
 import multipart from '@fastify/multipart';
+import websocket from '@fastify/websocket';
+import { agentRoutes } from './routes/agent.js';
+import { setupPiConfig } from './config/pi-models.js';
 
 const port = parseInt(process.env.API_PORT || '3001');
 const isProd = process.env.NODE_ENV === 'production';
@@ -54,6 +57,9 @@ async function start() {
   // Multipart file uploads (20 MB limit)
   await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
+  // WebSocket support
+  await fastify.register(websocket);
+
   // Public routes (before auth middleware)
 
   // Health check
@@ -87,10 +93,12 @@ async function start() {
   await fastify.register(googleAuthRoutes);
   await fastify.register(paymentRoutes);
   await fastify.register(fileRoutes);
+  await fastify.register(agentRoutes);
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`\n🚀 Minai API running on http://localhost:${port}\n`);
+    setupPiConfig();
     startBriefingScheduler();
   } catch (err) {
     fastify.log.error(err);

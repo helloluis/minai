@@ -152,3 +152,15 @@ export interface SessionResponse {
   user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id'>;
   balance: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
 }
+
+// ─── Pi Agent ───
+
+export interface PiAgentMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  toolName?: string;
+  toolInput?: string;
+  toolOutput?: string;
+  timestamp: number;
+}

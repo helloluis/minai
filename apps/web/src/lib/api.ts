@@ -212,6 +212,19 @@ export interface UsageResponse {
 export const getUsage = (days = 30) =>
   fetchAPI<UsageResponse>(`/api/settings/usage?days=${days}`);
 
+// OpenClaw Agent
+export const getAgentToken = () =>
+  fetchAPI<{ token: string }>('/api/agent/token');
+
+export interface AgentSkill {
+  name: string;
+  description: string;
+  default: boolean;
+}
+
+export const getAgentSkills = () =>
+  fetchAPI<{ skills: AgentSkill[] }>('/api/agent/skills');
+
 // Streaming
 export function streamMessage(
   conversationId: string,

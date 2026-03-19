@@ -18,8 +18,11 @@ function getOAuth2Client(redirectUri?: string) {
   );
 }
 
-/** Build the callback URL from the request's own origin */
+/** Build the callback URL — prefer env var, fall back to request origin */
 function getCallbackUri(request: { headers: { host?: string }; protocol?: string }): string {
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    return process.env.GOOGLE_REDIRECT_URI;
+  }
   const host = request.headers.host ?? 'localhost:3000';
   const proto = host.includes('localhost') ? 'http' : 'https';
   return `${proto}://${host}/api/auth/google/callback`;

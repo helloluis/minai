@@ -12,6 +12,9 @@ COPY packages/shared/package.json packages/shared/
 
 RUN pnpm install --frozen-lockfile
 
+# Install pi-coding-agent globally for the pi agent feature
+RUN npm install -g @mariozechner/pi-coding-agent
+
 # Build shared package (api + web depend on it)
 COPY packages/shared/ packages/shared/
 RUN pnpm --filter @minai/shared build

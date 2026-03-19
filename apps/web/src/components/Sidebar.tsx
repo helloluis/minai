@@ -895,8 +895,20 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* ── Footer: Settings link ── */}
-        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2">
+        {/* ── Footer: OpenClaw + Settings ── */}
+        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-0.5">
+          <button
+            onClick={() => router.push('/agent')}
+            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm
+              text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900
+              hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>OpenClaw</span>
+          </button>
           <button
             onClick={() => router.push('/settings')}
             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm
