@@ -18,7 +18,7 @@ interface PiAgentState {
   isStreaming: boolean;
 
   // Actions
-  connect: (sessionToken: string) => void;
+  connect: (sessionToken: string, conversationId?: string) => void;
   disconnect: () => void;
   sendMessage: (content: string) => void;
   newSession: () => void;
@@ -28,14 +28,16 @@ interface PiAgentState {
 
 let msgIdCounter = 0;
 
-function getWsUrl(sessionToken: string): string {
+function getWsUrl(sessionToken: string, conversationId?: string): string {
   if (typeof window === 'undefined') return '';
   const loc = window.location;
+  const params = new URLSearchParams({ session: sessionToken });
+  if (conversationId) params.set('conversation', conversationId);
   if (loc.port === '3002') {
-    return `ws://${loc.hostname}:3001/api/agent/ws?session=${encodeURIComponent(sessionToken)}`;
+    return `ws://${loc.hostname}:3001/api/agent/ws?${params}`;
   }
   const proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${loc.host}/api/agent/ws?session=${encodeURIComponent(sessionToken)}`;
+  return `${proto}//${loc.host}/api/agent/ws?${params}`;
 }
 
 export const usePiAgentStore = create<PiAgentState>()((set, get) => ({
@@ -47,7 +49,7 @@ export const usePiAgentStore = create<PiAgentState>()((set, get) => ({
   streamingThinking: '',
   isStreaming: false,
 
-  connect: (sessionToken: string) => {
+  connect: (sessionToken: string, conversationId?: string) => {
     const { ws } = get();
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
       return;
@@ -55,7 +57,7 @@ export const usePiAgentStore = create<PiAgentState>()((set, get) => ({
 
     set({ status: 'connecting', error: null });
 
-    const url = getWsUrl(sessionToken);
+    const url = getWsUrl(sessionToken, conversationId);
     const socket = new WebSocket(url);
 
     socket.onopen = () => {

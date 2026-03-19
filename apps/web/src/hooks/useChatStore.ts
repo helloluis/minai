@@ -195,6 +195,7 @@ export const useChatStore = create<ChatState>()(
           conversation_id: activeConversationId,
           role: 'user',
           content,
+          source: 'chat',
           model: null,
           input_tokens: 0,
           output_tokens: 0,

@@ -207,11 +207,12 @@ export async function createMessage(
   content: string,
   model?: string,
   images?: string[],
-  fileIds?: string[]
+  fileIds?: string[],
+  source: 'chat' | 'agent' = 'chat'
 ): Promise<Message> {
   const { rows } = await pool.query<Message>(
-    `INSERT INTO messages (conversation_id, role, content, model, images, file_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [conversationId, role, content, model ?? null, images && images.length > 0 ? JSON.stringify(images) : null, fileIds && fileIds.length > 0 ? JSON.stringify(fileIds) : null]
+    `INSERT INTO messages (conversation_id, role, content, model, images, file_ids, source) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [conversationId, role, content, model ?? null, images && images.length > 0 ? JSON.stringify(images) : null, fileIds && fileIds.length > 0 ? JSON.stringify(fileIds) : null, source]
   );
   // Update conversation timestamp
   await pool.query(
@@ -224,9 +225,11 @@ export async function createMessage(
 export async function getMessages(
   conversationId: string,
   limit = 50,
-  before?: string
+  before?: string,
+  source?: 'chat' | 'agent'
 ): Promise<Message[]> {
   const params: unknown[] = [conversationId];
+  const sourceFilter = source ? ` AND source = '${source}'` : '';
 
   if (before) {
     // Pagination: get N messages BEFORE a timestamp (for loading older messages)
@@ -236,7 +239,7 @@ export async function getMessages(
     if (limit) params.push(limit);
     const { rows } = await pool.query<Message>(
       `SELECT * FROM (
-        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL AND created_at < $2
+        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL AND created_at < $2${sourceFilter}
         ORDER BY created_at DESC ${limitClause}
       ) sub ORDER BY created_at ASC`,
       params
@@ -249,7 +252,7 @@ export async function getMessages(
     params.push(limit);
     const { rows } = await pool.query<Message>(
       `SELECT * FROM (
-        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL
+        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL${sourceFilter}
         ORDER BY created_at DESC LIMIT $2
       ) sub ORDER BY created_at ASC`,
       params
@@ -259,7 +262,7 @@ export async function getMessages(
 
   // No limit, no cursor: return all messages
   const { rows } = await pool.query<Message>(
-    `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
+    `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL${sourceFilter} ORDER BY created_at ASC`,
     params
   );
   return hydrateMessageFiles(rows);

@@ -54,6 +54,7 @@ export interface Message {
   created_at: string;
   deleted_at: string | null;
   images?: string[]; // base64 data URLs (stored as JSONB in DB)
+  source: 'chat' | 'agent'; // which thread this message belongs to
   file_ids?: string[]; // IDs of attached notebook_files (stored as JSONB in DB)
   files?: { id: string; display_name: string; mime_type: string; file_size: number }[]; // hydrated file metadata
   widget_data?: {

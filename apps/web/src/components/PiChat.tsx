@@ -102,7 +102,7 @@ function SkillButton({ skill, onClick }: { skill: AgentSkill; onClick: () => voi
   );
 }
 
-export default function PiChat() {
+export default function PiChat({ conversationId }: { conversationId?: string } = {}) {
   const {
     status, error, messages, streamingContent, isStreaming,
     connect, disconnect, sendMessage, newSession, abort,
@@ -124,7 +124,7 @@ export default function PiChat() {
   useEffect(() => {
     if (session?.user && status === 'disconnected') {
       api.getAgentToken()
-        .then(({ token }) => connect(token))
+        .then(({ token }) => connect(token, conversationId))
         .catch((err) => console.error('[openclaw] Failed to get token:', err));
     }
   }, [session, status, connect]);

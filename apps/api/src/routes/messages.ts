@@ -5,11 +5,11 @@ import { streamResponse } from '../services/router.js';
 
 export async function messageRoutes(fastify: FastifyInstance) {
   // Get messages for a conversation
-  fastify.get<{ Params: { id: string }; Querystring: { limit?: string; before?: string } }>(
+  fastify.get<{ Params: { id: string }; Querystring: { limit?: string; before?: string; source?: string } }>(
     '/api/conversations/:id/messages',
     async (request) => {
       const { id } = request.params;
-      const { limit, before } = request.query;
+      const { limit, before, source } = request.query;
 
       // Verify conversation belongs to user
       const conversation = await db.getConversation(id, request.user.id);
@@ -17,7 +17,8 @@ export async function messageRoutes(fastify: FastifyInstance) {
         throw { statusCode: 404, message: 'Conversation not found' };
       }
 
-      return db.getMessages(id, limit ? parseInt(limit) : 50, before);
+      const sourceFilter = source === 'agent' ? 'agent' : source === 'chat' ? 'chat' : undefined;
+      return db.getMessages(id, limit ? parseInt(limit) : 50, before, sourceFilter);
     }
   );
 

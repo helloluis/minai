@@ -54,10 +54,11 @@ export const deleteConversation = (id: string) =>
   fetchAPI<{ success: boolean }>(`/api/conversations/${id}`, { method: 'DELETE' });
 
 // Messages
-export const getMessages = (conversationId: string, limit?: number, before?: string) => {
+export const getMessages = (conversationId: string, limit?: number, before?: string, source?: 'chat' | 'agent') => {
   const params = new URLSearchParams();
   if (limit) params.set('limit', String(limit));
   if (before) params.set('before', before);
+  if (source) params.set('source', source);
   return fetchAPI<Message[]>(`/api/conversations/${conversationId}/messages?${params}`);
 };
 

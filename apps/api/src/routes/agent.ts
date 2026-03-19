@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
-import { getUserBySession } from '../services/db.js';
+import { getUserBySession, createMessage, getConversation } from '../services/db.js';
 import {
   sessionManager, type PiRpcProcess,
   getInstalledSkills, getAvailableTemplates, installSkill, removeSkill,
@@ -11,6 +11,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
   fastify.get('/api/agent/ws', { websocket: true }, async (socket: WebSocket, request) => {
     const url = new URL(request.url, `http://localhost`);
     const sessionToken = url.searchParams.get('session') || '';
+    const conversationId = url.searchParams.get('conversation') || '';
 
     if (!sessionToken) {
       socket.send(JSON.stringify({ type: 'error', error: 'session parameter required' }));
@@ -25,7 +26,14 @@ export async function agentRoutes(fastify: FastifyInstance) {
       return;
     }
 
-    console.log(`[agent:ws] Connected user=${user.id.slice(0, 8)}...`);
+    // Verify conversation belongs to user (needed for persistence)
+    let convId = conversationId;
+    if (convId) {
+      const conv = await getConversation(convId, user.id);
+      if (!conv) convId = ''; // invalid — don't persist
+    }
+
+    console.log(`[agent:ws] Connected user=${user.id.slice(0, 8)}... conv=${convId.slice(0, 8) || 'none'}`);
 
     let rpc: PiRpcProcess;
     try {
@@ -37,10 +45,26 @@ export async function agentRoutes(fastify: FastifyInstance) {
       return;
     }
 
-    // Forward pi output to WebSocket
+    // Track streaming assistant content for persistence
+    let assistantBuffer = '';
+
+    // Forward pi output to WebSocket + persist assistant messages
     const listener = (piMsg: Record<string, unknown>) => {
-      if (socket.readyState === 1) { // WebSocket.OPEN
-        socket.send(JSON.stringify(piMsg));
+      if (socket.readyState !== 1) return; // WebSocket.OPEN
+      socket.send(JSON.stringify(piMsg));
+
+      // Accumulate assistant text for persistence
+      if (piMsg.type === 'message_update') {
+        const event = piMsg.assistantMessageEvent as Record<string, unknown> | undefined;
+        if (event?.type === 'text_delta' && typeof event.delta === 'string') {
+          assistantBuffer += event.delta;
+        }
+        // On message complete, persist the full assistant response
+        if (event?.type === 'done' && convId && assistantBuffer.trim()) {
+          createMessage(convId, 'assistant', assistantBuffer.trim(), undefined, undefined, undefined, 'agent')
+            .catch((err) => console.error('[agent:ws] Failed to persist assistant message:', err));
+          assistantBuffer = '';
+        }
       }
     };
     rpc.addListener(listener);
@@ -53,7 +77,7 @@ export async function agentRoutes(fastify: FastifyInstance) {
       // Process may not support get_state
     }
 
-    // Forward user messages to pi
+    // Forward user messages to pi + persist user messages
     socket.on('message', (data: Buffer) => {
       try {
         const msg = JSON.parse(data.toString());
@@ -64,6 +88,14 @@ export async function agentRoutes(fastify: FastifyInstance) {
           socket.send(JSON.stringify({ type: 'auth_ok' }));
           return;
         }
+
+        // Persist user prompts
+        if (msg.type === 'prompt' && typeof msg.message === 'string' && convId) {
+          createMessage(convId, 'user', msg.message, undefined, undefined, undefined, 'agent')
+            .catch((err) => console.error('[agent:ws] Failed to persist user message:', err));
+          assistantBuffer = ''; // reset for next response
+        }
+
         rpc.send(msg);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Invalid message';
@@ -73,6 +105,11 @@ export async function agentRoutes(fastify: FastifyInstance) {
 
     socket.on('close', () => {
       console.log(`[agent:ws] Disconnected user=${user.id.slice(0, 8)}...`);
+      // Persist any buffered assistant content on disconnect
+      if (convId && assistantBuffer.trim()) {
+        createMessage(convId, 'assistant', assistantBuffer.trim(), undefined, undefined, undefined, 'agent')
+          .catch(console.error);
+      }
       rpc.removeListener(listener);
     });
   });

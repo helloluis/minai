@@ -54,6 +54,7 @@ function NotebookRow({
   onRename,
   onNewNote,
   onSelectNote,
+  onSelectAutomate,
   onExpandNotes,
   onOpenFile,
   dragProps,
@@ -64,6 +65,7 @@ function NotebookRow({
   notes: Note[];
   files: NotebookFile[];
   onSelect: () => void;
+  onSelectAutomate: () => void;
   onRename: (newTitle: string) => void;
   onNewNote: () => void;
   onSelectNote: (noteId: string) => void;
@@ -158,6 +160,17 @@ function NotebookRow({
           >
             <span>🗨️</span>
             <span className="font-medium">Chat</span>
+          </div>
+
+          <div
+            onClick={() => onSelectAutomate()}
+            className="flex items-center gap-2 px-9 py-1.5 text-sm cursor-pointer transition-colors
+              text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300
+              hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <span>⚡</span>
+            <span className="font-medium">Automate</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium">OpenClaw</span>
           </div>
 
           {notes.slice(0, 5).map(note => (
@@ -878,6 +891,7 @@ export function Sidebar() {
                     notes={(notesByConv[conv.id] ?? []).slice().sort((a, b) => a.display_order - b.display_order)}
                     files={filesByConv[conv.id] ?? []}
                     onSelect={() => handleSelectNotebook(conv.id)}
+                    onSelectAutomate={() => { router.push(`/notebooks/${conv.id}/automate`); }}
                     onRename={(title) => handleRename(conv.id, title)}
                     onNewNote={async () => {
                       if (conv.id !== activeConversationId) await handleSelectNotebook(conv.id);
