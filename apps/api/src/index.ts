@@ -20,7 +20,8 @@ import { fileRoutes } from './routes/files.js';
 import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import { agentRoutes } from './routes/agent.js';
-import { setupPiConfig } from './config/pi-models.js';
+// setupPiConfig removed — Pi now uses OPENAI_BASE_URL to talk to our LLM proxy
+// No need to write API keys to disk
 import { startLLMProxy } from './services/llm-proxy.js';
 
 const port = parseInt(process.env.API_PORT || '3001');
@@ -99,7 +100,6 @@ async function start() {
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`\n🚀 Minai API running on http://localhost:${port}\n`);
-    setupPiConfig();
     startLLMProxy();
     startBriefingScheduler();
   } catch (err) {

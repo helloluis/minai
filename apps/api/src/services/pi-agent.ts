@@ -248,9 +248,10 @@ export class PiRpcProcess {
     }
 
     // Sandbox: restricted environment — no real API keys
+    // HOME points to the user's workspace, NOT /root (which has SSH keys, Pi config with real API keys, etc.)
     // Pi talks to our LLM proxy at localhost, which handles auth + billing
     const safeEnv: Record<string, string> = {
-      HOME: homedir(),
+      HOME: cwd,
       PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
       LANG: 'en_US.UTF-8',
       TERM: 'xterm-256color',
