@@ -81,11 +81,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  // Auth: Bearer token is the user ID
+  // Auth: Bearer token is the user ID — only accept IDs with an active agent session
   const auth = req.headers.authorization ?? '';
   const userId = auth.replace('Bearer ', '').trim();
   if (!userId || userId.length < 16) {
-    sendError(res, 401, 'Invalid authorization — expected Bearer <userId>');
+    sendError(res, 401, 'Invalid authorization');
+    return;
+  }
+
+  // Verify this user actually has a running agent session (prevents user ID guessing)
+  const { sessionManager } = await import('./pi-agent.js');
+  const session = sessionManager.get(userId);
+  if (!session?.ready) {
+    sendError(res, 403, 'No active agent session');
     return;
   }
 
