@@ -359,11 +359,25 @@ export async function* streamResponse(
     }
     console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
 
-    // Override: tool-heavy requests need the deep model (flash hallucinates tool calls)
-    if (classification === 'simple' && /\b(add|create|schedule|book|set up|delete|remove|cancel|update|change|move|reschedule)\b.*\b(calendar|event|meeting|appointment|reminder|session)\b/i.test(userMessage)) {
-      model = MODEL_DEEP;
-      classification = 'balanced';
-      console.log(`[Router] Override: calendar action detected → upgrading to ${model}`);
+    // Override: flash model is unreliable for tool-calling. Upgrade to deep when:
+    // 1. Message explicitly requests an action (calendar, feature, image, file, etc.)
+    // 2. Message is a short confirmation that likely triggers a pending tool call
+    if (classification === 'simple') {
+      const needsTools =
+        // Calendar actions
+        /\b(add|create|schedule|book|set up|delete|remove|cancel|update|change|move|reschedule)\b.*\b(calendar|event|meeting|appointment|reminder|session)\b/i.test(userMessage) ||
+        // Feature suggestions
+        /\b(feature|suggestion|suggest|idea)\b/i.test(userMessage) ||
+        // Image generation/editing
+        /\b(generate|create|make|draw|design)\b.*\b(image|photo|picture|logo|headshot)\b/i.test(userMessage) ||
+        // Short confirmations (likely triggering a pending action from previous turn)
+        /^(yes|yep|yup|yeah|ok|okay|sure|go ahead|do it|confirm|sounds good|sounds great|that'?s? (right|correct|good|great|perfect)|submit|send|approved?)\b/i.test(userMessage.trim());
+
+      if (needsTools) {
+        model = MODEL_DEEP;
+        classification = 'balanced';
+        console.log(`[Router] Override: tool-likely message → upgrading to ${model}`);
+      }
     }
   }
 
