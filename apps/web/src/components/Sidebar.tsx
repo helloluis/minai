@@ -135,28 +135,14 @@ function NotebookRow({
 
         {!editing && (
           <button
-            onClick={startEditing}
-            className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all flex-shrink-0
-              ${isActive ? 'text-minai-200 hover:bg-minai-500' : 'text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-            title="Rename notebook"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
-        )}
-
-        {!editing && (
-          <button
             onClick={(e) => { e.stopPropagation(); onExpandNotes(); }}
-            className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all flex-shrink-0
-              ${isActive ? 'text-minai-200 hover:bg-minai-500' : 'text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+            className={`p-1 rounded transition-colors flex-shrink-0
+              ${isActive ? 'text-minai-200 hover:bg-minai-500' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
             title="Open notes canvas"
           >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <line x1="20" y1="4" x2="20" y2="20" strokeLinecap="round" />
             </svg>
           </button>
         )}
