@@ -306,6 +306,123 @@ function NoteCard({
   );
 }
 
+// ─── FileRow ────────────────────────────────────────────────────────────────
+
+function FileRow({
+  file,
+  conversationId,
+  onView,
+  onRenamed,
+  onDeleted,
+}: {
+  file: NotebookFile;
+  conversationId: string;
+  onView: () => void;
+  onRenamed: (newName: string) => void;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(file.display_name);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditValue(file.display_name);
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const commitEdit = () => {
+    setEditing(false);
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== file.display_name) {
+      api.renameFile(conversationId, file.id, trimmed).then(() => onRenamed(trimmed)).catch(console.error);
+    }
+  };
+
+  const handleDelete = () => {
+    api.deleteFile(conversationId, file.id).then(() => onDeleted()).catch(console.error);
+    setConfirmDelete(false);
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete file?"
+        message={`"${file.display_name}" will be permanently removed.`}
+        confirmLabel="Delete file"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+      <div
+        className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
+          hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+        onClick={editing ? undefined : onView}
+      >
+        <span className="text-base">{getFileIcon(file.mime_type)}</span>
+
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEdit();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 text-sm bg-white dark:bg-gray-800 border border-minai-300
+              dark:border-minai-700 rounded px-1.5 py-0.5 outline-none text-gray-800 dark:text-gray-100"
+          />
+        ) : (
+          <span className="flex-1 text-sm truncate text-gray-700 dark:text-gray-300">{file.display_name}</span>
+        )}
+
+        <span className="text-xs text-gray-400 flex-shrink-0">{(file.file_size / 1024).toFixed(0)} KB</span>
+
+        {!editing && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+            <button
+              onClick={startEditing}
+              className="p-1 rounded text-gray-400 hover:text-minai-600"
+              title="Rename"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <a
+              href={api.getFileDownloadUrl(conversationId, file.id)}
+              download={file.original_name}
+              onClick={(e) => e.stopPropagation()}
+              className="p-1 rounded text-gray-400 hover:text-minai-600"
+              title="Download"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </a>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+              className="p-1 rounded text-gray-400 hover:text-red-500"
+              title="Delete"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
@@ -619,28 +736,26 @@ export function Sidebar() {
                 <div className="mt-4 mb-2">
                   <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Files</div>
                   {(filesByConv[activeConversationId] ?? []).map((file) => (
-                    <div
+                    <FileRow
                       key={file.id}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
-                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
-                      onClick={() => setViewingFile(file)}
-                    >
-                      <span className="text-base">{getFileIcon(file.mime_type)}</span>
-                      <span className="flex-1 text-sm truncate text-gray-700 dark:text-gray-300">{file.display_name}</span>
-                      <span className="text-xs text-gray-400">{(file.file_size / 1024).toFixed(0)} KB</span>
-                      <a
-                        href={api.getFileDownloadUrl(activeConversationId, file.id)}
-                        download={file.original_name}
-                        onClick={(e) => e.stopPropagation()}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-minai-600 transition-all"
-                        title="Download"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </a>
-                    </div>
+                      file={file}
+                      conversationId={activeConversationId}
+                      onView={() => setViewingFile(file)}
+                      onRenamed={(newName) => {
+                        setFilesByConv((prev) => ({
+                          ...prev,
+                          [activeConversationId]: (prev[activeConversationId] ?? []).map((f) =>
+                            f.id === file.id ? { ...f, display_name: newName } : f
+                          ),
+                        }));
+                      }}
+                      onDeleted={() => {
+                        setFilesByConv((prev) => ({
+                          ...prev,
+                          [activeConversationId]: (prev[activeConversationId] ?? []).filter((f) => f.id !== file.id),
+                        }));
+                      }}
+                    />
                   ))}
                 </div>
               )}

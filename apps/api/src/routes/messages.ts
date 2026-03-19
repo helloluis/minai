@@ -26,9 +26,9 @@ export async function messageRoutes(fastify: FastifyInstance) {
     '/api/conversations/:id/messages/stream',
     async (request, reply) => {
       const { id } = request.params;
-      const { content, mode, images } = request.body as SendMessageRequest;
+      const { content, mode, images, file_ids } = request.body as SendMessageRequest & { file_ids?: string[] };
 
-      console.log(`[Messages] Received: content="${content.slice(0, 50)}", mode=${mode}, images=${images ? images.length : 0}${images?.[0] ? `, first image: ${images[0].slice(0, 50)}...` : ''}`);
+      console.log(`[Messages] Received: content="${content.slice(0, 50)}", mode=${mode}, images=${images ? images.length : 0}, files=${file_ids ? file_ids.length : 0}`);
 
       // Verify conversation belongs to user
       const conversation = await db.getConversation(id, request.user.id);
@@ -36,8 +36,8 @@ export async function messageRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Conversation not found' });
       }
 
-      // Store user message (with images if present)
-      await db.createMessage(id, 'user', content, undefined, images);
+      // Store user message (with images and file references if present)
+      await db.createMessage(id, 'user', content, undefined, images, file_ids);
 
       // Create assistant message placeholder
       const assistantMsg = await db.createMessage(id, 'assistant', '', undefined);

@@ -59,7 +59,7 @@ interface ChatState {
 
   loadMessages: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
-  sendMessage: (content: string, images?: string[]) => Promise<void>;
+  sendMessage: (content: string, images?: string[], fileIds?: string[]) => Promise<void>;
 
   deposit: (amount?: number) => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -185,7 +185,7 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      sendMessage: async (content: string, images?: string[]) => {
+      sendMessage: async (content: string, images?: string[], fileIds?: string[]) => {
         const { activeConversationId, mode, messages } = get();
         if (!activeConversationId || get().isStreaming) return;
 
@@ -215,7 +215,7 @@ export const useChatStore = create<ChatState>()(
         });
 
         try {
-          for await (const { event, data } of api.fetchSSE(activeConversationId, content, mode, images)) {
+          for await (const { event, data } of api.fetchSSE(activeConversationId, content, mode, images, fileIds)) {
             const chunk = data as Record<string, unknown>;
 
             switch (event) {

@@ -224,13 +224,14 @@ export async function* fetchSSE(
   conversationId: string,
   content: string,
   mode: LLMMode,
-  images?: string[]
+  images?: string[],
+  fileIds?: string[]
 ): AsyncGenerator<{ event: string; data: unknown }> {
   const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages/stream`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, mode, images }),
+    body: JSON.stringify({ content, mode, images, file_ids: fileIds }),
   });
 
   if (!res.ok) {

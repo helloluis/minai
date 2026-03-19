@@ -205,11 +205,12 @@ export async function createMessage(
   role: string,
   content: string,
   model?: string,
-  images?: string[]
+  images?: string[],
+  fileIds?: string[]
 ): Promise<Message> {
   const { rows } = await pool.query<Message>(
-    `INSERT INTO messages (conversation_id, role, content, model, images) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [conversationId, role, content, model ?? null, images && images.length > 0 ? JSON.stringify(images) : null]
+    `INSERT INTO messages (conversation_id, role, content, model, images, file_ids) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [conversationId, role, content, model ?? null, images && images.length > 0 ? JSON.stringify(images) : null, fileIds && fileIds.length > 0 ? JSON.stringify(fileIds) : null]
   );
   // Update conversation timestamp
   await pool.query(
@@ -239,7 +240,7 @@ export async function getMessages(
       ) sub ORDER BY created_at ASC`,
       params
     );
-    return rows;
+    return hydrateMessageFiles(rows);
   }
 
   if (limit) {
@@ -252,7 +253,7 @@ export async function getMessages(
       ) sub ORDER BY created_at ASC`,
       params
     );
-    return rows;
+    return hydrateMessageFiles(rows);
   }
 
   // No limit, no cursor: return all messages
@@ -260,7 +261,27 @@ export async function getMessages(
     `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
     params
   );
-  return rows;
+  return hydrateMessageFiles(rows);
+}
+
+/** Attach file metadata to messages that have file_ids */
+async function hydrateMessageFiles(messages: Message[]): Promise<Message[]> {
+  const allFileIds = messages.flatMap((m) => m.file_ids ?? []);
+  if (allFileIds.length === 0) return messages;
+
+  const { rows: files } = await pool.query<{ id: string; display_name: string; mime_type: string; file_size: number }>(
+    `SELECT id, display_name, mime_type, file_size FROM notebook_files WHERE id = ANY($1) AND deleted_at IS NULL`,
+    [allFileIds]
+  );
+  const fileMap = new Map(files.map((f) => [f.id, f]));
+
+  return messages.map((m) => {
+    if (!m.file_ids?.length) return m;
+    return {
+      ...m,
+      files: m.file_ids.map((id) => fileMap.get(id)).filter(Boolean) as Message['files'],
+    };
+  });
 }
 
 export async function updateMessageTokens(

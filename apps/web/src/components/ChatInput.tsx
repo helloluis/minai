@@ -30,6 +30,7 @@ const DOC_TYPES = new Set([
 
 interface StagedDoc {
   name: string;
+  fileId?: string; // set after upload completes
   uploading: boolean;
   error?: string;
 }
@@ -101,14 +102,10 @@ export function ChatInput() {
         setStagedDocs((prev) => [...prev, { name: docName, uploading: true }]);
 
         uploadFile(activeConversationId, file)
-          .then(() => {
+          .then((uploaded) => {
             setStagedDocs((prev) =>
-              prev.map((d) => d.name === docName ? { ...d, uploading: false } : d)
+              prev.map((d) => d.name === docName ? { ...d, uploading: false, fileId: uploaded.id } : d)
             );
-            // Auto-remove after 3s
-            setTimeout(() => {
-              setStagedDocs((prev) => prev.filter((d) => d.name !== docName));
-            }, 3000);
           })
           .catch((err) => {
             setStagedDocs((prev) =>
@@ -129,20 +126,23 @@ export function ChatInput() {
 
   const handleSubmit = async () => {
     const trimmed = text.trim();
-    if ((!trimmed && stagedImages.length === 0) || isStreaming) return;
+    const hasFiles = stagedDocs.some((d) => d.fileId);
+    if ((!trimmed && stagedImages.length === 0 && !hasFiles) || isStreaming) return;
 
     const images = stagedImages.length > 0 ? [...stagedImages] : undefined;
-    const message = trimmed || 'What is this image?';
+    const fileIds = stagedDocs.filter((d) => d.fileId).map((d) => d.fileId!);
+    const message = trimmed || (images ? 'What is this image?' : 'Please review the attached file.');
 
     setText('');
     setStagedImages([]);
+    setStagedDocs([]);
     setFileError('');
     historyIndexRef.current = -1;
     savedDraftRef.current = '';
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     if (images && mode !== 'deep') setMode('deep');
-    await sendMessage(message, images);
+    await sendMessage(message, images, fileIds.length > 0 ? fileIds : undefined);
   };
 
   // ─── Keyboard ───────────────────────────────────────────────────────────
@@ -289,6 +289,12 @@ export function ChatInput() {
               {doc.error && <span>✕</span>}
               <span className="truncate max-w-[150px]">{doc.name}</span>
               {doc.error && <span className="text-[10px]">{doc.error}</span>}
+              {!doc.uploading && (
+                <button
+                  onClick={() => setStagedDocs((prev) => prev.filter((d) => d.name !== doc.name))}
+                  className="ml-0.5 text-gray-400 hover:text-red-500"
+                >×</button>
+              )}
             </div>
           ))}
         </div>

@@ -7,6 +7,8 @@ import { MessageActions } from './MessageActions';
 import { FlashIcon, BalancedIcon, DeepIcon } from './ModeIcons';
 import { WidgetRenderer } from './WidgetRenderer';
 import { MinaiLogo } from './MinaiLogo';
+import { FileViewer, getFileIcon } from './FileViewer';
+import { getFileDownloadUrl } from '@/lib/api';
 
 interface MessageBubbleProps {
   message: Message;
@@ -233,6 +235,8 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
     : null;
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const closeLightbox = useCallback(() => setLightboxSrc(null), []);
+  const [viewingFileId, setViewingFileId] = useState<string | null>(null);
+  const viewingFile = viewingFileId ? message.files?.find((f) => f.id === viewingFileId) : null;
 
   // Widget messages render as a plain bubble with no actions or metadata
   if (message.widget_data) {
@@ -249,6 +253,13 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
   return (
     <>
     {lightboxSrc && <Lightbox src={lightboxSrc} onClose={closeLightbox} />}
+    {viewingFile && (
+      <FileViewer
+        file={{ ...viewingFile, conversation_id: message.conversation_id, original_name: viewingFile.display_name, parse_status: 'done', created_at: message.created_at, updated_at: message.created_at }}
+        conversationId={message.conversation_id}
+        onClose={() => setViewingFileId(null)}
+      />
+    )}
     <div
       id={`message-${message.id}`}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}
@@ -281,6 +292,26 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
                 onClick={() => setLightboxSrc(src)}
                 className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-zoom-in"
               />
+            ))}
+          </div>
+        )}
+
+        {/* Attached files */}
+        {message.files && message.files.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-2">
+            {message.files.map((file) => (
+              <button
+                key={file.id}
+                onClick={() => setViewingFileId(file.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors
+                  ${isUser
+                    ? 'border-white/20 bg-white/10 hover:bg-white/20 text-white/90'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                  }`}
+              >
+                <span>{getFileIcon(file.mime_type)}</span>
+                <span className="truncate max-w-[180px]">{file.display_name}</span>
+              </button>
             ))}
           </div>
         )}
