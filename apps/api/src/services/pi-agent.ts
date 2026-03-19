@@ -253,16 +253,13 @@ export class PiRpcProcess {
       args.push('--system-prompt', systemPrompt);
     }
 
-    // Sandbox: restrict environment
+    // Sandbox: restrict environment — NO API keys, NO secrets
     const safeEnv: Record<string, string> = {
       HOME: homedir(),
       PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
       LANG: 'en_US.UTF-8',
       TERM: 'xterm-256color',
       NODE_ENV: 'production',
-      // Pass through API keys the agent might need
-      ...(process.env.NVIDIA_NIM_API_KEY ? { NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY } : {}),
-      ...(process.env.DASHSCOPE_API_KEY ? { DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY } : {}),
     };
 
     this.process = spawn(PI_BIN, args, {
