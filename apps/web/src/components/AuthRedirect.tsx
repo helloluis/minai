@@ -53,9 +53,9 @@ export function GuestLoginButton() {
     <button
       onClick={handleLogin}
       disabled={loading}
-      className="w-full py-3 px-6 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800
-        border border-gray-200 dark:border-gray-700
-        text-gray-500 dark:text-gray-400 font-medium rounded-xl transition-colors
+      className="w-full py-3 px-6 bg-white/10 hover:bg-white/20
+        border border-white/20
+        text-white/70 font-medium rounded-xl transition-colors
         flex items-center justify-center gap-3 text-sm"
     >
       {loading ? (
