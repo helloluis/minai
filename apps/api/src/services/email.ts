@@ -1,29 +1,15 @@
 /**
- * Email notification service — sends transactional emails via SMTP.
+ * Email notification service — uses Resend for transactional emails.
  *
  * Env vars:
- *   SMTP_HOST (default: smtp.gmail.com)
- *   SMTP_PORT (default: 587)
- *   SMTP_USER — email address to send from
- *   SMTP_PASS — app password (not regular password)
+ *   RESEND_API_KEY — API key from resend.com
  *   TEAM_EMAILS — comma-separated list of team emails to notify
  */
 
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const transporter = process.env.SMTP_USER
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT ?? '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-  : null;
-
-const FROM = process.env.SMTP_USER ?? 'noreply@minai.work';
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const FROM = process.env.EMAIL_FROM ?? 'minai <onboarding@resend.dev>';
 const TEAM_EMAILS = (process.env.TEAM_EMAILS ?? 'lbuenaventura2@gmail.com').split(',').map((e) => e.trim());
 
 export async function sendFeatureSuggestionEmail(opts: {
@@ -48,30 +34,27 @@ export async function sendFeatureSuggestionEmail(opts: {
       </blockquote>
       <p><strong>From:</strong> ${escapeHtml(contactInfo)}</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
-      <p style="color: #888; font-size: 12px;">
-        Sent from minai feature suggestion system
-      </p>
+      <p style="color: #888; font-size: 12px;">Sent from minai feature suggestion system</p>
     </div>
   `;
 
-  if (!transporter) {
-    console.log(`[Email] SMTP not configured — would have sent feature suggestion to ${TEAM_EMAILS.join(', ')}`);
+  if (!resend) {
+    console.log(`[Email] Resend not configured — would have sent feature suggestion to ${TEAM_EMAILS.join(', ')}`);
     console.log(`[Email] Title: ${title}`);
     console.log(`[Email] From: ${contactInfo}`);
     return;
   }
 
   try {
-    await transporter.sendMail({
-      from: `"minai" <${FROM}>`,
-      to: TEAM_EMAILS.join(', '),
+    await resend.emails.send({
+      from: FROM,
+      to: TEAM_EMAILS,
       subject: `[minai] Feature suggestion: ${title}`,
       html,
     });
     console.log(`[Email] Feature suggestion sent to ${TEAM_EMAILS.join(', ')}`);
   } catch (err) {
     console.error('[Email] Failed to send feature suggestion:', err);
-    // Don't throw — email failure shouldn't break the tool
   }
 }
 
