@@ -358,6 +358,13 @@ export async function* streamResponse(
       enableThinking = false;
     }
     console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
+
+    // Override: tool-heavy requests need the deep model (flash hallucinates tool calls)
+    if (classification === 'simple' && /\b(add|create|schedule|book|set up|delete|remove|cancel|update|change|move|reschedule)\b.*\b(calendar|event|meeting|appointment|reminder|session)\b/i.test(userMessage)) {
+      model = MODEL_DEEP;
+      classification = 'balanced';
+      console.log(`[Router] Override: calendar action detected → upgrading to ${model}`);
+    }
   }
 
   // Emit start event with classification so the client can show the right placeholder
