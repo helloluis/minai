@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { WebSocket } from 'ws';
 import { getUserBySession } from '../services/db.js';
 import {
   sessionManager, type PiRpcProcess,
@@ -7,7 +8,7 @@ import {
 
 export async function agentRoutes(fastify: FastifyInstance) {
   // WebSocket endpoint for pi agent communication
-  fastify.get('/api/agent/ws', { websocket: true }, async (socket, request) => {
+  fastify.get('/api/agent/ws', { websocket: true }, async (socket: WebSocket, request) => {
     const url = new URL(request.url, `http://localhost`);
     const sessionToken = url.searchParams.get('session') || '';
 

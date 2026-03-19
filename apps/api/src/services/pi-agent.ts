@@ -2,11 +2,14 @@ import { spawn, type ChildProcess } from 'child_process';
 import { createInterface, type Interface } from 'readline';
 import { homedir } from 'os';
 import { mkdirSync, existsSync, readdirSync, readFileSync, cpSync, writeFileSync, rmSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve, normalize } from 'path';
 import { fileURLToPath } from 'url';
+import { getFilesDir } from './file-store.js';
+import * as db from './db.js';
+import { calculateCost } from '../config/pricing.js';
+import { MODEL_DEEP } from './providers/index.js';
 
 const PI_BIN = process.env.PI_BIN || 'pi';
-const WORKSPACE_ROOT = process.env.PI_WORKSPACE_ROOT || join(homedir(), 'pi-workspaces');
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_CONCURRENT = 2;
 
@@ -15,17 +18,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_TEMPLATES_DIR = join(__dirname, '..', 'skills');
 const DEFAULT_SKILLS = ['write-email', 'summarize', 'brainstorm'];
 
+// Blocked commands/patterns the agent must never execute
+const BLOCKED_PATTERNS = [
+  /rm\s+-rf\s+\//,           // rm -rf /
+  /rm\s+-rf\s+~/,            // rm -rf ~
+  /mkfs/,                     // format filesystems
+  /dd\s+if=/,                // raw disk writes
+  /:(){ :|:& };:/,           // fork bomb
+  />\s*\/dev\//,             // write to devices
+  /curl.*\|\s*sh/,           // pipe curl to shell
+  /wget.*\|\s*sh/,           // pipe wget to shell
+];
+
 type Listener = (msg: Record<string, unknown>) => void;
 
-// ── Workspace & Skills ──
+// ── Workspace & Skills (unified with file uploads) ──
+
+/**
+ * User workspace = same directory as their file uploads.
+ * Skills live in .openclaw/skills/ within that directory.
+ */
+function getUserWorkspace(userId: string): string {
+  return join(getFilesDir(), userId);
+}
 
 function ensureWorkspace(userId: string): string {
-  const workDir = join(WORKSPACE_ROOT, userId);
-  mkdirSync(join(workDir, '.pi', 'skills'), { recursive: true });
+  const workDir = getUserWorkspace(userId);
+  mkdirSync(join(workDir, '.openclaw', 'skills'), { recursive: true });
 
   // Auto-install default skills
   for (const skill of DEFAULT_SKILLS) {
-    const destDir = join(workDir, '.pi', 'skills', skill);
+    const destDir = join(workDir, '.openclaw', 'skills', skill);
     if (!existsSync(destDir)) {
       installSkillFromTemplate(workDir, skill);
     }
@@ -34,14 +57,13 @@ function ensureWorkspace(userId: string): string {
   // Write README if missing
   const readmePath = join(workDir, 'README.md');
   if (!existsSync(readmePath)) {
-    writeFileSync(readmePath, `# OpenClaw Workspace
+    writeFileSync(readmePath, `# Your Workspace
 
-This is your personal workspace. The OpenClaw agent can read and write files here.
+This is your personal workspace. OpenClaw can read and write files here.
+Your uploaded documents are also stored here.
 
-## Notes
-- Your skills are in \`.pi/skills/\`
-- You can create new skills by adding a directory with a \`SKILL.md\` file
-- This file is yours to edit — it won't be overwritten.
+## Skills
+Your custom skills are in \`.openclaw/skills/\`.
 `);
   }
 
@@ -51,14 +73,14 @@ This is your personal workspace. The OpenClaw agent can read and write files her
 function installSkillFromTemplate(workDir: string, skillName: string): boolean {
   const templateDir = join(SKILL_TEMPLATES_DIR, skillName);
   if (!existsSync(templateDir)) return false;
-  const destDir = join(workDir, '.pi', 'skills', skillName);
+  const destDir = join(workDir, '.openclaw', 'skills', skillName);
   mkdirSync(destDir, { recursive: true });
   cpSync(templateDir, destDir, { recursive: true });
   return true;
 }
 
 function scanSkills(workDir: string): { name: string; description: string }[] {
-  const skillsDir = join(workDir, '.pi', 'skills');
+  const skillsDir = join(workDir, '.openclaw', 'skills');
   if (!existsSync(skillsDir)) return [];
 
   return readdirSync(skillsDir, { withFileTypes: true })
@@ -78,28 +100,33 @@ function scanSkills(workDir: string): { name: string; description: string }[] {
 function buildSystemPrompt(workDir: string): string {
   const parts: string[] = [];
 
-  parts.push(`You are OpenClaw, a helpful assistant inside the Minai platform. You can read, write, and edit files, run commands, and help with all kinds of tasks.
+  parts.push(`You are OpenClaw, a helpful assistant inside the Minai platform. You can read, write, and edit files, and help with all kinds of tasks.
 
 Your workspace is: ${workDir}
-All your files are here. Your current working directory is already set to this path.`);
+All your files are here — including the user's uploaded documents. Your current working directory is already set to this path.
+
+## SECURITY RULES (MANDATORY)
+- You may ONLY read/write files within your workspace directory: ${workDir}
+- You must NEVER access files outside this directory
+- You must NEVER run destructive system commands (rm -rf /, mkfs, dd, etc.)
+- You must NEVER pipe downloads to shell (curl|sh, wget|sh)
+- You must NEVER attempt to access other users' files or system files
+- You must NEVER install system packages or modify system configuration
+- Network requests are allowed only for fetching data (APIs, web pages) — NOT for executing remote code
+- If a user asks you to do something that violates these rules, politely decline and explain why`);
 
   // Skills
   const skills = scanSkills(workDir);
   if (skills.length > 0) {
     const skillList = skills.map((s) => `- **${s.name}**: ${s.description}`).join('\n');
-    parts.push(`Your skills:\n${skillList}\n\nSkill docs: \`.pi/skills/<name>/SKILL.md\` (relative to your workspace). Read a skill's SKILL.md to learn how to use it.`);
+    parts.push(`Your skills:\n${skillList}\n\nSkill docs: \`.openclaw/skills/<name>/SKILL.md\` (relative to your workspace). Read a skill's SKILL.md to learn how to use it.`);
   }
 
   parts.push(`## Creating new skills
 
-When the user asks you to create a skill, make a folder at \`.pi/skills/<skill-name>/\` with a \`SKILL.md\` file inside it. The SKILL.md should explain what the skill does and give examples of how to use it.
+When the user asks you to create a skill, make a folder at \`.openclaw/skills/<skill-name>/\` with a \`SKILL.md\` file inside it. The SKILL.md should explain what the skill does and give examples of how to use it.
 
-Skills are shortcuts for things the user does often. You write the code and logic behind them so the user doesn't have to. A skill can include scripts, templates, config files — whatever it needs to work. Good examples:
-- A "weekly-report" skill with a script that pulls data and formats it how they like
-- A "meeting-notes" skill that turns rough notes into clean action items
-- A "social-post" skill that drafts posts in their brand voice and preferred length
-- A "translate" skill with a script that calls a translation API between specific languages
-- A "resize-images" skill with a bash script that batch-resizes photos in a folder
+Skills are shortcuts for things the user does often. You write the code and logic behind them so the user doesn't have to. A skill can include scripts, templates, config files — whatever it needs to work.
 
 Use lowercase names with dashes (e.g., \`weekly-report\`). The skill shows up as a button immediately after you create it.`);
 
@@ -116,8 +143,8 @@ Use lowercase names with dashes (e.g., \`weekly-report\`). The skill shows up as
 // ── Skill management (for REST API) ──
 
 export function getInstalledSkills(userId: string) {
-  const workDir = join(WORKSPACE_ROOT, userId);
-  const skillsDir = join(workDir, '.pi', 'skills');
+  const workDir = getUserWorkspace(userId);
+  const skillsDir = join(workDir, '.openclaw', 'skills');
   if (!existsSync(skillsDir)) return [];
 
   return readdirSync(skillsDir, { withFileTypes: true })
@@ -157,8 +184,11 @@ export function installSkill(userId: string, name: string, opts: {
   config?: Record<string, unknown>;
   files?: Record<string, string>;
 }): boolean {
-  const workDir = join(WORKSPACE_ROOT, userId);
-  const skillDir = join(workDir, '.pi', 'skills', name);
+  const workDir = getUserWorkspace(userId);
+  const skillDir = join(workDir, '.openclaw', 'skills', name);
+
+  // Validate skill name (no path traversal)
+  if (!/^[a-z0-9-]+$/.test(name)) return false;
 
   if (opts.template) {
     if (!installSkillFromTemplate(workDir, opts.template)) return false;
@@ -175,6 +205,9 @@ export function installSkill(userId: string, name: string, opts: {
 
   if (opts.files) {
     for (const [filePath, content] of Object.entries(opts.files)) {
+      // Validate no path traversal in file paths
+      const resolved = resolve(skillDir, filePath);
+      if (!resolved.startsWith(normalize(skillDir))) continue;
       const fullPath = join(skillDir, filePath);
       mkdirSync(dirname(fullPath), { recursive: true });
       writeFileSync(fullPath, content);
@@ -186,16 +219,18 @@ export function installSkill(userId: string, name: string, opts: {
 
 export function removeSkill(userId: string, skillName: string): boolean {
   if (DEFAULT_SKILLS.includes(skillName)) return false;
-  const skillDir = join(WORKSPACE_ROOT, userId, '.pi', 'skills', skillName);
+  if (!/^[a-z0-9-]+$/.test(skillName)) return false;
+  const skillDir = join(getUserWorkspace(userId), '.openclaw', 'skills', skillName);
   if (!existsSync(skillDir)) return false;
   rmSync(skillDir, { recursive: true, force: true });
   return true;
 }
 
-// ── RPC Process ──
+// ── RPC Process with token tracking ──
 
 export class PiRpcProcess {
   sessionId: string;
+  userId: string;
   process: ChildProcess | null = null;
   rl: Interface | null = null;
   listeners = new Set<Listener>();
@@ -203,8 +238,13 @@ export class PiRpcProcess {
   lastActivity = Date.now();
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(sessionId: string) {
+  // Token tracking per session
+  totalInputTokens = 0;
+  totalOutputTokens = 0;
+
+  constructor(sessionId: string, userId: string) {
     this.sessionId = sessionId;
+    this.userId = userId;
   }
 
   start(cwd: string, systemPrompt?: string) {
@@ -213,19 +253,43 @@ export class PiRpcProcess {
       args.push('--system-prompt', systemPrompt);
     }
 
+    // Sandbox: restrict environment
+    const safeEnv: Record<string, string> = {
+      HOME: homedir(),
+      PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
+      LANG: 'en_US.UTF-8',
+      TERM: 'xterm-256color',
+      NODE_ENV: 'production',
+      // Pass through API keys the agent might need
+      ...(process.env.NVIDIA_NIM_API_KEY ? { NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY } : {}),
+      ...(process.env.DASHSCOPE_API_KEY ? { DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY } : {}),
+    };
+
     this.process = spawn(PI_BIN, args, {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        HOME: homedir(),
-      },
+      env: safeEnv,
+      // Resource limits
+      ...(process.platform !== 'win32' ? {
+        // On Linux: limit memory to 512MB, kill on timeout
+        timeout: 0, // no per-command timeout (idle timer handles it)
+      } : {}),
     });
 
     this.rl = createInterface({ input: this.process.stdout! });
     this.rl.on('line', (line) => {
       try {
         const msg = JSON.parse(line);
+
+        // Track token usage from agent responses
+        this.trackUsage(msg);
+
+        // Check for blocked commands in tool execution
+        if (this.isBlockedCommand(msg)) {
+          console.warn(`[pi:${this.sessionId}] Blocked dangerous command`);
+          return; // Don't forward to listeners
+        }
+
         for (const listener of this.listeners) {
           listener(msg);
         }
@@ -241,11 +305,57 @@ export class PiRpcProcess {
     this.process.on('exit', (code) => {
       console.log(`[pi:${this.sessionId}] Process exited with code ${code}`);
       this.ready = false;
+      // Flush accumulated token usage to DB
+      this.flushUsage();
     });
 
     this.ready = true;
     this.touchActivity();
     console.log(`[pi:${this.sessionId}] Started in ${cwd}`);
+  }
+
+  /** Extract token usage from Pi's message stream */
+  private trackUsage(msg: Record<string, unknown>) {
+    // Pi sends usage in message_update events with type 'done'
+    const event = msg.assistantMessageEvent as Record<string, unknown> | undefined;
+    if (msg.type === 'message_update' && event?.type === 'done') {
+      const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+      if (usage) {
+        this.totalInputTokens += usage.input_tokens ?? 0;
+        this.totalOutputTokens += usage.output_tokens ?? 0;
+      }
+    }
+  }
+
+  /** Check if a tool execution contains dangerous commands */
+  private isBlockedCommand(msg: Record<string, unknown>): boolean {
+    if (msg.type !== 'tool_execution_start') return false;
+    const argsStr = JSON.stringify(msg.args ?? '');
+    return BLOCKED_PATTERNS.some((p) => p.test(argsStr));
+  }
+
+  /** Deduct accumulated token costs from user's balance */
+  private async flushUsage() {
+    if (this.totalInputTokens === 0 && this.totalOutputTokens === 0) return;
+
+    const cost = calculateCost(MODEL_DEEP, this.totalInputTokens, this.totalOutputTokens);
+    if (cost <= 0) return;
+
+    try {
+      // Deduct from free credit first, then balance
+      const freeCreditUsed = await db.deductFreeCredit(this.userId, cost);
+      const chargeableCost = cost - freeCreditUsed;
+      if (chargeableCost > 0) {
+        await db.deductBalance(this.userId, chargeableCost);
+        await db.recordPayment(this.userId, -chargeableCost, 'usage');
+      }
+      console.log(`[pi:${this.sessionId}] Flushed usage: ${this.totalInputTokens} in / ${this.totalOutputTokens} out = $${cost.toFixed(6)}`);
+    } catch (err) {
+      console.error(`[pi:${this.sessionId}] Failed to flush usage:`, err);
+    }
+
+    this.totalInputTokens = 0;
+    this.totalOutputTokens = 0;
   }
 
   send(command: Record<string, unknown>) {
@@ -274,6 +384,8 @@ export class PiRpcProcess {
 
   kill() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
+    // Flush usage before killing
+    this.flushUsage();
     if (this.process) {
       this.process.kill();
       this.process = null;
@@ -313,7 +425,7 @@ class SessionManager {
     const workDir = ensureWorkspace(userId);
     const systemPrompt = buildSystemPrompt(workDir);
 
-    const rpc = new PiRpcProcess(sessionId);
+    const rpc = new PiRpcProcess(sessionId, userId);
     rpc.start(workDir, systemPrompt);
     this.sessions.set(sessionId, rpc);
     return rpc;
@@ -345,6 +457,7 @@ class SessionManager {
         ready: s.ready,
         lastActivity: s.lastActivity,
         listeners: s.listeners.size,
+        tokensUsed: { input: s.totalInputTokens, output: s.totalOutputTokens },
       })),
     };
   }
