@@ -2,7 +2,7 @@
 
 ## VPS / SSH
 
-- SSH alias: `ssh minai` (dedicated server, 192.248.144.62) — **always use this**
+- SSH alias: `ssh minai` (dedicated server, 192.248.144.62, port 2222) — **always use this**
 - App directory: `/var/www/minai`
 - PM2 processes: `minai-api` (id 0), `minai-web` (id 1)
 - Git remote: `git@github.com:helloluis/minai.git` (deploy key: `~/.ssh/id_minai` on server, configured in `~/.ssh/config`)
@@ -22,5 +22,21 @@
 ```
 ssh minai "sed -i 's/\r//' /root/script.sh && bash /root/script.sh"
 ```
+
+## Server Security (fail2ban is active!)
+
+The server has **fail2ban** running. Be careful not to trigger bans:
+
+- **SSH (port 2222):** 3 failed attempts → **2-hour ban**. Always use `ssh minai` alias (key-based auth). Never retry failed connections in a loop.
+- **nginx auth:** 5 failed attempts in 10 min → 1-hour ban
+- **nginx rate limit:** triggered by exceeding request rate → 1-hour ban
+- **API rate limits (nginx layer):** auth endpoints 5/min, payment 3/min, general API 30/s
+
+If you get banned (connection refused / timeout), wait or ask the user to run `fail2ban-client set sshd unbanip <IP>` from the Vultr console.
+
+**Do NOT:**
+- Retry failed SSH connections repeatedly
+- Send rapid-fire HTTP requests to auth or payment endpoints
+- Run load tests or parallel curl against the server
 
 See `VULTR-VPS-GUIDE.md` for full setup documentation.
