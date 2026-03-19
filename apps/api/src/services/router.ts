@@ -4,7 +4,7 @@
 
 import type { LLMMode, LLMClassification, ModelId, StreamChunk, TokenUsage } from '@minai/shared';
 import type { ProviderMessage, ProviderStreamChunk, ToolDefinition, ToolCallInfo } from './providers/types.js';
-import { DashScopeProvider } from './providers/dashscope.js';
+import { getProvider, MODEL_FAST, MODEL_DEEP } from './providers/index.js';
 import { SYSTEM_PROMPT, AUTO_CLASSIFIER_PROMPT } from '../config/system-prompt.js';
 import { calculateCost } from '../config/pricing.js';
 import * as db from './db.js';
@@ -14,11 +14,10 @@ import { detectAndExecuteTools } from './tool-runner.js';
 import { executeTool, TOOL_DEFINITIONS } from './tools.js';
 import type { ContextImage } from './tools.js';
 
-const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
-
-const MODEL_FAST: ModelId = 'qwen3.5-flash';
-const MODEL_DEEP: ModelId = 'qwen3.5-plus';
+const provider = getProvider();
 const MAX_TOOL_ITERATIONS = 10;
+
+console.log(`[Router] Provider: ${process.env.LLM_PROVIDER ?? 'dashscope'}, fast: ${MODEL_FAST}, deep: ${MODEL_DEEP}`);
 
 // Classifier config — switch via env vars
 const CLASSIFIER_PROVIDER = process.env.CLASSIFIER_PROVIDER ?? 'dashscope'; // 'dashscope' | 'ollama'

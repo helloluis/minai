@@ -6,13 +6,13 @@
 
 import type { Message } from '@minai/shared';
 import type { ProviderMessage } from './providers/types.js';
-import { DashScopeProvider } from './providers/dashscope.js';
+import { getProvider, MODEL_FAST } from './providers/index.js';
 import * as db from './db.js';
 
-const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
+const provider = getProvider();
 
 const KEEP_RECENT = 6; // Keep this many recent messages uncompacted
-const MODEL = 'qwen3.5-flash'; // Use cheapest model for summarization
+const MODEL = MODEL_FAST; // Use cheapest model for summarization
 
 const COMPACTION_PROMPT = `You are a conversation summarizer. Given a sequence of messages from a conversation, produce a brief summary that captures:
 - Key topics discussed

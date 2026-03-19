@@ -20,12 +20,17 @@ export const PRICING = {
   image_edit_cost_usd: 0.016,
 } as const;
 
+// The configured "deep" model ID — used to determine pricing tier
+const DEEP_MODEL = process.env.LLM_PROVIDER === 'nim'
+  ? (process.env.NIM_MODEL_DEEP ?? 'qwen/qwen3.5-397b-a17b')
+  : 'qwen3.5-plus';
+
 export function calculateCost(
   model: string,
   inputTokens: number,
   outputTokens: number
 ): number {
-  const isDeep = model === 'qwen3.5-plus';
+  const isDeep = model === DEEP_MODEL;
   const inputPrice = isDeep
     ? PRICING.input_token_price_per_mil_deep
     : PRICING.input_token_price_per_mil_fast;

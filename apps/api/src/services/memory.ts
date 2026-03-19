@@ -4,11 +4,11 @@
  */
 
 import type { ProviderMessage } from './providers/types.js';
-import { DashScopeProvider } from './providers/dashscope.js';
+import { getProvider, MODEL_FAST } from './providers/index.js';
 import * as db from './db.js';
 
-const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
-const MODEL = 'qwen3.5-flash';
+const provider = getProvider();
+const MODEL = MODEL_FAST;
 
 const MEMORY_EXTRACTION_PROMPT = `You extract user preferences and facts from messages. Given a user message, identify any personal facts worth remembering for future conversations.
 

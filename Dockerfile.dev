@@ -1,0 +1,20 @@
+FROM node:24-alpine
+
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy dependency manifests first (Docker layer cache)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+
+RUN pnpm install --frozen-lockfile
+
+# Build shared package (api + web depend on it)
+COPY packages/shared/ packages/shared/
+RUN pnpm --filter @minai/shared build
+
+# Copy remaining source (overridden by volume mounts in dev)
+COPY apps/ apps/
