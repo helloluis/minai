@@ -191,7 +191,16 @@ async function buildMessages(
 
   // System prompt with user memories
   const memories = await db.getUserMemories(userId);
+  const user = await db.getUserById(userId);
   let systemPrompt = SYSTEM_PROMPT;
+
+  // Inject current date/time in user's timezone
+  const tz = user?.timezone ?? 'UTC';
+  const now = new Date();
+  const userDate = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
+  const userTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
+  systemPrompt += `\n\n## Current Date & Time\nRight now it is **${userDate}** at **${userTime}** (${tz}). Always use this when the user references "today", "tomorrow", "yesterday", "this week", etc.`;
+
   if (memories.length > 0) {
     const memoryContext = memories.map((m) => `- ${m.key}: ${m.value}`).join('\n');
     systemPrompt += `\n\n## What you know about this user\n${memoryContext}`;
