@@ -18,6 +18,7 @@ function formatSize(bytes: number): string {
 
 export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
   const downloadUrl = getFileDownloadUrl(conversationId, file.id);
+  const viewUrl = downloadUrl + '?inline=1';
   const isImage = file.mime_type.startsWith('image/');
   const isPdf = file.mime_type === 'application/pdf';
   const needsPreview = !isImage && !isPdf;
@@ -88,7 +89,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
           {isImage && (
             <div className="flex items-center justify-center p-4">
               <img
-                src={downloadUrl}
+                src={viewUrl}
                 alt={file.display_name}
                 className="max-w-full max-h-[75vh] object-contain rounded-lg"
               />
@@ -98,7 +99,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
           {/* PDF */}
           {isPdf && (
             <iframe
-              src={downloadUrl}
+              src={viewUrl}
               title={file.display_name}
               className="w-full h-[80vh]"
             />

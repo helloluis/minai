@@ -154,7 +154,7 @@ function NotebookRow({
           <div
             onClick={onSelect}
             className="flex items-center gap-2 px-9 py-1.5 text-sm cursor-pointer transition-colors
-              text-minai-600 dark:text-minai-400 hover:bg-minai-50 dark:hover:bg-minai-950/20"
+              text-minai-600 dark:text-minai-400 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             <span>🗨️</span>
             <span className="font-medium">Chat</span>

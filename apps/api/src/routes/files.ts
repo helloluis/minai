@@ -122,17 +122,23 @@ export async function fileRoutes(fastify: FastifyInstance) {
   );
 
   // Download original file
-  fastify.get<{ Params: { conversationId: string; fileId: string } }>(
+  // Download or view original file (?inline=1 for in-browser viewing)
+  fastify.get<{ Params: { conversationId: string; fileId: string }; Querystring: { inline?: string } }>(
     '/api/conversations/:conversationId/files/:fileId/download',
     async (request, reply) => {
       const file = await db.getNotebookFile(request.params.fileId, request.user.id);
       if (!file) return reply.status(404).send({ error: 'File not found' });
 
       const fullPath = getFullPath(file.storage_path);
+      const isInline = request.query.inline === '1';
       try {
         const data = await readFile(fullPath);
         reply.header('Content-Type', file.mime_type);
-        reply.header('Content-Disposition', `attachment; filename="${encodeURIComponent(file.original_name)}"`);
+        reply.header('Content-Disposition',
+          isInline
+            ? `inline; filename="${encodeURIComponent(file.original_name)}"`
+            : `attachment; filename="${encodeURIComponent(file.original_name)}"`
+        );
         reply.header('Cache-Control', 'private, max-age=3600');
         return reply.send(data);
       } catch {
