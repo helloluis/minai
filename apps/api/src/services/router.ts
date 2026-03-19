@@ -48,13 +48,16 @@ function parseClassification(raw: string): 'simple' | 'balanced' | 'deep' {
 }
 
 /** Classify via DashScope (qwen3.5-flash) */
-async function classifyWithDashscope(userMessage: string): Promise<ClassifyResult & { latencyMs: number }> {
+async function classifyWithDashscope(userMessage: string, recentContext?: string): Promise<ClassifyResult & { latencyMs: number }> {
   const t0 = Date.now();
+  const classifierInput = recentContext
+    ? `Recent conversation:\n${recentContext}\n\nLatest message to classify:\n${userMessage}`
+    : userMessage;
   try {
     const { content, usage } = await provider.complete(
       [
         { role: 'system', content: AUTO_CLASSIFIER_PROMPT },
-        { role: 'user', content: userMessage },
+        { role: 'user', content: classifierInput },
       ],
       MODEL_FAST,
       16
@@ -69,7 +72,7 @@ async function classifyWithDashscope(userMessage: string): Promise<ClassifyResul
 }
 
 /** Classify via local Ollama */
-async function classifyWithOllama(userMessage: string): Promise<ClassifyResult & { latencyMs: number }> {
+async function classifyWithOllama(userMessage: string, recentContext?: string): Promise<ClassifyResult & { latencyMs: number }> {
   const t0 = Date.now();
   try {
     const res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
@@ -105,14 +108,13 @@ async function classifyWithOllama(userMessage: string): Promise<ClassifyResult &
  * Uses CLASSIFIER_PROVIDER env var to select the backend.
  * If CLASSIFIER_COMPARE=true, runs both in parallel and logs disagreements.
  */
-async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
+async function classifyPrompt(userMessage: string, recentContext?: string): Promise<ClassifyResult> {
   const preview = userMessage.slice(0, 60).replace(/\n/g, ' ');
 
   if (CLASSIFIER_COMPARE) {
-    // Run both in parallel — use the configured provider's result, log any disagreement
     const [primary, secondary] = CLASSIFIER_PROVIDER === 'ollama'
-      ? await Promise.all([classifyWithOllama(userMessage), classifyWithDashscope(userMessage)])
-      : await Promise.all([classifyWithDashscope(userMessage), classifyWithOllama(userMessage)]);
+      ? await Promise.all([classifyWithOllama(userMessage, recentContext), classifyWithDashscope(userMessage, recentContext)])
+      : await Promise.all([classifyWithDashscope(userMessage, recentContext), classifyWithOllama(userMessage, recentContext)]);
 
     const agree = primary.classification === secondary.classification;
     const primaryName = CLASSIFIER_PROVIDER === 'ollama' ? 'ollama' : 'dashscope';
@@ -126,14 +128,13 @@ async function classifyPrompt(userMessage: string): Promise<ClassifyResult> {
     return { classification: primary.classification, usage: primary.usage };
   }
 
-  // Single provider
   if (CLASSIFIER_PROVIDER === 'ollama') {
-    const result = await classifyWithOllama(userMessage);
+    const result = await classifyWithOllama(userMessage, recentContext);
     console.log(`[Classifier:ollama] "${preview}" → ${result.classification} (${result.latencyMs}ms)`);
     return { classification: result.classification, usage: result.usage };
   }
 
-  const result = await classifyWithDashscope(userMessage);
+  const result = await classifyWithDashscope(userMessage, recentContext);
   console.log(`[Classifier:dashscope] "${preview}" → ${result.classification} (${result.latencyMs}ms)`);
   return { classification: result.classification, usage: result.usage };
 }
@@ -344,7 +345,13 @@ export async function* streamResponse(
     classification = 'deep';
   } else {
     // Auto mode: 3-way classify → simple / balanced / deep
-    const result = await classifyPrompt(userMessage);
+    // Fetch last 4 messages for classifier context (so "yes" after a tool prompt gets classified correctly)
+    const recentMsgs = await db.getMessages(conversationId, 4);
+    const recentContext = recentMsgs.length > 0
+      ? recentMsgs.map((m) => `[${m.role}]: ${m.content.slice(0, 200)}`).join('\n')
+      : undefined;
+
+    const result = await classifyPrompt(userMessage, recentContext);
     classifierUsage = result.usage;
     classification = result.classification;
     if (classification === 'deep') {
@@ -358,27 +365,6 @@ export async function* streamResponse(
       enableThinking = false;
     }
     console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
-
-    // Override: flash model is unreliable for tool-calling. Upgrade to deep when:
-    // 1. Message explicitly requests an action (calendar, feature, image, file, etc.)
-    // 2. Message is a short confirmation that likely triggers a pending tool call
-    if (classification === 'simple') {
-      const needsTools =
-        // Calendar actions
-        /\b(add|create|schedule|book|set up|delete|remove|cancel|update|change|move|reschedule)\b.*\b(calendar|event|meeting|appointment|reminder|session)\b/i.test(userMessage) ||
-        // Feature suggestions
-        /\b(feature|suggestion|suggest|idea)\b/i.test(userMessage) ||
-        // Image generation/editing
-        /\b(generate|create|make|draw|design)\b.*\b(image|photo|picture|logo|headshot)\b/i.test(userMessage) ||
-        // Short confirmations (likely triggering a pending action from previous turn)
-        /^(yes|yep|yup|yeah|ok|okay|sure|go ahead|do it|confirm|sounds good|sounds great|that'?s? (right|correct|good|great|perfect)|submit|send|approved?)\b/i.test(userMessage.trim());
-
-      if (needsTools) {
-        model = MODEL_DEEP;
-        classification = 'balanced';
-        console.log(`[Router] Override: tool-likely message → upgrading to ${model}`);
-      }
-    }
   }
 
   // Emit start event with classification so the client can show the right placeholder

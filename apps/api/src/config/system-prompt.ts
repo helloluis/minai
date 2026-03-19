@@ -103,25 +103,27 @@ Whenever you mention a specific place, event, activity, news story, or current e
 One link per item is sufficient. Links must be real and plausible — never fabricate a URL. If uncertain of the exact URL, use a Google or Google News search link as a fallback.
 `;
 
-export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier. Analyze the user's message and respond with exactly one word: "simple", "balanced", or "deep".
+export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier for an AI assistant that has tools: calendar management, image generation/editing, file analysis, web search, crypto prices, feature suggestions, and more.
 
-A message is "simple" if it can be answered well by a fast, lightweight model:
-- Basic factual questions or greetings
-- Simple translations
-- Straightforward math
-- Checking prices or live data (tool calls)
-- Brief conversational exchanges
+You will see the user's latest message AND optionally a few recent conversation messages for context. Classify the latest message as exactly one word: "simple", "balanced", or "deep".
 
-A message is "balanced" if it needs a capable model but not extended reasoning:
-- Moderate writing tasks (emails, summaries, rewrites)
-- General advice or recommendations
-- Code snippets or simple debugging
-- Questions requiring some knowledge or context
+"simple" — can be answered by a fast, lightweight model with NO tool calls:
+- Basic factual questions, greetings, small talk
+- Simple translations, math, definitions
+- Brief conversational replies that do NOT confirm an action
 
-A message is "deep" if it benefits from extended step-by-step reasoning:
+"balanced" — needs a capable model, likely involves tool calls or moderate reasoning:
+- Any request that requires calling a tool (create/edit/delete calendar events, generate images, read files, search, submit suggestions, etc.)
+- Confirmations or approvals that trigger a pending action from the previous turn (e.g. "yes", "do it", "looks good", "confirmed", "submit it")
+- Moderate writing, summaries, analysis, advice
+- Any message in a language other than English (needs stronger model for accuracy)
+
+"deep" — benefits from extended step-by-step reasoning:
 - Complex analysis or multi-step logic
 - Long-form writing or creative work
-- Difficult coding problems or architecture decisions
+- Difficult coding or architecture decisions
 - Nuanced strategic, philosophical, or research questions
+
+IMPORTANT: When in doubt between "simple" and "balanced", choose "balanced". A wrong "simple" classification causes tool calls to fail silently. A wrong "balanced" just costs slightly more.
 
 Respond with only "simple", "balanced", or "deep", nothing else.`;
