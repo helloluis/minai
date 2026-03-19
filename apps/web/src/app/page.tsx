@@ -22,6 +22,25 @@ export default function LandingPage() {
       {/* Client-side auth redirect (invisible — redirects logged-in users) */}
       <AuthRedirect />
 
+      {/* Karma ribbon — top right diagonal */}
+      <a
+        href="https://www.karmahq.xyz/project/minai"
+        target="_blank"
+        rel="noopener"
+        className="fixed top-0 right-0 z-50 overflow-hidden w-[200px] h-[200px] pointer-events-none"
+      >
+        <div
+          className="pointer-events-auto absolute top-[42px] -right-[70px] w-[260px] text-center
+            rotate-45 py-2 shadow-md
+            border-y-[3px] border-green-500 bg-white"
+        >
+          <span className="text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5">
+            We&apos;re on
+            <img src="https://www.karmahq.xyz/logo/karma-logo-light.svg" alt="Karma" className="h-4 inline-block" />!
+          </span>
+        </div>
+      </a>
+
       {/* Dark overlay for contrast */}
       <div className="absolute inset-0 bg-black/30" />
 
