@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AuthRedirect } from '@/components/AuthRedirect';
+import { AuthRedirect, GuestLoginButton } from '@/components/AuthRedirect';
 
 export const metadata: Metadata = {
   title: 'minai — AI for Everyone',
@@ -70,6 +70,16 @@ export default function LandingPage() {
           </svg>
           Continue with Google
         </a>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-2">
+          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+          <span className="text-xs text-gray-400">or</span>
+          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        </div>
+
+        {/* Guest login (client component) */}
+        <GuestLoginButton />
 
         {/* Legal links — bot-readable */}
         <div className="mt-8 flex items-center justify-center gap-4 text-xs text-gray-400">

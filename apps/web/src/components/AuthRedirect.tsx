@@ -1,17 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import * as api from '@/lib/api';
 
 /**
- * Invisible client component that checks auth and redirects logged-in users.
- * Renders nothing — the landing page content is server-rendered.
+ * Handles auth redirect (logged-in users) + guest login button.
+ * The landing page is a server component — this is the only client part.
  */
 export function AuthRedirect() {
   const router = useRouter();
-  const { checkSession, createConversation } = useChatStore();
+  const { checkSession, login, createConversation } = useChatStore();
 
   useEffect(() => {
     checkSession().then(() => {
@@ -29,4 +29,40 @@ export function AuthRedirect() {
   }, [checkSession, createConversation, router]);
 
   return null;
+}
+
+export function GuestLoginButton() {
+  const router = useRouter();
+  const { login, createConversation } = useChatStore();
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      await login();
+      const id = await createConversation();
+      router.push(`/notebooks/${id}/chat`);
+    } catch (err) {
+      console.error('Login failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleLogin}
+      disabled={loading}
+      className="w-full py-3 px-6 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800
+        border border-gray-200 dark:border-gray-700
+        text-gray-500 dark:text-gray-400 font-medium rounded-xl transition-colors
+        flex items-center justify-center gap-3 text-sm"
+    >
+      {loading ? (
+        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+      ) : (
+        'Continue without account'
+      )}
+    </button>
+  );
 }
