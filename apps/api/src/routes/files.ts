@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { readFile } from 'fs/promises';
+import * as mammoth from 'mammoth';
 import * as db from '../services/db.js';
 import { storeFile, getFullPath } from '../services/file-store.js';
 import { parseFileContent } from '../services/file-parser.js';
@@ -136,6 +137,49 @@ export async function fileRoutes(fastify: FastifyInstance) {
         return reply.send(data);
       } catch {
         return reply.status(404).send({ error: 'File not found on disk' });
+      }
+    }
+  );
+
+  // Preview file content (rendered for in-browser viewing)
+  fastify.get<{ Params: { conversationId: string; fileId: string } }>(
+    '/api/conversations/:conversationId/files/:fileId/preview',
+    async (request, reply) => {
+      const file = await db.getNotebookFile(request.params.fileId, request.user.id);
+      if (!file) return reply.status(404).send({ error: 'File not found' });
+
+      const fullPath = getFullPath(file.storage_path);
+
+      try {
+        // DOCX → convert to HTML via mammoth
+        if (
+          file.mime_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          file.mime_type === 'application/msword'
+        ) {
+          const result = await mammoth.convertToHtml({ path: fullPath });
+          return { type: 'html', content: result.value };
+        }
+
+        // Plain text family → raw content
+        if (
+          file.mime_type === 'text/plain' ||
+          file.mime_type === 'text/csv' ||
+          file.mime_type === 'text/markdown' ||
+          file.mime_type === 'text/html'
+        ) {
+          const text = await readFile(fullPath, 'utf-8');
+          return { type: file.mime_type === 'text/html' ? 'html' : 'text', content: text.slice(0, 500_000) };
+        }
+
+        // PDF and images are handled client-side (iframe / img)
+        // For anything else, return the parsed text if available
+        if (file.parsed_text) {
+          return { type: 'text', content: file.parsed_text };
+        }
+
+        return reply.status(400).send({ error: 'No preview available for this file type' });
+      } catch {
+        return reply.status(500).send({ error: 'Failed to generate preview' });
       }
     }
   );

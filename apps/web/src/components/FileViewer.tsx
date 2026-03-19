@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import type { NotebookFile } from '@/lib/api';
-import { getFileDownloadUrl } from '@/lib/api';
+import { getFileDownloadUrl, getFilePreview } from '@/lib/api';
 
 interface FileViewerProps {
   file: NotebookFile;
@@ -20,6 +20,11 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
   const downloadUrl = getFileDownloadUrl(conversationId, file.id);
   const isImage = file.mime_type.startsWith('image/');
   const isPdf = file.mime_type === 'application/pdf';
+  const needsPreview = !isImage && !isPdf;
+
+  const [preview, setPreview] = useState<{ type: 'text' | 'html'; content: string } | null>(null);
+  const [previewError, setPreviewError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -30,13 +35,23 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
+  // Fetch preview for non-PDF/non-image files
+  useEffect(() => {
+    if (!needsPreview) return;
+    setLoading(true);
+    getFilePreview(conversationId, file.id)
+      .then((data) => setPreview(data))
+      .catch((err) => setPreviewError(err.message ?? 'Preview unavailable'))
+      .finally(() => setLoading(false));
+  }, [conversationId, file.id, needsPreview]);
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[90vh] mx-4 bg-white dark:bg-gray-900 rounded-2xl
+        className="relative w-full max-w-5xl max-h-[90vh] mx-4 bg-white dark:bg-gray-900 rounded-2xl
           shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -69,6 +84,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-auto">
+          {/* Images */}
           {isImage && (
             <div className="flex items-center justify-center p-4">
               <img
@@ -79,6 +95,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
             </div>
           )}
 
+          {/* PDF */}
           {isPdf && (
             <iframe
               src={downloadUrl}
@@ -87,24 +104,40 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
             />
           )}
 
-          {!isImage && !isPdf && (
-            <div className="p-5 text-sm">
-              <div className="flex items-center gap-2 mb-4 text-gray-400">
-                <span>{getFileIcon(file.mime_type)}</span>
-                <span>{file.original_name}</span>
-                {file.parse_status === 'pending' && <span className="text-yellow-500">Parsing...</span>}
-                {file.parse_status === 'failed' && <span className="text-red-500">Parse failed</span>}
-              </div>
-              <div className="text-center py-8 text-gray-400">
-                <p className="mb-3">Preview not available for this file type.</p>
-                <a
-                  href={downloadUrl}
-                  download={file.original_name}
-                  className="text-minai-600 hover:underline"
-                >
-                  Download original file
-                </a>
-              </div>
+          {/* Text/DOCX/Other — fetched preview */}
+          {needsPreview && loading && (
+            <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Loading preview…
+            </div>
+          )}
+
+          {needsPreview && !loading && preview?.type === 'html' && (
+            <div
+              className="p-6 prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: preview.content }}
+            />
+          )}
+
+          {needsPreview && !loading && preview?.type === 'text' && (
+            <pre className="p-6 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">
+              {preview.content}
+            </pre>
+          )}
+
+          {needsPreview && !loading && !preview && previewError && (
+            <div className="text-center py-16 text-gray-400">
+              <p className="mb-3 text-sm">{previewError}</p>
+              <a
+                href={downloadUrl}
+                download={file.original_name}
+                className="text-minai-600 hover:underline text-sm"
+              >
+                Download original file
+              </a>
             </div>
           )}
         </div>

@@ -185,6 +185,9 @@ export function getFileDownloadUrl(conversationId: string, fileId: string): stri
   return `${API_BASE}/api/conversations/${conversationId}/files/${fileId}/download`;
 }
 
+export const getFilePreview = (conversationId: string, fileId: string) =>
+  fetchAPI<{ type: 'text' | 'html'; content: string }>(`/api/conversations/${conversationId}/files/${fileId}/preview`);
+
 // Settings
 export const setTimezone = (timezone: string) =>
   fetchAPI<{ success: boolean }>('/api/settings/timezone', {
