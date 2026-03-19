@@ -5,13 +5,11 @@ import { mkdirSync, existsSync, readdirSync, readFileSync, cpSync, writeFileSync
 import { join, dirname, resolve, normalize } from 'path';
 import { fileURLToPath } from 'url';
 import { getFilesDir } from './file-store.js';
-import * as db from './db.js';
-import { calculateCost } from '../config/pricing.js';
-import { MODEL_DEEP } from './providers/index.js';
 
 const PI_BIN = process.env.PI_BIN || 'pi';
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_CONCURRENT = 2;
+const LLM_PROXY_PORT = parseInt(process.env.LLM_PROXY_PORT ?? '3009');
 
 // Skill templates bundled with the API
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -238,10 +236,6 @@ export class PiRpcProcess {
   lastActivity = Date.now();
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Token tracking per session
-  totalInputTokens = 0;
-  totalOutputTokens = 0;
-
   constructor(sessionId: string, userId: string) {
     this.sessionId = sessionId;
     this.userId = userId;
@@ -253,13 +247,17 @@ export class PiRpcProcess {
       args.push('--system-prompt', systemPrompt);
     }
 
-    // Sandbox: restrict environment — NO API keys, NO secrets
+    // Sandbox: restricted environment — no real API keys
+    // Pi talks to our LLM proxy at localhost, which handles auth + billing
     const safeEnv: Record<string, string> = {
       HOME: homedir(),
       PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
       LANG: 'en_US.UTF-8',
       TERM: 'xterm-256color',
       NODE_ENV: 'production',
+      // Point Pi's LLM calls at our proxy — user ID is the "API key"
+      OPENAI_API_KEY: this.userId,
+      OPENAI_BASE_URL: `http://127.0.0.1:${LLM_PROXY_PORT}/v1`,
     };
 
     this.process = spawn(PI_BIN, args, {
@@ -277,9 +275,6 @@ export class PiRpcProcess {
     this.rl.on('line', (line) => {
       try {
         const msg = JSON.parse(line);
-
-        // Track token usage from agent responses
-        this.trackUsage(msg);
 
         // Check for blocked commands in tool execution
         if (this.isBlockedCommand(msg)) {
@@ -302,8 +297,6 @@ export class PiRpcProcess {
     this.process.on('exit', (code) => {
       console.log(`[pi:${this.sessionId}] Process exited with code ${code}`);
       this.ready = false;
-      // Flush accumulated token usage to DB
-      this.flushUsage();
     });
 
     this.ready = true;
@@ -311,48 +304,11 @@ export class PiRpcProcess {
     console.log(`[pi:${this.sessionId}] Started in ${cwd}`);
   }
 
-  /** Extract token usage from Pi's message stream */
-  private trackUsage(msg: Record<string, unknown>) {
-    // Pi sends usage in message_update events with type 'done'
-    const event = msg.assistantMessageEvent as Record<string, unknown> | undefined;
-    if (msg.type === 'message_update' && event?.type === 'done') {
-      const usage = event.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-      if (usage) {
-        this.totalInputTokens += usage.input_tokens ?? 0;
-        this.totalOutputTokens += usage.output_tokens ?? 0;
-      }
-    }
-  }
-
   /** Check if a tool execution contains dangerous commands */
   private isBlockedCommand(msg: Record<string, unknown>): boolean {
     if (msg.type !== 'tool_execution_start') return false;
     const argsStr = JSON.stringify(msg.args ?? '');
     return BLOCKED_PATTERNS.some((p) => p.test(argsStr));
-  }
-
-  /** Deduct accumulated token costs from user's balance */
-  private async flushUsage() {
-    if (this.totalInputTokens === 0 && this.totalOutputTokens === 0) return;
-
-    const cost = calculateCost(MODEL_DEEP, this.totalInputTokens, this.totalOutputTokens);
-    if (cost <= 0) return;
-
-    try {
-      // Deduct from free credit first, then balance
-      const freeCreditUsed = await db.deductFreeCredit(this.userId, cost);
-      const chargeableCost = cost - freeCreditUsed;
-      if (chargeableCost > 0) {
-        await db.deductBalance(this.userId, chargeableCost);
-        await db.recordPayment(this.userId, -chargeableCost, 'usage');
-      }
-      console.log(`[pi:${this.sessionId}] Flushed usage: ${this.totalInputTokens} in / ${this.totalOutputTokens} out = $${cost.toFixed(6)}`);
-    } catch (err) {
-      console.error(`[pi:${this.sessionId}] Failed to flush usage:`, err);
-    }
-
-    this.totalInputTokens = 0;
-    this.totalOutputTokens = 0;
   }
 
   send(command: Record<string, unknown>) {
@@ -381,8 +337,6 @@ export class PiRpcProcess {
 
   kill() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    // Flush usage before killing
-    this.flushUsage();
     if (this.process) {
       this.process.kill();
       this.process = null;
@@ -454,7 +408,7 @@ class SessionManager {
         ready: s.ready,
         lastActivity: s.lastActivity,
         listeners: s.listeners.size,
-        tokensUsed: { input: s.totalInputTokens, output: s.totalOutputTokens },
+        // Token usage tracked by LLM proxy
       })),
     };
   }

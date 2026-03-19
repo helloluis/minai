@@ -21,6 +21,7 @@ import multipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import { agentRoutes } from './routes/agent.js';
 import { setupPiConfig } from './config/pi-models.js';
+import { startLLMProxy } from './services/llm-proxy.js';
 
 const port = parseInt(process.env.API_PORT || '3001');
 const isProd = process.env.NODE_ENV === 'production';
@@ -99,6 +100,7 @@ async function start() {
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`\n🚀 Minai API running on http://localhost:${port}\n`);
     setupPiConfig();
+    startLLMProxy();
     startBriefingScheduler();
   } catch (err) {
     fastify.log.error(err);
