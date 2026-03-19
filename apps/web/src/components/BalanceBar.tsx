@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
 import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 import { TopUpModal } from './TopUpModal';
@@ -22,13 +22,24 @@ function formatBalance(usd: number): string {
 function PinnedButton() {
   const pinnedMessages = useChatStore((s) => s.pinnedMessages);
   const togglePinnedMenu = useChatStore((s) => s.togglePinnedMenu);
+  const [bouncing, setBouncing] = useState(false);
+  const prevCount = useRef(pinnedMessages.length);
+
+  useEffect(() => {
+    if (pinnedMessages.length > prevCount.current) {
+      setBouncing(true);
+      setTimeout(() => setBouncing(false), 600);
+    }
+    prevCount.current = pinnedMessages.length;
+  }, [pinnedMessages.length]);
 
   if (pinnedMessages.length === 0) return null;
 
   return (
     <button
       onClick={togglePinnedMenu}
-      className="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      className={`relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all
+        ${bouncing ? 'animate-pin-bounce' : ''}`}
       aria-label="Pinned messages"
     >
       <span className="text-base">📌</span>
