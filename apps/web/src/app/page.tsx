@@ -28,19 +28,21 @@ export default function LandingPage() {
       {/* Content — positioned upper-left */}
       <div className="relative z-10 min-h-screen flex items-start justify-start p-4 sm:p-10 lg:p-16">
         <div className="max-w-md w-full bg-green-900/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/10">
-          {/* Logo */}
-          <div className="mb-6">
+          {/* Logo + title inline */}
+          <div className="flex items-center gap-4 mb-5">
             <img
               src="/icon.svg"
               alt="minai logo"
-              width={64}
-              height={70}
-              className="mb-3"
+              width={56}
+              height={61}
+              className="flex-shrink-0"
             />
-            <h1 className="text-4xl font-bold text-white mb-1">minai</h1>
-            <p className="text-green-200/80 text-base">
-              An AI Assistant for Human Assistants
-            </p>
+            <div>
+              <h1 className="text-3xl font-bold text-white leading-tight">minai</h1>
+              <p className="text-green-200/80 text-sm">
+                An AI Assistant for Human Assistants
+              </p>
+            </div>
           </div>
 
           {/* Feature bullets */}
@@ -56,6 +58,10 @@ export default function LandingPage() {
             <li className="flex items-start gap-2">
               <span className="text-green-400 mt-0.5">•</span>
               <span>Top up with <a href="https://minipay.to" target="_blank" className="underline hover:text-white">MiniPay</a> or any crypto wallet on Celo</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-green-400 mt-0.5">•</span>
+              <span>Try it for free ❤️</span>
             </li>
           </ul>
 
