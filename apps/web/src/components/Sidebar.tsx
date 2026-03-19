@@ -6,8 +6,9 @@ import { useChatStore } from '@/hooks/useChatStore';
 import { NoteEditor } from '@/components/NoteEditor';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import * as api from '@/lib/api';
-import type { Note } from '@/lib/api';
+import type { Note, NotebookFile } from '@/lib/api';
 import type { ConversationListItem } from '@minai/shared';
+import { FileViewer, getFileIcon } from '@/components/FileViewer';
 
 // ─── Drag-to-sort ─────────────────────────────────────────────────────────────
 
@@ -48,22 +49,26 @@ function NotebookRow({
   conv,
   isActive,
   notes,
+  files,
   onSelect,
   onRename,
   onNewNote,
   onSelectNote,
   onExpandNotes,
+  onOpenFile,
   dragProps,
   isDragOver,
 }: {
   conv: ConversationListItem;
   isActive: boolean;
   notes: Note[];
+  files: NotebookFile[];
   onSelect: () => void;
   onRename: (newTitle: string) => void;
   onNewNote: () => void;
   onSelectNote: (noteId: string) => void;
   onExpandNotes: () => void;
+  onOpenFile: (file: NotebookFile) => void;
   dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: true };
   isDragOver: boolean;
 }) {
@@ -182,6 +187,19 @@ function NotebookRow({
             </div>
           ))}
 
+          {files.slice(0, 5).map(file => (
+            <div
+              key={file.id}
+              onClick={() => onOpenFile(file)}
+              className="flex items-center gap-2 px-9 py-1.5 text-sm cursor-pointer transition-colors
+                text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300
+                hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <span className="text-xs opacity-50">{getFileIcon(file.mime_type)}</span>
+              <span className="truncate">{file.display_name}</span>
+            </div>
+          ))}
+
           <div className="flex items-center gap-2 px-9 pt-1.5">
             <button
               onClick={(e) => { e.stopPropagation(); onNewNote(); }}
@@ -189,14 +207,14 @@ function NotebookRow({
             >
               + New note
             </button>
-            {notes.length > 5 && (
+            {(notes.length > 5 || files.length > 5) && (
               <>
                 <span className="text-gray-300 dark:text-gray-700">·</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onExpandNotes(); }}
                   className="text-xs text-gray-400 hover:text-minai-600 transition-colors"
                 >
-                  see all {notes.length}
+                  see all
                 </button>
               </>
             )}
@@ -308,8 +326,10 @@ export function Sidebar() {
   } = useChatStore();
 
   const [notesByConv, setNotesByConv] = useState<Record<string, Note[]>>({});
+  const [filesByConv, setFilesByConv] = useState<Record<string, NotebookFile[]>>({});
   const [notebookOrder, setNotebookOrder] = useState<string[]>([]);
   const [confirmDeleteNotebook, setConfirmDeleteNotebook] = useState(false);
+  const [viewingFile, setViewingFile] = useState<NotebookFile | null>(null);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Load conversations
@@ -325,13 +345,19 @@ export function Sidebar() {
     });
   }, [conversations]);
 
-  // Load notes when active conversation changes
+  // Load notes + files when active conversation changes
   useEffect(() => {
     if (!activeConversationId) return;
-    if (notesByConv[activeConversationId]) return; // already loaded
-    api.getNotes(activeConversationId).then(notes => {
-      setNotesByConv(prev => ({ ...prev, [activeConversationId]: notes }));
-    }).catch(console.error);
+    if (!notesByConv[activeConversationId]) {
+      api.getNotes(activeConversationId).then(notes => {
+        setNotesByConv(prev => ({ ...prev, [activeConversationId]: notes }));
+      }).catch(console.error);
+    }
+    if (!filesByConv[activeConversationId]) {
+      api.getFiles(activeConversationId).then(files => {
+        setFilesByConv(prev => ({ ...prev, [activeConversationId]: files }));
+      }).catch(console.error);
+    }
   }, [activeConversationId]);
 
   // Scroll to targetNoteId when sidebar is expanded
@@ -467,6 +493,14 @@ export function Sidebar() {
 
   return (
     <>
+      {viewingFile && activeConversationId && (
+        <FileViewer
+          file={viewingFile}
+          conversationId={activeConversationId}
+          onClose={() => setViewingFile(null)}
+        />
+      )}
+
       <ConfirmDialog
         open={confirmDeleteNotebook}
         title="Delete notebook?"
@@ -580,6 +614,37 @@ export function Sidebar() {
                 </>
               )}
 
+              {/* Files section in expanded view */}
+              {(filesByConv[activeConversationId] ?? []).length > 0 && (
+                <div className="mt-4 mb-2">
+                  <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Files</div>
+                  {(filesByConv[activeConversationId] ?? []).map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer
+                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+                      onClick={() => setViewingFile(file)}
+                    >
+                      <span className="text-base">{getFileIcon(file.mime_type)}</span>
+                      <span className="flex-1 text-sm truncate text-gray-700 dark:text-gray-300">{file.display_name}</span>
+                      <span className="text-xs text-gray-400">{(file.file_size / 1024).toFixed(0)} KB</span>
+                      <a
+                        href={api.getFileDownloadUrl(activeConversationId, file.id)}
+                        download={file.original_name}
+                        onClick={(e) => e.stopPropagation()}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-minai-600 transition-all"
+                        title="Download"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Delete notebook — bottom of expanded view */}
               <div className="pt-4 pb-8 px-1">
                 <button
@@ -612,6 +677,7 @@ export function Sidebar() {
                     conv={conv}
                     isActive={conv.id === activeConversationId}
                     notes={(notesByConv[conv.id] ?? []).slice().sort((a, b) => a.display_order - b.display_order)}
+                    files={filesByConv[conv.id] ?? []}
                     onSelect={() => handleSelectNotebook(conv.id)}
                     onRename={(title) => handleRename(conv.id, title)}
                     onNewNote={async () => {
@@ -620,6 +686,7 @@ export function Sidebar() {
                     }}
                     onSelectNote={(noteId) => handleSelectNote(conv.id, noteId)}
                     onExpandNotes={() => handleExpandNotes(conv.id)}
+                    onOpenFile={(file) => setViewingFile(file)}
                     dragProps={dragProps(index)}
                     isDragOver={overIndex === index}
                   />
