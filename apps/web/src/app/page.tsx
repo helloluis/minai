@@ -37,13 +37,13 @@ export default function LandingPage() {
 
         {/* Feature bullets — static HTML, bot-readable */}
         <ul className="text-gray-600 dark:text-gray-300 mb-8 text-left space-y-2">
-          <li className="flex items-start gap-2">
+          {/* <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
             <span>Frontier-grade multimodal AI at a fraction of the price</span>
-          </li>
+          </li> */}
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Manage multiple calendars, analyze documents fast, generate or edit images, build custom skills with OpenClaw (soon!)</span>
+            <span>Manage multiple calendars, analyze documents fast, generate or edit images ... even design your own custom skills with OpenClaw (soon!)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
@@ -51,7 +51,7 @@ export default function LandingPage() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Top up with MiniPay or any crypto wallet on Celo</span>
+            <span>Top up with <a href="https://minipay.to" target="_blank">MiniPay</a> or any crypto wallet on Celo</span>
           </li>
         </ul>
 
