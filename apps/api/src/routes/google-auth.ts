@@ -8,18 +8,28 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
 ];
 
-function getOAuth2Client() {
+const ALLOWED_ORIGINS = (process.env.API_ALLOWED_ORIGINS ?? '').split(',').filter(Boolean);
+
+function getOAuth2Client(redirectUri?: string) {
   return new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback'
+    redirectUri || process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback'
   );
+}
+
+/** Build the callback URL from the request's own origin */
+function getCallbackUri(request: { headers: { host?: string }; protocol?: string }): string {
+  const host = request.headers.host ?? 'localhost:3000';
+  const proto = host.includes('localhost') ? 'http' : 'https';
+  return `${proto}://${host}/api/auth/google/callback`;
 }
 
 export async function googleAuthRoutes(fastify: FastifyInstance) {
   // GET /api/auth/google — redirect to Google consent screen
   fastify.get('/api/auth/google', async (request, reply) => {
-    const oauth2Client = getOAuth2Client();
+    const callbackUri = getCallbackUri(request);
+    const oauth2Client = getOAuth2Client(callbackUri);
 
     // Encode source in state (no session token — session is read from cookie on callback)
     const { source } = request.query as { source?: string };
@@ -48,7 +58,8 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const oauth2Client = getOAuth2Client();
+      const callbackUri = getCallbackUri(request);
+      const oauth2Client = getOAuth2Client(callbackUri);
       const { tokens } = await oauth2Client.getToken(code);
       oauth2Client.setCredentials(tokens);
 
