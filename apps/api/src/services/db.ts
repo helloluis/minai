@@ -223,22 +223,42 @@ export async function getMessages(
   limit = 50,
   before?: string
 ): Promise<Message[]> {
-  let query = `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL`;
   const params: unknown[] = [conversationId];
 
   if (before) {
-    query += ` AND created_at < $2`;
+    // Pagination: get N messages BEFORE a timestamp (for loading older messages)
+    // Ordered DESC to get the N closest to the cursor, then reversed to ASC
     params.push(before);
+    const limitClause = limit ? `LIMIT $${params.length + 1}` : '';
+    if (limit) params.push(limit);
+    const { rows } = await pool.query<Message>(
+      `SELECT * FROM (
+        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL AND created_at < $2
+        ORDER BY created_at DESC ${limitClause}
+      ) sub ORDER BY created_at ASC`,
+      params
+    );
+    return rows;
   }
-
-  query += ` ORDER BY created_at ASC`;
 
   if (limit) {
-    query += ` LIMIT $${params.length + 1}`;
+    // Initial load: get the NEWEST N messages (subquery DESC, then ASC)
     params.push(limit);
+    const { rows } = await pool.query<Message>(
+      `SELECT * FROM (
+        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL
+        ORDER BY created_at DESC LIMIT $2
+      ) sub ORDER BY created_at ASC`,
+      params
+    );
+    return rows;
   }
 
-  const { rows } = await pool.query<Message>(query, params);
+  // No limit, no cursor: return all messages
+  const { rows } = await pool.query<Message>(
+    `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC`,
+    params
+  );
   return rows;
 }
 
