@@ -18,6 +18,7 @@ export interface User {
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  timezone: string;
   created_at: string;
   deleted_at: string | null;
 }
