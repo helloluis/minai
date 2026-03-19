@@ -3,6 +3,7 @@ import './env.js'; // Load .env.local before anything else
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { getUploadsDir } from './services/image-store.js';
@@ -19,6 +20,13 @@ import { fileRoutes } from './routes/files.js';
 import multipart from '@fastify/multipart';
 
 const port = parseInt(process.env.API_PORT || '3001');
+const isProd = process.env.NODE_ENV === 'production';
+
+// ─── Startup validation ──────────────────────────────────────────────────────
+if (!process.env.WALLET_SEED) throw new Error('WALLET_SEED env var is required');
+if (isProd && (!process.env.COOKIE_SECRET || process.env.COOKIE_SECRET === 'minai-dev-secret')) {
+  throw new Error('COOKIE_SECRET env var must be set in production');
+}
 
 async function start() {
   const fastify = Fastify({
@@ -26,15 +34,21 @@ async function start() {
     bodyLimit: 30 * 1024 * 1024, // 30 MB — supports 20 MB images as base64
   });
 
-  // CORS — allow Next.js dev server
-  await fastify.register(cors, {
-    origin: ['http://localhost:3000', 'http://localhost:3002'],
-    credentials: true,
-  });
+  // CORS
+  const allowedOrigins = process.env.API_ALLOWED_ORIGINS
+    ? process.env.API_ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:3002'];
+  await fastify.register(cors, { origin: allowedOrigins, credentials: true });
 
   // Cookies
   await fastify.register(cookie, {
     secret: process.env.COOKIE_SECRET || 'minai-dev-secret',
+  });
+
+  // Global rate limiting
+  await fastify.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
   });
 
   // Multipart file uploads (20 MB limit)

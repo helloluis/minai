@@ -14,7 +14,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 14, // 14 days
     });
 
     const balance = await db.getBalance(user.id);
@@ -47,24 +48,5 @@ export async function authRoutes(fastify: FastifyInstance) {
     };
   });
 
-  // Mock deposit (adds funds to balance)
-  fastify.post('/api/auth/deposit', async (request) => {
-    const { amount } = (request.body as { amount?: number }) || {};
-    const depositAmount = amount ?? PRICING.min_deposit_usd;
-
-    if (depositAmount < PRICING.min_deposit_usd) {
-      throw { statusCode: 400, message: `Minimum deposit is $${PRICING.min_deposit_usd}` };
-    }
-
-    await db.addBalance(request.user.id, depositAmount);
-    await db.recordPayment(request.user.id, depositAmount, 'deposit', `mock-${uuid()}`);
-
-    const balance = await db.getBalance(request.user.id);
-    return {
-      balance: {
-        balance_usd: balance?.balance_usd ?? 0,
-        free_credit_usd: balance?.free_credit_usd ?? 0,
-      },
-    };
-  });
+  // Mock deposit removed — use /api/payment/verify with real on-chain tx
 }

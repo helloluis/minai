@@ -25,14 +25,17 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
   // POST /api/payment/verify — verify a tx hash and credit the balance
   fastify.post<{ Body: { tx_hash: string } }>(
     '/api/payment/verify',
-    { schema: { body: { type: 'object', required: ['tx_hash'], properties: { tx_hash: { type: 'string' } } } } },
+    {
+      schema: { body: { type: 'object', required: ['tx_hash'], properties: { tx_hash: { type: 'string' } } } },
+      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    },
     async (request, reply) => {
       const userId = request.user?.id;
       if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
       const { tx_hash } = request.body;
-      if (!tx_hash?.startsWith('0x')) {
-        return reply.code(400).send({ error: 'Invalid transaction hash — must start with 0x' });
+      if (!/^0x[a-fA-F0-9]{64}$/.test(tx_hash)) {
+        return reply.code(400).send({ error: 'Invalid transaction hash format' });
       }
 
       const deposit = await verifyDeposit(userId, tx_hash);

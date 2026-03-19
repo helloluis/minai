@@ -63,8 +63,9 @@ export async function getBalance(userId: string): Promise<UserBalance | null> {
 }
 
 export async function deductBalance(userId: string, amount: number): Promise<void> {
+  if (amount <= 0) return;
   await pool.query(
-    `UPDATE user_balances SET balance_usd = balance_usd - $2, updated_at = now() WHERE user_id = $1`,
+    `UPDATE user_balances SET balance_usd = GREATEST(0, balance_usd - $2), updated_at = now() WHERE user_id = $1`,
     [userId, amount]
   );
 }

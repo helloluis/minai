@@ -38,5 +38,11 @@ export async function deleteStoredFile(storagePath: string): Promise<void> {
 }
 
 export function getFullPath(storagePath: string): string {
-  return join(getFilesDir(), storagePath);
+  const full = join(getFilesDir(), storagePath);
+  const normalized = full.replace(/\\/g, '/');
+  const root = getFilesDir().replace(/\\/g, '/');
+  if (!normalized.startsWith(root)) {
+    throw new Error('Path traversal attempt blocked');
+  }
+  return full;
 }

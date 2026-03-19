@@ -21,10 +21,9 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
   fastify.get('/api/auth/google', async (request, reply) => {
     const oauth2Client = getOAuth2Client();
 
-    // Encode current session + source in state so we can link accounts and redirect correctly
+    // Encode source in state (no session token — session is read from cookie on callback)
     const { source } = request.query as { source?: string };
-    const sessionToken = request.cookies?.session ?? '';
-    const state = Buffer.from(JSON.stringify({ session: sessionToken, source: source ?? 'login' })).toString('base64url');
+    const state = Buffer.from(JSON.stringify({ source: source ?? 'login' })).toString('base64url');
 
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -63,18 +62,19 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
       const displayName = firstName;
       const avatarUrl = profile.picture ?? '';
 
-      // Decode state
-      let stateData: { session?: string; source?: string } = {};
+      // Decode state (source only — session comes from cookie)
+      let stateData: { source?: string } = {};
       if (state) {
         try {
           stateData = JSON.parse(Buffer.from(state, 'base64url').toString());
         } catch { /* ignore malformed state */ }
       }
 
-      // Get existing session's user (may be null for unauthenticated SSO)
+      // Get existing session's user from cookie (not from state param)
       let existingUserId: string | null = null;
-      if (stateData.session) {
-        const existing = await db.getUserBySession(stateData.session);
+      const sessionCookie = request.cookies?.session;
+      if (sessionCookie) {
+        const existing = await db.getUserBySession(sessionCookie);
         existingUserId = existing?.id ?? null;
       }
 
@@ -103,7 +103,8 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
         path: '/',
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 14, // 14 days
       });
 
       // Save OAuth tokens
