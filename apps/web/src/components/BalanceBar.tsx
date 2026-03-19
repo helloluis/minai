@@ -118,40 +118,36 @@ export function BalanceBar() {
           {showTooltip && (
             <div className="absolute top-full right-0 mt-2 w-60 p-3 rounded-xl shadow-lg border
               bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-50 text-xs">
-              {freeCredit > 0 ? (
-                <>
-                  <div className="font-semibold text-sm mb-2">Free Credit</div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-500">Remaining</span>
-                    <span className="font-medium" style={{ color: ringColor }}>
-                      ${freeCredit.toFixed(6)} of ${FREE_CREDIT_INITIAL_USD.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between mb-2 text-gray-400">
-                    <span>Spent</span>
-                    <span>${(FREE_CREDIT_INITIAL_USD - freeCredit).toFixed(6)}</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${remainingPct}%`, backgroundColor: ringColor }}
-                    />
-                  </div>
-                  <div className="text-gray-400">
-                    After free credit is used, charges come from your paid balance.
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="font-semibold text-sm mb-1">Paid Balance</div>
-                  <div className="text-2xl font-bold mb-2">${balance.toFixed(6)}</div>
-                  <div className="text-gray-400">Free credit exhausted. Top up to continue.</div>
-                </>
+              {/* Total available */}
+              <div className="font-semibold text-sm mb-0.5">Available Balance</div>
+              <div className="text-xl font-bold mb-2.5">${totalAvailable.toFixed(2)}</div>
+
+              {/* Breakdown */}
+              {freeCredit > 0 && (
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-500">Free credit</span>
+                  <span className="font-medium" style={{ color: ringColor }}>
+                    ${freeCredit.toFixed(4)}
+                  </span>
+                </div>
               )}
-              {balance > 0 && freeCredit > 0 && (
-                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between text-gray-400">
-                  <span>Paid balance</span>
-                  <span>${balance.toFixed(6)}</span>
+              {freeCredit > 0 && (
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-1.5">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${remainingPct}%`, backgroundColor: ringColor }}
+                  />
+                </div>
+              )}
+              {balance > 0 && (
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-500">Paid balance</span>
+                  <span className="font-medium">${balance.toFixed(2)}</span>
+                </div>
+              )}
+              {freeCredit > 0 && balance === 0 && (
+                <div className="text-gray-400 mt-1.5">
+                  After free credit is used, top up to continue.
                 </div>
               )}
             </div>
