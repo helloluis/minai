@@ -8,6 +8,12 @@ import * as mammoth from 'mammoth';
 
 const MAX_TEXT_LENGTH = 500_000; // cap stored text at 500K chars
 
+/** Strip null bytes and other chars that PostgreSQL TEXT columns reject */
+function sanitize(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x00/g, '');
+}
+
 export interface ParseResult {
   text: string;
   error?: string;
@@ -23,7 +29,7 @@ export async function parseFileContent(filePath: string, mimeType: string): Prom
       mimeType === 'text/html'
     ) {
       const text = await readFile(filePath, 'utf-8');
-      return { text: text.slice(0, MAX_TEXT_LENGTH) };
+      return { text: sanitize(text).slice(0, MAX_TEXT_LENGTH) };
     }
 
     // PDF
@@ -31,7 +37,7 @@ export async function parseFileContent(filePath: string, mimeType: string): Prom
       const buffer = await readFile(filePath);
       const parser = new PDFParse({ data: new Uint8Array(buffer) });
       const result = await parser.getText();
-      return { text: result.text.slice(0, MAX_TEXT_LENGTH) };
+      return { text: sanitize(result.text).slice(0, MAX_TEXT_LENGTH) };
     }
 
     // DOCX / DOC
@@ -40,7 +46,7 @@ export async function parseFileContent(filePath: string, mimeType: string): Prom
       mimeType === 'application/msword'
     ) {
       const result = await mammoth.extractRawText({ path: filePath });
-      return { text: result.value.slice(0, MAX_TEXT_LENGTH) };
+      return { text: sanitize(result.value).slice(0, MAX_TEXT_LENGTH) };
     }
 
     return { text: '', error: `Unsupported file type: ${mimeType}` };
