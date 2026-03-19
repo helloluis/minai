@@ -1,82 +1,57 @@
-'use client';
+import type { Metadata } from 'next';
+import { AuthRedirect } from '@/components/AuthRedirect';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useChatStore } from '@/hooks/useChatStore';
-import * as api from '@/lib/api';
+export const metadata: Metadata = {
+  title: 'minai — AI for Everyone',
+  description: 'Affordable frontier-grade AI assistant for emerging economies. Pay-as-you-go, no subscriptions. Calendar management, document analysis, image generation, and more.',
+  openGraph: {
+    title: 'minai — AI for Everyone',
+    description: 'Affordable frontier-grade AI assistant for emerging economies.',
+    url: 'https://minai.work',
+    siteName: 'minai',
+    type: 'website',
+  },
+};
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { login, checkSession, isAuthenticated, createConversation } = useChatStore();
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    checkSession().finally(() => setChecking(false));
-  }, [checkSession]);
-
-  useEffect(() => {
-    if (isAuthenticated && !checking) {
-      // Already logged in — go to most recent conversation, or create one if none exist
-      api.getConversations().then((convs: { id: string }[]) => {
-        if (convs.length > 0) {
-          router.push(`/notebooks/${convs[0].id}/chat`);
-        } else {
-          createConversation().then((id) => router.push(`/notebooks/${id}/chat`));
-        }
-      });
-    }
-  }, [isAuthenticated, checking, createConversation, router]);
-
-  const handleLogin = async () => {
-    setLoading(true);
-    try {
-      await login();
-      const id = await createConversation();
-      router.push(`/notebooks/${id}/chat`);
-    } catch (err) {
-      console.error('Login failed:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (checking) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse text-gray-400">Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4">
+      {/* Client-side auth redirect (invisible — redirects logged-in users) */}
+      <AuthRedirect />
+
       <div className="text-center max-w-md">
-        {/* Logo / Brand */}
-        <div className="mb-8">
+        {/* Logo — prominent, bot-visible */}
+        <div className="mb-6">
+          <img
+            src="/icon.svg"
+            alt="minai logo"
+            width={80}
+            height={87}
+            className="mx-auto mb-4"
+          />
           <h1 className="text-5xl font-bold text-minai-600 mb-2">minai</h1>
           <p className="text-gray-500 dark:text-gray-400 text-lg">
-            An Assistant for Assistants
+            AI for Everyone
           </p>
         </div>
 
-        {/* Feature bullets */}
+        {/* Feature bullets — static HTML, bot-readable */}
         <ul className="text-gray-600 dark:text-gray-300 mb-8 text-left space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Pay-as-you-go, no subscription fees, top-up with as little as $0.10</span>
+            <span>Pay-as-you-go, no subscription fees — top up with as little as $0.10</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Multimodal frontier-grade AI at 1/10th of the price</span>
+            <span>Frontier-grade multimodal AI at a fraction of the price</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Calendar, PDFs, Image generation, OpenClaw (soon!) and other common tools</span>
+            <span>Calendar management, document analysis, image generation, web search</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Build with us ❤️ Earn tokens when you suggest a great feature</span>
+            <span>Top up with crypto (USDC, cUSD) on Celo via MiniPay or any wallet</span>
           </li>
         </ul>
 
@@ -96,28 +71,12 @@ export default function LandingPage() {
           Continue with Google
         </a>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-2">
-          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-          <span className="text-xs text-gray-400">or</span>
-          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        {/* Legal links — bot-readable */}
+        <div className="mt-8 flex items-center justify-center gap-4 text-xs text-gray-400">
+          <a href="/privacy" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Privacy Policy</a>
+          <span>·</span>
+          <a href="/terms" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Terms of Service</a>
         </div>
-
-        {/* Anonymous login */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full py-3 px-6 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800
-            border border-gray-200 dark:border-gray-700
-            text-gray-500 dark:text-gray-400 font-medium rounded-xl transition-colors
-            flex items-center justify-center gap-3 text-sm"
-        >
-          {loading ? (
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            'Continue without account'
-          )}
-        </button>
       </div>
     </div>
   );
