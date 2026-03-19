@@ -232,6 +232,8 @@ function NoteCard({
   conversationId,
   onUpdate,
   onDelete,
+  isExpanded,
+  onToggleExpand,
   dragProps,
   isDragOver,
 }: {
@@ -239,6 +241,8 @@ function NoteCard({
   conversationId: string;
   onUpdate: (noteId: string, updates: { title?: string; content?: string }) => void;
   onDelete: (noteId: string) => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: true };
   isDragOver: boolean;
 }) {
@@ -251,6 +255,61 @@ function NoteCard({
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate(note.id, { title: e.target.value });
   };
+
+  // Expanded note fills the viewport (below top bar)
+  if (isExpanded) {
+    return (
+      <>
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Delete note?"
+          message={`"${note.title || 'Untitled note'}" will be permanently removed.`}
+          confirmLabel="Delete note"
+          onConfirm={() => { setConfirmDelete(false); onDelete(note.id); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+        <div className="fixed inset-0 top-[57px] z-[55] bg-white dark:bg-gray-950 flex flex-col">
+          <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-200 dark:border-gray-800">
+            <button
+              onClick={onToggleExpand}
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"
+              title="Collapse"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+              </svg>
+            </button>
+            <input
+              className="flex-1 font-semibold text-base bg-transparent outline-none
+                placeholder-gray-300 dark:placeholder-gray-600
+                text-gray-800 dark:text-gray-100"
+              value={note.title}
+              placeholder="Note title..."
+              onChange={handleTitleChange}
+            />
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-1.5"
+              title="Delete note"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="max-w-4xl mx-auto">
+              <NoteEditor
+                content={note.content}
+                onChange={handleContentChange}
+              />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -283,6 +342,16 @@ function NoteCard({
             placeholder="Note title..."
             onChange={handleTitleChange}
           />
+          <button
+            onClick={onToggleExpand}
+            className="text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0"
+            title="Expand note"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
           <button
             onClick={() => setConfirmDelete(true)}
             className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
@@ -447,6 +516,8 @@ export function Sidebar() {
   const [notebookOrder, setNotebookOrder] = useState<string[]>([]);
   const [confirmDeleteNotebook, setConfirmDeleteNotebook] = useState(false);
   const [viewingFile, setViewingFile] = useState<NotebookFile | null>(null);
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Load conversations
@@ -641,7 +712,7 @@ export function Sidebar() {
           dark:border-gray-800 z-50 flex flex-col
           transition-[transform,width] duration-200 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isExpanded ? 'w-[calc(100vw-2rem)] max-w-5xl' : 'w-72'}`}
+          ${isExpanded ? 'w-screen' : 'w-72'}`}
       >
         {/* ── Header ── */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
@@ -692,7 +763,7 @@ export function Sidebar() {
         <div className="flex-1 overflow-y-auto">
           {isExpanded && activeConversationId ? (
             /* ── Expanded: notes canvas ── */
-            <div className="p-4 max-w-2xl mx-auto w-full">
+            <div className="p-4 max-w-4xl mx-auto w-full">
               {expandedNotes.length === 0 ? (
                 <div className="text-center py-24 text-gray-400">
                   <div className="text-5xl mb-4">📄</div>
@@ -713,6 +784,8 @@ export function Sidebar() {
                         conversationId={activeConversationId}
                         onUpdate={(noteId, updates) => handleNoteUpdate(activeConversationId, noteId, updates)}
                         onDelete={(noteId) => handleDeleteNote(activeConversationId, noteId)}
+                        isExpanded={expandedNoteId === note.id}
+                        onToggleExpand={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
                         dragProps={noteDragProps(index)}
                         isDragOver={noteOverIndex === index}
                       />
@@ -731,11 +804,32 @@ export function Sidebar() {
                 </>
               )}
 
-              {/* Files section in expanded view */}
-              {(filesByConv[activeConversationId] ?? []).length > 0 && (
-                <div className="mt-4 mb-2">
-                  <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Files</div>
-                  {(filesByConv[activeConversationId] ?? []).map((file) => (
+              {/* Files section in expanded view — with drag-to-upload */}
+              <div
+                className={`mt-4 mb-2 rounded-xl transition-colors ${
+                  isDraggingFile ? 'bg-minai-50 dark:bg-minai-900/20 ring-2 ring-dashed ring-minai-400' : ''
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(false);
+                  if (!activeConversationId || !e.dataTransfer.files.length) return;
+                  for (const file of Array.from(e.dataTransfer.files)) {
+                    api.uploadFile(activeConversationId, file).then((uploaded) => {
+                      setFilesByConv((prev) => ({
+                        ...prev,
+                        [activeConversationId]: [uploaded, ...(prev[activeConversationId] ?? [])],
+                      }));
+                    }).catch(console.error);
+                  }
+                }}
+              >
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">
+                  {isDraggingFile ? 'Drop files here' : 'Files'}
+                </div>
+                {(filesByConv[activeConversationId] ?? []).length > 0 ? (
+                  (filesByConv[activeConversationId] ?? []).map((file) => (
                     <FileRow
                       key={file.id}
                       file={file}
@@ -756,9 +850,13 @@ export function Sidebar() {
                         }));
                       }}
                     />
-                  ))}
-                </div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-xs text-gray-400 px-3 py-4 text-center">
+                    Drag files here to upload
+                  </div>
+                )}
+              </div>
 
               {/* Delete notebook — bottom of expanded view */}
               <div className="pt-4 pb-8 px-1">
