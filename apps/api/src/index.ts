@@ -15,6 +15,8 @@ import { noteRoutes } from './routes/notes.js';
 import { settingsRoutes } from './routes/settings.js';
 import { googleAuthRoutes } from './routes/google-auth.js';
 import paymentRoutes from './routes/payment.js';
+import { fileRoutes } from './routes/files.js';
+import multipart from '@fastify/multipart';
 
 const port = parseInt(process.env.API_PORT || '3001');
 
@@ -34,6 +36,9 @@ async function start() {
   await fastify.register(cookie, {
     secret: process.env.COOKIE_SECRET || 'minai-dev-secret',
   });
+
+  // Multipart file uploads (20 MB limit)
+  await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
   // Public routes (before auth middleware)
 
@@ -67,6 +72,7 @@ async function start() {
   await fastify.register(settingsRoutes);
   await fastify.register(googleAuthRoutes);
   await fastify.register(paymentRoutes);
+  await fastify.register(fileRoutes);
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });

@@ -12,7 +12,7 @@
   ```
 - Always build `@minai/shared` first — the web and API bundle from its `dist/`, so skipping it causes stale constants
 - The server has 2GB RAM — use `NODE_OPTIONS='--max-old-space-size=1800'` for web builds
-- **If the API `tsc` build OOMs:** stop the API first (`pm2 stop minai-api`), build, then restart
+- **If the API `tsc` build OOMs:** stop both PM2 processes first (`pm2 stop all`), build with `NODE_OPTIONS='--max-old-space-size=1800'`, then restart
 
 **Never run parallel SSH commands.** Always sequential, one at a time.
 

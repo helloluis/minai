@@ -72,7 +72,7 @@ export default function LandingPage() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Calendar, PDFs, Image generation, and other common tools</span>
+            <span>Calendar, PDFs, Image generation, OpenClaw (soon!) and other common tools</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>

@@ -139,6 +139,52 @@ export const verifyDeposit = (tx_hash: string) =>
     { method: 'POST', body: JSON.stringify({ tx_hash }) }
   );
 
+// Files
+export interface NotebookFile {
+  id: string;
+  conversation_id: string;
+  original_name: string;
+  display_name: string;
+  mime_type: string;
+  file_size: number;
+  parse_status: 'pending' | 'done' | 'failed';
+  created_at: string;
+  updated_at: string;
+}
+
+export async function uploadFile(conversationId: string, file: File): Promise<NotebookFile> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/api/conversations/${conversationId}/files`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Upload failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export const getFiles = (conversationId: string) =>
+  fetchAPI<NotebookFile[]>(`/api/conversations/${conversationId}/files`);
+
+export const renameFile = (conversationId: string, fileId: string, displayName: string) =>
+  fetchAPI<{ id: string; display_name: string }>(`/api/conversations/${conversationId}/files/${fileId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ display_name: displayName }),
+  });
+
+export const deleteFile = (conversationId: string, fileId: string) =>
+  fetchAPI<{ success: boolean }>(`/api/conversations/${conversationId}/files/${fileId}`, {
+    method: 'DELETE',
+  });
+
+export function getFileDownloadUrl(conversationId: string, fileId: string): string {
+  return `${API_BASE}/api/conversations/${conversationId}/files/${fileId}/download`;
+}
+
 // Settings
 export const setTimezone = (timezone: string) =>
   fetchAPI<{ success: boolean }>('/api/settings/timezone', {

@@ -34,6 +34,7 @@ async function migrate() {
       '011_message_widgets.sql',
       '012_payment_sender.sql',
       '013_user_timezone_briefing.sql',
+      '014_notebook_files.sql',
     ];
 
     for (const migration of migrations) {

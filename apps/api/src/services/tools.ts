@@ -439,6 +439,46 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['prompt'],
     },
   },
+
+  // ─── File tools ──────────────────────────────────────────────────────────
+
+  {
+    name: 'list_files',
+    description: 'List all files uploaded to the current notebook/conversation. Shows file names, types, sizes, and IDs. Call this when the user asks about their uploaded documents.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'read_file',
+    description: 'Read the parsed text content of an uploaded file. Works for PDFs, DOCX, TXT, CSV files. Use this to answer questions about a document, summarize it, extract data from it, etc. Get file IDs from list_files first.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_id: {
+          type: 'string',
+          description: 'The file ID to read (get IDs from list_files)',
+        },
+      },
+      required: ['file_id'],
+    },
+  },
+  {
+    name: 'search_files',
+    description: 'Search across all uploaded files in the current notebook for a text query. Returns matching snippets with file names. Useful for finding specific information across multiple documents.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The text to search for across all file contents',
+        },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -959,7 +999,7 @@ async function setPreferredName(userId: string, args: { name: string }): Promise
 
 // ─── Tool Executor ───
 
-export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: ContextImage[]): Promise<ToolResult> {
+export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: ContextImage[], conversationId?: string): Promise<ToolResult> {
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
@@ -1073,6 +1113,45 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       } catch (err) {
         content = `Image editing failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
+      break;
+    }
+
+    // ─── File tools ──────────────────────────────────────────────────────────
+
+    case 'list_files': {
+      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+      const files = await db.getNotebookFiles(conversationId, userId);
+      if (files.length === 0) { content = 'No files uploaded to this notebook.'; break; }
+      content = files.map((f) =>
+        `- ${f.display_name} (${f.mime_type}, ${(f.file_size / 1024).toFixed(1)} KB, status: ${f.parse_status})\n  ID: ${f.id}`
+      ).join('\n');
+      break;
+    }
+
+    case 'read_file': {
+      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+      const fileId = args.file_id as string;
+      const result = await db.getNotebookFileContent(fileId, conversationId, userId);
+      if (!result) { content = 'File not found.'; break; }
+      if (result.parse_status !== 'done' || !result.parsed_text) {
+        content = `File "${result.display_name}" has no parsed text (status: ${result.parse_status}). It may still be processing or the format is unsupported.`;
+        break;
+      }
+      const text = result.parsed_text.length > 8000
+        ? result.parsed_text.slice(0, 8000) + '\n\n... [truncated — file has more content]'
+        : result.parsed_text;
+      content = `Content of "${result.display_name}":\n\n${text}`;
+      break;
+    }
+
+    case 'search_files': {
+      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+      const query = args.query as string;
+      const results = await db.searchNotebookFiles(conversationId, userId, query);
+      if (results.length === 0) { content = `No matches found for "${query}" across uploaded files.`; break; }
+      content = results.map((r) =>
+        `**${r.display_name}** (ID: ${r.id}):\n  ...${r.snippet}...`
+      ).join('\n\n');
       break;
     }
 

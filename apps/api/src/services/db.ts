@@ -694,6 +694,121 @@ export async function updateLastBriefing(userId: string): Promise<void> {
   await pool.query('UPDATE users SET last_briefing_at = NOW() WHERE id = $1', [userId]);
 }
 
+// ─── Notebook Files ──────────────────────────────────────────────────────────
+
+export interface NotebookFile {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  original_name: string;
+  display_name: string;
+  mime_type: string;
+  file_size: number;
+  storage_path: string;
+  parsed_text: string | null;
+  parse_status: string;
+  parse_error: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export async function createNotebookFile(
+  conversationId: string,
+  userId: string,
+  originalName: string,
+  mimeType: string,
+  fileSize: number,
+  storagePath: string,
+): Promise<NotebookFile> {
+  const { rows } = await pool.query<NotebookFile>(
+    `INSERT INTO notebook_files (conversation_id, user_id, original_name, display_name, mime_type, file_size, storage_path)
+     VALUES ($1, $2, $3, $3, $4, $5, $6) RETURNING *`,
+    [conversationId, userId, originalName, mimeType, fileSize, storagePath]
+  );
+  return rows[0];
+}
+
+export async function getNotebookFiles(conversationId: string, userId: string): Promise<NotebookFile[]> {
+  const { rows } = await pool.query<NotebookFile>(
+    `SELECT * FROM notebook_files WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL ORDER BY created_at DESC`,
+    [conversationId, userId]
+  );
+  return rows;
+}
+
+export async function getNotebookFile(id: string, userId: string): Promise<NotebookFile | null> {
+  const { rows } = await pool.query<NotebookFile>(
+    `SELECT * FROM notebook_files WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+    [id, userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateNotebookFile(
+  id: string,
+  userId: string,
+  updates: { display_name?: string; parsed_text?: string; parse_status?: string; parse_error?: string },
+): Promise<NotebookFile | null> {
+  const sets: string[] = ['updated_at = now()'];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined) {
+      sets.push(`${key} = $${idx}`);
+      params.push(val);
+      idx++;
+    }
+  }
+  params.push(id, userId);
+
+  const { rows } = await pool.query<NotebookFile>(
+    `UPDATE notebook_files SET ${sets.join(', ')} WHERE id = $${idx} AND user_id = $${idx + 1} AND deleted_at IS NULL RETURNING *`,
+    params
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteNotebookFile(id: string, userId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE notebook_files SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+    [id, userId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function getNotebookFileContent(
+  fileId: string,
+  conversationId: string,
+  userId: string,
+): Promise<{ display_name: string; parsed_text: string | null; parse_status: string } | null> {
+  const { rows } = await pool.query<{ display_name: string; parsed_text: string | null; parse_status: string }>(
+    `SELECT display_name, parsed_text, parse_status FROM notebook_files
+     WHERE id = $1 AND conversation_id = $2 AND user_id = $3 AND deleted_at IS NULL`,
+    [fileId, conversationId, userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function searchNotebookFiles(
+  conversationId: string,
+  userId: string,
+  query: string,
+): Promise<{ id: string; display_name: string; snippet: string }[]> {
+  const pattern = `%${query}%`;
+  const { rows } = await pool.query<{ id: string; display_name: string; snippet: string }>(
+    `SELECT id, display_name,
+       SUBSTRING(parsed_text FROM GREATEST(1, POSITION(LOWER($3) IN LOWER(parsed_text)) - 80) FOR 200) AS snippet
+     FROM notebook_files
+     WHERE conversation_id = $1 AND user_id = $2 AND deleted_at IS NULL
+       AND parsed_text ILIKE $4
+     LIMIT 10`,
+    [conversationId, userId, query, pattern]
+  );
+  return rows;
+}
+
 // ─── Pool ───
 
 export { pool };
