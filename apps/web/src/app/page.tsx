@@ -31,7 +31,7 @@ export default function LandingPage() {
           />
           <h1 className="text-5xl font-bold text-minai-600 mb-2">minai</h1>
           <p className="text-gray-500 dark:text-gray-400 text-lg">
-            AI for Everyone
+            An AI Assistant for Human Assistants
           </p>
         </div>
 
@@ -39,19 +39,19 @@ export default function LandingPage() {
         <ul className="text-gray-600 dark:text-gray-300 mb-8 text-left space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Pay-as-you-go, no subscription fees — top up with as little as $0.10</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-minai-500 mt-0.5">•</span>
             <span>Frontier-grade multimodal AI at a fraction of the price</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Calendar management, document analysis, image generation, web search</span>
+            <span>Manage multiple calendars, analyze documents fast, generate or edit images, build custom skills with OpenClaw (soon!)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-minai-500 mt-0.5">•</span>
-            <span>Top up with crypto (USDC, cUSD) on Celo via MiniPay or any wallet</span>
+            <span>Pay-as-you-go, no up-front subscription fees — top up with as little as $0.10!</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-minai-500 mt-0.5">•</span>
+            <span>Top up with MiniPay or any crypto wallet on Celo</span>
           </li>
         </ul>
 

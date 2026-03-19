@@ -10,6 +10,7 @@ import { MessageBubble } from '@/components/MessageBubble';
 import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
+import { GuestBanner } from '@/components/GuestBanner';
 
 function AnimatedDots() {
   return (
@@ -164,6 +165,7 @@ export default function NotebookChatPage() {
   return (
     <div className={`flex flex-col h-screen transition-[padding] duration-200 ease-in-out ${contentMargin}`}>
       <BalanceBar />
+      <GuestBanner />
       <Sidebar />
       <PinnedMessagesMenu />
 

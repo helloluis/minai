@@ -46,10 +46,11 @@ export async function updateUserDisplayName(userId: string, name: string): Promi
 
 // ─── Balances ───
 
-export async function createBalance(userId: string): Promise<UserBalance> {
+export async function createBalance(userId: string, freeCredit?: number): Promise<UserBalance> {
+  const credit = freeCredit ?? PRICING.free_credit_initial_usd;
   const { rows } = await pool.query<UserBalance>(
     `INSERT INTO user_balances (user_id, free_credit_usd) VALUES ($1, $2) RETURNING *`,
-    [userId, PRICING.free_credit_initial_usd]
+    [userId, credit]
   );
   return rows[0];
 }

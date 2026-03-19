@@ -8,7 +8,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/api/auth/login', async (request, reply) => {
     const sessionToken = uuid();
     const user = await db.createUser(sessionToken);
-    await db.createBalance(user.id);
+    await db.createBalance(user.id, 0.50); // Guest users get $0.50 (Google SSO users get $1.00)
 
     reply.setCookie('session', sessionToken, {
       path: '/',
