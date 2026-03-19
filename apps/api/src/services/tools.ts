@@ -982,9 +982,22 @@ async function submitFeatureSuggestion(userId: string, args: { title: string; de
     [userId, args.title.slice(0, 100), args.description]
   );
   console.log(`[FeatureSuggestion] New suggestion from ${userId}: "${args.title}"`);
+
+  // Send email notification to the team (fire-and-forget)
+  const user = await db.getUserById(userId);
+  import('./email.js').then(({ sendFeatureSuggestionEmail }) => {
+    sendFeatureSuggestionEmail({
+      title: args.title,
+      description: args.description,
+      userName: user?.display_name ?? null,
+      userEmail: user?.email ?? null,
+      userId,
+    });
+  }).catch(console.error);
+
   return JSON.stringify({
     success: true,
-    message: "Suggestion submitted! The team reviews all submissions and credits are awarded for accepted features.",
+    message: "Suggestion submitted! The platform team has been notified and will reach out if they have questions.",
   });
 }
 
