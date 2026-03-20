@@ -466,6 +466,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'read_all_files',
+    description: 'Read the summaries of ALL uploaded files in the current notebook in one call. Returns a compact summary for each file. Use this instead of calling read_file repeatedly when you need to analyze, compare, or tabulate data across many files.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: 'search_files',
     description: 'Search across all uploaded files in the current notebook for a text query. Returns matching snippets with file names. Useful for finding specific information across multiple documents.',
     parameters: {
@@ -1159,6 +1168,23 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
           : result.parsed_text;
         content = `Content of "${result.display_name}":\n\n${text}`;
       }
+      break;
+    }
+
+    case 'read_all_files': {
+      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+      const allFiles = await db.getNotebookFiles(conversationId, userId);
+      if (allFiles.length === 0) { content = 'No files in this notebook.'; break; }
+      const summaries: string[] = [];
+      for (const f of allFiles) {
+        const fc = await db.getNotebookFileContent(f.id, conversationId, userId);
+        if (!fc) continue;
+        const summary = fc.llm_summary && fc.summary_status === 'done'
+          ? fc.llm_summary
+          : fc.parsed_text?.slice(0, 2000) ?? '(no content)';
+        summaries.push(`--- FILE: ${fc.display_name} ---\n${summary}`);
+      }
+      content = `${allFiles.length} files:\n\n${summaries.join('\n\n')}`;
       break;
     }
 

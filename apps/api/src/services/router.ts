@@ -18,7 +18,7 @@ const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
 const MODEL_FAST: ModelId = 'qwen3.5-flash';
 const MODEL_DEEP: ModelId = 'qwen3.5-plus';
-const MAX_TOOL_ITERATIONS = 10;
+const MAX_TOOL_ITERATIONS = 30;
 
 // Classifier config — switch via env vars
 const CLASSIFIER_PROVIDER = process.env.CLASSIFIER_PROVIDER ?? 'dashscope'; // 'dashscope' | 'ollama'
@@ -345,10 +345,11 @@ export async function* streamResponse(
     classification = 'deep';
   } else {
     // Auto mode: 3-way classify → simple / balanced / deep
-    // Fetch last 4 messages for classifier context (so "yes" after a tool prompt gets classified correctly)
-    const recentMsgs = await db.getMessages(conversationId, 4);
+    // Fetch last 2 messages for classifier context (enough for confirmation detection)
+    // Truncate aggressively — classifier only needs to know the topic, not full content
+    const recentMsgs = await db.getMessages(conversationId, 2);
     const recentContext = recentMsgs.length > 0
-      ? recentMsgs.map((m) => `[${m.role}]: ${m.content.slice(0, 200)}`).join('\n')
+      ? recentMsgs.map((m) => `[${m.role}]: ${m.content.slice(0, 100)}`).join('\n')
       : undefined;
 
     const result = await classifyPrompt(userMessage, recentContext);
