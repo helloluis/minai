@@ -26,6 +26,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
   const [preview, setPreview] = useState<{ type: 'text' | 'html'; content: string } | null>(null);
   const [previewError, setPreviewError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -35,6 +36,17 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleKey]);
+
+  // Fetch PDF/image as blob (iframe/img can't send auth cookies)
+  useEffect(() => {
+    if (!isPdf && !isImage) return;
+    fetch(viewUrl, { credentials: 'include' })
+      .then((res) => res.blob())
+      .then((blob) => setBlobUrl(URL.createObjectURL(blob)))
+      .catch(() => setPreviewError('Failed to load file'));
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewUrl, isPdf, isImage]);
 
   // Fetch preview for non-PDF/non-image files
   useEffect(() => {
@@ -86,10 +98,10 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
         {/* Content */}
         <div className="flex-1 overflow-auto">
           {/* Images */}
-          {isImage && (
+          {isImage && blobUrl && (
             <div className="flex items-center justify-center p-4">
               <img
-                src={viewUrl}
+                src={blobUrl}
                 alt={file.display_name}
                 className="max-w-full max-h-[75vh] object-contain rounded-lg"
               />
@@ -97,12 +109,23 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
           )}
 
           {/* PDF */}
-          {isPdf && (
+          {isPdf && blobUrl && (
             <iframe
-              src={viewUrl}
+              src={blobUrl}
               title={file.display_name}
               className="w-full h-[80vh]"
             />
+          )}
+
+          {/* Loading blob */}
+          {(isPdf || isImage) && !blobUrl && !previewError && (
+            <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Loading…
+            </div>
           )}
 
           {/* Text/DOCX/Other — fetched preview */}
