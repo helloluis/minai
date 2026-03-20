@@ -467,10 +467,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'read_all_files',
-    description: 'Read the summaries of ALL uploaded files in the current notebook in one call. Returns a compact summary for each file. Use this instead of calling read_file repeatedly when you need to analyze, compare, or tabulate data across many files.',
+    description: 'Read the summaries of uploaded files in the current notebook in one call. Returns a compact summary for each file. Use this instead of calling read_file repeatedly when you need to analyze, compare, or tabulate data across many files. Supports optional filters.',
     parameters: {
       type: 'object',
-      properties: {},
+      properties: {
+        filenames: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: only read files whose names contain any of these strings (case-insensitive). Example: ["invoice", "receipt"]',
+        },
+        mime_types: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: only read files matching these MIME types. Example: ["image/jpeg", "image/png"] for photos, ["application/pdf"] for PDFs.',
+        },
+      },
       required: [],
     },
   },
@@ -1173,8 +1184,24 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
 
     case 'read_all_files': {
       if (!userId || !conversationId) { content = 'Authentication required.'; break; }
-      const allFiles = await db.getNotebookFiles(conversationId, userId);
+      let allFiles = await db.getNotebookFiles(conversationId, userId);
       if (allFiles.length === 0) { content = 'No files in this notebook.'; break; }
+
+      // Apply optional filters
+      const filenameFilters = args.filenames as string[] | undefined;
+      const mimeFilters = args.mime_types as string[] | undefined;
+      if (filenameFilters?.length) {
+        const lowerFilters = filenameFilters.map((f) => f.toLowerCase());
+        allFiles = allFiles.filter((f) =>
+          lowerFilters.some((filter) => f.display_name.toLowerCase().includes(filter))
+        );
+      }
+      if (mimeFilters?.length) {
+        allFiles = allFiles.filter((f) => mimeFilters.includes(f.mime_type));
+      }
+
+      if (allFiles.length === 0) { content = 'No files matched the filters.'; break; }
+
       const summaries: string[] = [];
       for (const f of allFiles) {
         const fc = await db.getNotebookFileContent(f.id, conversationId, userId);
@@ -1184,7 +1211,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
           : fc.parsed_text?.slice(0, 2000) ?? '(no content)';
         summaries.push(`--- FILE: ${fc.display_name} ---\n${summary}`);
       }
-      content = `${allFiles.length} files:\n\n${summaries.join('\n\n')}`;
+      content = `${allFiles.length} file(s) matched:\n\n${summaries.join('\n\n')}`;
       break;
     }
 
