@@ -543,6 +543,7 @@ export async function* streamResponse(
       balance: updatedBalance ? {
         balance_usd: updatedBalance.balance_usd,
         free_credit_usd: updatedBalance.free_credit_usd,
+        balance_high_water: updatedBalance.balance_high_water,
       } : undefined,
       display_name: updatedUser?.display_name ?? null,
     };

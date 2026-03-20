@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/hooks/useChatStore';
 import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 import { TopUpModal } from './TopUpModal';
@@ -63,15 +63,10 @@ export function BalanceBar() {
 
   // Total available = free credit + paid balance
   const totalAvailable = freeCredit + balance;
-
-  // Ring: high-water mark tracks the peak balance since last top-up or page load.
-  // When the user tops up, the mark rises and the ring fills up.
-  // As they spend, totalAvailable drops below the mark and the ring depletes.
-  const highWaterRef = useRef(totalAvailable);
-  if (totalAvailable > highWaterRef.current) {
-    highWaterRef.current = totalAvailable; // top-up detected — reset to full
-  }
-  const ringMax = Math.max(highWaterRef.current, 0.01);
+  // High-water mark: set by the server on each top-up, persisted in DB.
+  // Ring shows totalAvailable / highWater — full after top-up, depletes as credits are used.
+  const highWater = Number(session?.balance?.balance_high_water ?? totalAvailable);
+  const ringMax = Math.max(highWater, 0.01);
   const remainingPct = Math.max(0, Math.min(100, (totalAvailable / ringMax) * 100));
   const ringColor = getRemainingColor(remainingPct);
 

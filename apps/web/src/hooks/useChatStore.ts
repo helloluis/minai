@@ -229,14 +229,14 @@ export const useChatStore = create<ChatState>()(
                 set((s) => ({ streamingContent: s.streamingContent + (chunk.content as string) }));
                 break;
               case 'usage': {
-                const bal = chunk.balance as { balance_usd: number; free_credit_usd: number } | undefined;
+                const bal = chunk.balance as { balance_usd: number; free_credit_usd: number; balance_high_water: number } | undefined;
                 const displayName = chunk.display_name as string | null | undefined;
                 set((s) => {
                   if (!s.session) return {};
                   return {
                     session: {
                       ...s.session,
-                      ...(bal ? { balance: { balance_usd: bal.balance_usd, free_credit_usd: bal.free_credit_usd } } : {}),
+                      ...(bal ? { balance: { balance_usd: bal.balance_usd, free_credit_usd: bal.free_credit_usd, balance_high_water: bal.balance_high_water } } : {}),
                       user: {
                         ...s.session.user,
                         ...(displayName !== undefined ? { display_name: displayName } : {}),

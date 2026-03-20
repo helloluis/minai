@@ -25,6 +25,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
         free_credit_usd: balance?.free_credit_usd ?? 0,
+        balance_high_water: balance?.balance_high_water ?? 1,
       },
     };
   });
@@ -44,6 +45,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       balance: {
         balance_usd: balance?.balance_usd ?? 0,
         free_credit_usd: balance?.free_credit_usd ?? 0,
+        balance_high_water: balance?.balance_high_water ?? 1,
       },
     };
   });

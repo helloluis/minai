@@ -72,8 +72,13 @@ export async function deductBalance(userId: string, amount: number): Promise<voi
 }
 
 export async function addBalance(userId: string, amount: number): Promise<void> {
+  // Update balance and reset high-water mark to new total (ring resets to full on top-up)
   await pool.query(
-    `UPDATE user_balances SET balance_usd = balance_usd + $2, updated_at = now() WHERE user_id = $1`,
+    `UPDATE user_balances SET
+       balance_usd = balance_usd + $2,
+       balance_high_water = balance_usd + $2 + free_credit_usd,
+       updated_at = now()
+     WHERE user_id = $1`,
     [userId, amount]
   );
 }

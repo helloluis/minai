@@ -28,6 +28,7 @@ export interface UserBalance {
   user_id: string;
   balance_usd: number;
   free_credit_usd: number;
+  balance_high_water: number;
   updated_at: string;
 }
 
@@ -117,7 +118,7 @@ export interface StreamChunk {
   model?: ModelId;
   classification?: LLMClassification;
   usage?: TokenUsage;
-  balance?: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
+  balance?: Pick<UserBalance, 'balance_usd' | 'free_credit_usd' | 'balance_high_water'>;
   display_name?: string | null;
   actions?: { navigate?: string; open_sidebar?: boolean };
   error?: string;
@@ -150,5 +151,5 @@ export interface ConversationListItem {
 
 export interface SessionResponse {
   user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id'>;
-  balance: Pick<UserBalance, 'balance_usd' | 'free_credit_usd'>;
+  balance: Pick<UserBalance, 'balance_usd' | 'free_credit_usd' | 'balance_high_water'>;
 }
