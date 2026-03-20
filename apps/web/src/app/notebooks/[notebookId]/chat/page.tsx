@@ -89,8 +89,37 @@ export default function NotebookChatPage() {
     }
   }, [pendingNavigation, setPendingNavigation, router]);
 
-  // Auto-scroll to bottom only if user is near the bottom
+  // Restore saved scroll position on load, or zip to bottom
+  const hasRestoredScroll = useRef(false);
   useEffect(() => {
+    if (hasRestoredScroll.current || messages.length === 0) return;
+    hasRestoredScroll.current = true;
+
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const saved = sessionStorage.getItem(`scroll:${notebookId}`);
+    if (saved) {
+      // Restore to saved position (use requestAnimationFrame to wait for render)
+      requestAnimationFrame(() => {
+        el.scrollTop = parseInt(saved);
+      });
+    } else {
+      // No saved position — go to bottom
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView();
+      });
+    }
+  }, [messages, notebookId]);
+
+  // Reset restore flag when switching conversations
+  useEffect(() => {
+    hasRestoredScroll.current = false;
+  }, [notebookId]);
+
+  // Auto-scroll to bottom only if user is near the bottom (during streaming)
+  useEffect(() => {
+    if (!hasRestoredScroll.current) return; // don't fight the restore
     if (isNearBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
@@ -103,6 +132,9 @@ export default function NotebookChatPage() {
 
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distFromBottom < 100;
+
+    // Save scroll position per conversation
+    sessionStorage.setItem(`scroll:${notebookId}`, String(el.scrollTop));
 
     // Show scroll-down arrow when user is more than 1 viewport height from bottom
     setShowScrollDown(distFromBottom > el.clientHeight);
