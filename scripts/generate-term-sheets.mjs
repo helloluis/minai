@@ -152,6 +152,63 @@ function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) 
 function formatMoney(n) { return '$' + n.toLocaleString('en-US'); }
 function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
 
+// Filename patterns that look like they came from different people/systems
+const usedFilenames = new Set();
+function messyFilename(productName, founderName, lastName, amount) {
+  const patterns = [
+    // Sarah from Good Ventures exports from DocuSign
+    () => `GV_TermSheet_${productName}_FINAL.pdf`,
+    () => `GV_TermSheet_${productName}_final(1).pdf`,
+    () => `GV Term Sheet - ${productName}.pdf`,
+    // Founder downloads and renames
+    () => `${productName} term sheet.pdf`,
+    () => `${productName} - Term Sheet (signed).pdf`,
+    () => `${productName}_GoodVentures_Terms.pdf`,
+    // Someone saves from email
+    () => `term_sheet_${productName.toLowerCase()}.pdf`,
+    () => `Term Sheet ${productName} ${randInt(2025, 2026)}.pdf`,
+    // Copy-pasted from shared drive
+    () => `Copy of ${productName} Grant Agreement.pdf`,
+    () => `${productName} Grant - DRAFT v${randInt(2,5)}.pdf`,
+    // Windows user who doesn't rename
+    () => `Document${randInt(1,99)}.pdf`,
+    () => `Scan_${String(randInt(1,12)).padStart(2,'0')}${String(randInt(1,28)).padStart(2,'0')}2026.pdf`,
+    // Founder's local language naming
+    () => `${lastName}_termsheet_${amount/1000}k.pdf`,
+    () => `${founderName} - GV Grant.pdf`,
+    () => `GoodVentures_${productName}_${randInt(10,28)}Mar2026.pdf`,
+    // Legal team version
+    () => `TS-${String(randInt(1000,9999))}-${productName}.pdf`,
+    // Google Drive export
+    () => `${productName} Term Sheet - Google Docs.pdf`,
+    // Someone just used the product name
+    () => `${productName}.pdf`,
+    // Messy caps
+    () => `TERM SHEET ${productName.toUpperCase()}.pdf`,
+    () => `termsheet_${productName.toLowerCase()}_goodventures.pdf`,
+    // With dates
+    () => `${productName}_TS_${randInt(1,12)}-${randInt(1,28)}-26.pdf`,
+    () => `GV-${productName}-${pick(['draft','final','signed','v2','rev1','APPROVED'])}.pdf`,
+    // Really messy
+    () => `${productName} terms (2).pdf`,
+    () => `${founderName.split(' ')[0]}_grant_agreement.pdf`,
+    () => `grant_${productName.toLowerCase().replace(/[^a-z]/g,'')}.pdf`,
+  ];
+
+  // Try until we get a unique name
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const fn = pick(patterns)();
+    if (!usedFilenames.has(fn)) {
+      usedFilenames.add(fn);
+      return fn;
+    }
+  }
+  // Fallback
+  const fn = `${productName}_${randInt(1000,9999)}.pdf`;
+  usedFilenames.add(fn);
+  return fn;
+}
+
 function generateDate() {
   const month = randInt(1, 12);
   const day = randInt(1, 28);
@@ -182,7 +239,7 @@ function generateTermSheet(index) {
     : `Single disbursement upon signing`;
   const coFounder = Math.random() > 0.5 ? `${pick(firstNames)} ${pick(lastNames)}` : null;
 
-  const filename = `${String(index + 1).padStart(2, '0')}-${slugify(productName)}-term-sheet.pdf`;
+  const filename = messyFilename(productName, founderName, lastName, grantAmount);
   const filepath = join(OUTPUT_DIR, filename);
 
   const doc = new PDFDocument({ margin: 60, size: 'LETTER' });
