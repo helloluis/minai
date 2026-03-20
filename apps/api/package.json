@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && cp src/migrations/*.sql dist/migrations/",
+    "build": "tsc && cp src/migrations/*.sql dist/migrations/ && cp -r src/assets dist/",
     "start": "node dist/index.js",
     "db:migrate": "tsx src/migrations/run.ts"
   },
@@ -21,6 +21,7 @@
     "googleapis": "^171.4.0",
     "mammoth": "^1.12.0",
     "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.18.0",
     "pg": "^8.13.0",
     "resend": "^6.9.4",
     "uuid": "^11.0.0",
