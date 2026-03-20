@@ -12,6 +12,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-71SGL038HS" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-71SGL038HS');
+        `}} />
+      </head>
       <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen">
         {children}
       </body>
