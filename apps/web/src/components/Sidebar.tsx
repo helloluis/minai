@@ -505,6 +505,10 @@ export function Sidebar() {
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<{ total: number; completed: number; current: string } | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Load conversations
@@ -636,6 +640,43 @@ export function Sidebar() {
 
   const handleRename = async (id: string, newTitle: string) => {
     await updateConversation(id, { title: newTitle });
+  };
+
+  const handleBulkUpload = async (fileList: FileList) => {
+    if (!activeConversationId || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    setUploadQueue({ total: files.length, completed: 0, current: files[0].name });
+    for (let i = 0; i < files.length; i++) {
+      setUploadQueue({ total: files.length, completed: i, current: files[i].name });
+      try {
+        const uploaded = await api.uploadFile(activeConversationId, files[i]);
+        setFilesByConv((prev) => ({
+          ...prev,
+          [activeConversationId]: [uploaded, ...(prev[activeConversationId] ?? [])],
+        }));
+      } catch (err) {
+        console.error(`Upload failed: ${files[i].name}`, err);
+      }
+    }
+    setUploadQueue(null);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!activeConversationId || selectedFileIds.size === 0) return;
+    for (const fileId of selectedFileIds) {
+      try {
+        await api.deleteFile(activeConversationId, fileId);
+      } catch (err) {
+        console.error(`Delete failed: ${fileId}`, err);
+      }
+    }
+    setFilesByConv((prev) => ({
+      ...prev,
+      [activeConversationId]: (prev[activeConversationId] ?? []).filter((f) => !selectedFileIds.has(f.id)),
+    }));
+    setSelectedFileIds(new Set());
+    setSelectMode(false);
+    setConfirmBulkDelete(false);
   };
 
   const handleExpandNotes = async (convId: string) => {
@@ -791,66 +832,141 @@ export function Sidebar() {
                 </>
               )}
 
-              {/* Files section in expanded view — with drag-to-upload */}
+              {/* Files section in expanded view */}
               <div
-                className={`mt-4 mb-2 rounded-xl transition-colors ${
-                  isDraggingFile ? 'bg-minai-50 dark:bg-minai-900/20 ring-2 ring-dashed ring-minai-400' : ''
+                className={`mt-4 mb-2 rounded-xl border transition-colors ${
+                  isDraggingFile
+                    ? 'border-minai-400 bg-minai-50 dark:bg-minai-900/20 ring-2 ring-dashed ring-minai-400'
+                    : 'border-gray-200 dark:border-gray-700'
                 }`}
                 onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
                 onDragLeave={() => setIsDraggingFile(false)}
                 onDrop={async (e) => {
                   e.preventDefault();
                   setIsDraggingFile(false);
-                  if (!activeConversationId || !e.dataTransfer.files.length) return;
-                  const files = Array.from(e.dataTransfer.files);
-                  setUploadQueue({ total: files.length, completed: 0, current: files[0].name });
-                  for (let i = 0; i < files.length; i++) {
-                    setUploadQueue({ total: files.length, completed: i, current: files[i].name });
-                    try {
-                      const uploaded = await api.uploadFile(activeConversationId, files[i]);
-                      setFilesByConv((prev) => ({
-                        ...prev,
-                        [activeConversationId]: [uploaded, ...(prev[activeConversationId] ?? [])],
-                      }));
-                    } catch (err) {
-                      console.error(`Upload failed: ${files[i].name}`, err);
-                    }
-                  }
-                  setUploadQueue(null);
+                  if (e.dataTransfer.files.length > 0) handleBulkUpload(e.dataTransfer.files);
                 }}
               >
-                <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">
-                  {isDraggingFile ? 'Drop files here' : 'Files'}
-                </div>
-                {(filesByConv[activeConversationId] ?? []).length > 0 ? (
-                  (filesByConv[activeConversationId] ?? []).map((file) => (
-                    <FileRow
-                      key={file.id}
-                      file={file}
-                      conversationId={activeConversationId}
-                      onView={() => setViewingFile(file)}
-                      onRenamed={(newName) => {
-                        setFilesByConv((prev) => ({
-                          ...prev,
-                          [activeConversationId]: (prev[activeConversationId] ?? []).map((f) =>
-                            f.id === file.id ? { ...f, display_name: newName } : f
-                          ),
-                        }));
-                      }}
-                      onDeleted={() => {
-                        setFilesByConv((prev) => ({
-                          ...prev,
-                          [activeConversationId]: (prev[activeConversationId] ?? []).filter((f) => f.id !== file.id),
-                        }));
+                {/* Header bar */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                    {isDraggingFile ? 'Drop files here' : `Files${(filesByConv[activeConversationId] ?? []).length > 0 ? ` (${(filesByConv[activeConversationId] ?? []).length})` : ''}`}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {/* Select mode toggle */}
+                    {(filesByConv[activeConversationId] ?? []).length > 0 && (
+                      <button
+                        onClick={() => { setSelectMode(!selectMode); setSelectedFileIds(new Set()); }}
+                        className={`p-1 rounded text-xs transition-colors ${
+                          selectMode ? 'text-minai-600 bg-minai-50 dark:bg-minai-900/30' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                        title={selectMode ? 'Cancel selection' : 'Select files'}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* Upload button */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.txt,.csv,.md"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) handleBulkUpload(e.target.files);
+                        e.target.value = '';
                       }}
                     />
-                  ))
-                ) : (
-                  <div className="text-xs text-gray-400 px-3 py-4 text-center">
-                    Drag files here to upload
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1 rounded text-gray-400 hover:text-minai-600 transition-colors"
+                      title="Upload files"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bulk delete bar */}
+                {selectMode && selectedFileIds.size > 0 && (
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30">
+                    <span className="text-xs text-red-600 dark:text-red-400">
+                      {selectedFileIds.size} selected
+                    </span>
+                    <button
+                      onClick={() => setConfirmBulkDelete(true)}
+                      className="text-xs text-red-600 dark:text-red-400 font-medium hover:text-red-700"
+                    >
+                      Delete selected
+                    </button>
                   </div>
                 )}
+
+                {/* File list */}
+                <div className="max-h-[40vh] overflow-y-auto">
+                  {(filesByConv[activeConversationId] ?? []).length > 0 ? (
+                    (filesByConv[activeConversationId] ?? []).map((file) => (
+                      <div key={file.id} className="flex items-center">
+                        {selectMode && (
+                          <label className="pl-3 pr-1 py-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedFileIds.has(file.id)}
+                              onChange={(e) => {
+                                const next = new Set(selectedFileIds);
+                                if (e.target.checked) next.add(file.id);
+                                else next.delete(file.id);
+                                setSelectedFileIds(next);
+                              }}
+                              className="rounded border-gray-300 text-minai-600 focus:ring-minai-500"
+                            />
+                          </label>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <FileRow
+                            file={file}
+                            conversationId={activeConversationId}
+                            onView={() => setViewingFile(file)}
+                            onRenamed={(newName) => {
+                              setFilesByConv((prev) => ({
+                                ...prev,
+                                [activeConversationId]: (prev[activeConversationId] ?? []).map((f) =>
+                                  f.id === file.id ? { ...f, display_name: newName } : f
+                                ),
+                              }));
+                            }}
+                            onDeleted={() => {
+                              setFilesByConv((prev) => ({
+                                ...prev,
+                                [activeConversationId]: (prev[activeConversationId] ?? []).filter((f) => f.id !== file.id),
+                              }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-gray-400 px-3 py-6 text-center">
+                      Drag files here or click + to upload
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Bulk delete confirmation */}
+              <ConfirmDialog
+                open={confirmBulkDelete}
+                title={`Delete ${selectedFileIds.size} file${selectedFileIds.size > 1 ? 's' : ''}?`}
+                message="These files will be permanently removed from this notebook."
+                confirmLabel={`Delete ${selectedFileIds.size} file${selectedFileIds.size > 1 ? 's' : ''}`}
+                onConfirm={handleBulkDelete}
+                onCancel={() => setConfirmBulkDelete(false)}
+              />
 
               {/* Delete notebook — bottom of expanded view */}
               <div className="pt-4 pb-8 px-1">
