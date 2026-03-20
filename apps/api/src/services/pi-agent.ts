@@ -277,10 +277,11 @@ export class PiRpcProcess {
       try {
         const msg = JSON.parse(line);
 
-        // Check for blocked commands in tool execution
+        // Log dangerous commands (NOTE: this is detection, not prevention —
+        // by the time we see this, Pi has already executed the command.
+        // Real protection comes from: HOME=workspace, stripped env, system prompt rules.)
         if (this.isBlockedCommand(msg)) {
-          console.warn(`[pi:${this.sessionId}] Blocked dangerous command`);
-          return; // Don't forward to listeners
+          console.warn(`[pi:${this.sessionId}] DANGEROUS COMMAND DETECTED: ${JSON.stringify(msg.args ?? '').slice(0, 200)}`);
         }
 
         for (const listener of this.listeners) {

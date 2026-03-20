@@ -229,17 +229,22 @@ export async function getMessages(
   source?: 'chat' | 'agent'
 ): Promise<Message[]> {
   const params: unknown[] = [conversationId];
-  const sourceFilter = source ? ` AND source = '${source}'` : '';
+
+  // Source filter uses parameterized query to prevent SQL injection
+  let sourceClause = '';
+  if (source) {
+    params.push(source);
+    sourceClause = ` AND source = $${params.length}`;
+  }
 
   if (before) {
-    // Pagination: get N messages BEFORE a timestamp (for loading older messages)
-    // Ordered DESC to get the N closest to the cursor, then reversed to ASC
     params.push(before);
+    const beforeIdx = params.length;
     const limitClause = limit ? `LIMIT $${params.length + 1}` : '';
     if (limit) params.push(limit);
     const { rows } = await pool.query<Message>(
       `SELECT * FROM (
-        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL AND created_at < $2${sourceFilter}
+        SELECT * FROM messages WHERE conversation_id = $1${sourceClause} AND deleted_at IS NULL AND created_at < $${beforeIdx}
         ORDER BY created_at DESC ${limitClause}
       ) sub ORDER BY created_at ASC`,
       params
@@ -248,21 +253,19 @@ export async function getMessages(
   }
 
   if (limit) {
-    // Initial load: get the NEWEST N messages (subquery DESC, then ASC)
     params.push(limit);
     const { rows } = await pool.query<Message>(
       `SELECT * FROM (
-        SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL${sourceFilter}
-        ORDER BY created_at DESC LIMIT $2
+        SELECT * FROM messages WHERE conversation_id = $1${sourceClause} AND deleted_at IS NULL
+        ORDER BY created_at DESC LIMIT $${params.length}
       ) sub ORDER BY created_at ASC`,
       params
     );
     return hydrateMessageFiles(rows);
   }
 
-  // No limit, no cursor: return all messages
   const { rows } = await pool.query<Message>(
-    `SELECT * FROM messages WHERE conversation_id = $1 AND deleted_at IS NULL${sourceFilter} ORDER BY created_at ASC`,
+    `SELECT * FROM messages WHERE conversation_id = $1${sourceClause} AND deleted_at IS NULL ORDER BY created_at ASC`,
     params
   );
   return hydrateMessageFiles(rows);
