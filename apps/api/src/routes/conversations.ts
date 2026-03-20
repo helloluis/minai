@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import * as db from '../services/db.js';
+import { seedWelcomeContent } from '../services/onboarding.js';
 
 export async function conversationRoutes(fastify: FastifyInstance) {
   // List conversations
@@ -10,7 +11,18 @@ export async function conversationRoutes(fastify: FastifyInstance) {
   // Create conversation
   fastify.post('/api/conversations', async (request) => {
     const { title } = (request.body as { title?: string }) || {};
-    return db.createConversation(request.user.id, title);
+    const userId = request.user.id;
+
+    // Check if this is the user's first notebook
+    const existing = await db.getConversations(userId);
+    const conv = await db.createConversation(userId, title);
+
+    // Seed welcome content for first-time users (fire-and-forget)
+    if (existing.length === 0) {
+      seedWelcomeContent(userId, conv.id).catch(console.error);
+    }
+
+    return conv;
   });
 
   // Update conversation
