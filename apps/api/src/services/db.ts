@@ -758,6 +758,7 @@ export interface NotebookFile {
   parse_error: string | null;
   llm_summary: string | null;
   summary_status: string;
+  summary_cost_usd: number;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -798,7 +799,7 @@ export async function getNotebookFile(id: string, userId: string): Promise<Noteb
 export async function updateNotebookFile(
   id: string,
   userId: string,
-  updates: { display_name?: string; parsed_text?: string; parse_status?: string; parse_error?: string; llm_summary?: string; summary_status?: string },
+  updates: { display_name?: string; parsed_text?: string; parse_status?: string; parse_error?: string; llm_summary?: string; summary_status?: string; summary_cost_usd?: number },
 ): Promise<NotebookFile | null> {
   const sets: string[] = ['updated_at = now()'];
   const params: unknown[] = [];

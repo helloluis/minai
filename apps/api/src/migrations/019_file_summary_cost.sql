@@ -1,0 +1,1 @@
+ALTER TABLE notebook_files ADD COLUMN IF NOT EXISTS summary_cost_usd NUMERIC(12,6) DEFAULT 0;

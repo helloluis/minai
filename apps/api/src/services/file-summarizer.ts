@@ -7,6 +7,7 @@
  */
 
 import { DashScopeProvider } from './providers/dashscope.js';
+import { calculateCost } from '../config/pricing.js';
 import * as db from './db.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
@@ -41,7 +42,7 @@ export async function summarizeFile(fileId: string, userId: string): Promise<voi
   try {
     await db.updateNotebookFile(fileId, userId, { summary_status: 'processing' });
 
-    const { content } = await provider.complete(
+    const { content, usage } = await provider.complete(
       [
         { role: 'system', content: SUMMARIZE_PROMPT },
         { role: 'user', content: `Document: "${file.display_name}"\n\nContent:\n${inputText}` },
@@ -50,12 +51,17 @@ export async function summarizeFile(fileId: string, userId: string): Promise<voi
       800
     );
 
+    const cost = usage
+      ? calculateCost(MODEL, usage.inputTokens, usage.outputTokens)
+      : 0;
+
     if (content.trim()) {
       await db.updateNotebookFile(fileId, userId, {
         llm_summary: content.trim(),
         summary_status: 'done',
+        summary_cost_usd: cost,
       });
-      console.log(`[Summarizer] ${file.display_name}: ${content.length} chars summary`);
+      console.log(`[Summarizer] ${file.display_name}: ${content.length} chars, $${cost.toFixed(6)}`);
     } else {
       await db.updateNotebookFile(fileId, userId, { summary_status: 'failed' });
     }
