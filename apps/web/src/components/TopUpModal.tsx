@@ -172,38 +172,61 @@ export function TopUpModal({ onClose }: Props) {
           {/* Ready — tabs */}
           {(step === 'ready' || step === 'verifying') && addressInfo && (
             <>
-              {/* Tab switcher (only show if wallet detected) */}
-              {walletType && (
-                <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <button
-                    onClick={() => { setTab('wallet'); setErrorMsg(''); }}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                      tab === 'wallet'
-                        ? 'bg-minai-600 text-white'
-                        : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    Pay with {walletLabel}
-                  </button>
-                  <button
-                    onClick={() => { setTab('manual'); setErrorMsg(''); }}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                      tab === 'manual'
-                        ? 'bg-minai-600 text-white'
-                        : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    Manual Deposit
-                  </button>
+              {/* Tab switcher */}
+              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <button
+                  onClick={() => { setTab('wallet'); setErrorMsg(''); }}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                    tab === 'wallet'
+                      ? 'bg-minai-600 text-white'
+                      : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Top up with MiniPay
+                </button>
+                <button
+                  onClick={() => { setTab('manual'); setErrorMsg(''); }}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                    tab === 'manual'
+                      ? 'bg-minai-600 text-white'
+                      : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Manual Deposit
+                </button>
+              </div>
+              {tab === 'wallet' && (
+                <div className="flex justify-center">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">
+                    All crypto wallets supported
+                  </span>
                 </div>
               )}
 
               {/* ── Wallet tab ─────────────────────────────────────── */}
+              {tab === 'wallet' && !walletType && (
+                <div className="text-center py-6 space-y-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No crypto wallet detected in this browser.
+                  </p>
+                  <a
+                    href="https://minipay.to"
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-block px-4 py-2 rounded-xl bg-minai-600 hover:bg-minai-700 text-white text-sm font-medium transition-colors"
+                  >
+                    Get MiniPay
+                  </a>
+                  <p className="text-xs text-gray-400">
+                    Or use MetaMask, Valora, or any Celo-compatible wallet.
+                  </p>
+                </div>
+              )}
               {tab === 'wallet' && walletType && (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Send <strong className="text-gray-700 dark:text-gray-200">cUSD or USDC</strong> directly
-                    from your {walletLabel} on <span className="text-minai-600 font-medium">Celo</span>.
+                    from your wallet on <span className="text-minai-600 font-medium">Celo</span>.
                   </p>
 
                   {/* Amount */}
@@ -272,7 +295,7 @@ export function TopUpModal({ onClose }: Props) {
                     {walletStatus !== 'idle' ? (
                       <><Spinner /> Processing…</>
                     ) : (
-                      <>Pay {amount ? `$${amount}` : ''} with {walletLabel}</>
+                      <>Pay {amount ? `$${amount}` : ''}</>
                     )}
                   </button>
                 </div>
