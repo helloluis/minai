@@ -756,6 +756,8 @@ export interface NotebookFile {
   parsed_text: string | null;
   parse_status: string;
   parse_error: string | null;
+  llm_summary: string | null;
+  summary_status: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -796,7 +798,7 @@ export async function getNotebookFile(id: string, userId: string): Promise<Noteb
 export async function updateNotebookFile(
   id: string,
   userId: string,
-  updates: { display_name?: string; parsed_text?: string; parse_status?: string; parse_error?: string },
+  updates: { display_name?: string; parsed_text?: string; parse_status?: string; parse_error?: string; llm_summary?: string; summary_status?: string },
 ): Promise<NotebookFile | null> {
   const sets: string[] = ['updated_at = now()'];
   const params: unknown[] = [];
@@ -830,9 +832,9 @@ export async function getNotebookFileContent(
   fileId: string,
   conversationId: string,
   userId: string,
-): Promise<{ display_name: string; parsed_text: string | null; parse_status: string } | null> {
-  const { rows } = await pool.query<{ display_name: string; parsed_text: string | null; parse_status: string }>(
-    `SELECT display_name, parsed_text, parse_status FROM notebook_files
+): Promise<{ display_name: string; parsed_text: string | null; parse_status: string; llm_summary: string | null; summary_status: string } | null> {
+  const { rows } = await pool.query<{ display_name: string; parsed_text: string | null; parse_status: string; llm_summary: string | null; summary_status: string }>(
+    `SELECT display_name, parsed_text, parse_status, llm_summary, summary_status FROM notebook_files
      WHERE id = $1 AND conversation_id = $2 AND user_id = $3 AND deleted_at IS NULL`,
     [fileId, conversationId, userId]
   );

@@ -1136,7 +1136,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       const files = await db.getNotebookFiles(conversationId, userId);
       if (files.length === 0) { content = 'No files uploaded to this notebook.'; break; }
       content = files.map((f) =>
-        `- ${f.display_name} (${f.mime_type}, ${(f.file_size / 1024).toFixed(1)} KB, status: ${f.parse_status})\n  ID: ${f.id}`
+        `- ${f.display_name} (${f.mime_type}, ${(f.file_size / 1024).toFixed(1)} KB, parsed: ${f.parse_status}, summary: ${f.summary_status})\n  ID: ${f.id}`
       ).join('\n');
       break;
     }
@@ -1150,10 +1150,15 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
         content = `File "${result.display_name}" has no parsed text (status: ${result.parse_status}). It may still be processing or the format is unsupported.`;
         break;
       }
-      const text = result.parsed_text.length > 8000
-        ? result.parsed_text.slice(0, 8000) + '\n\n... [truncated — file has more content]'
-        : result.parsed_text;
-      content = `Content of "${result.display_name}":\n\n${text}`;
+      // Prefer LLM summary (compact, structured) over raw text when available
+      if (result.llm_summary && result.summary_status === 'done') {
+        content = `Summary of "${result.display_name}":\n\n${result.llm_summary}`;
+      } else {
+        const text = result.parsed_text.length > 8000
+          ? result.parsed_text.slice(0, 8000) + '\n\n... [truncated — file has more content]'
+          : result.parsed_text;
+        content = `Content of "${result.display_name}":\n\n${text}`;
+      }
       break;
     }
 

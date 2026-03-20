@@ -37,6 +37,7 @@ async function migrate() {
       '014_notebook_files.sql',
       '015_message_files.sql',
       '017_balance_high_water.sql',
+      '018_file_llm_summary.sql',
     ];
 
     for (const migration of migrations) {

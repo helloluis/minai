@@ -504,6 +504,7 @@ export function Sidebar() {
   const [viewingFile, setViewingFile] = useState<NotebookFile | null>(null);
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<{ total: number; completed: number; current: string } | null>(null);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Load conversations
@@ -797,18 +798,25 @@ export function Sidebar() {
                 }`}
                 onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
                 onDragLeave={() => setIsDraggingFile(false)}
-                onDrop={(e) => {
+                onDrop={async (e) => {
                   e.preventDefault();
                   setIsDraggingFile(false);
                   if (!activeConversationId || !e.dataTransfer.files.length) return;
-                  for (const file of Array.from(e.dataTransfer.files)) {
-                    api.uploadFile(activeConversationId, file).then((uploaded) => {
+                  const files = Array.from(e.dataTransfer.files);
+                  setUploadQueue({ total: files.length, completed: 0, current: files[0].name });
+                  for (let i = 0; i < files.length; i++) {
+                    setUploadQueue({ total: files.length, completed: i, current: files[i].name });
+                    try {
+                      const uploaded = await api.uploadFile(activeConversationId, files[i]);
                       setFilesByConv((prev) => ({
                         ...prev,
                         [activeConversationId]: [uploaded, ...(prev[activeConversationId] ?? [])],
                       }));
-                    }).catch(console.error);
+                    } catch (err) {
+                      console.error(`Upload failed: ${files[i].name}`, err);
+                    }
                   }
+                  setUploadQueue(null);
                 }}
               >
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">
@@ -894,6 +902,29 @@ export function Sidebar() {
             </>
           )}
         </div>
+
+        {/* ── Upload progress bar ── */}
+        {uploadQueue && (
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-4 py-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-gray-500">
+                Uploading {uploadQueue.completed + 1} of {uploadQueue.total}
+              </span>
+              <span className="text-xs text-gray-400">
+                {Math.round(((uploadQueue.completed) / uploadQueue.total) * 100)}%
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-minai-500 rounded-full transition-all duration-300"
+                style={{ width: `${(uploadQueue.completed / uploadQueue.total) * 100}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-gray-400 mt-1 truncate">
+              {uploadQueue.current}
+            </div>
+          </div>
+        )}
 
         {/* ── Footer: Settings link ── */}
         <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2">

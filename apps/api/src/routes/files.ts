@@ -4,6 +4,7 @@ import * as mammoth from 'mammoth';
 import * as db from '../services/db.js';
 import { storeFile, getFullPath } from '../services/file-store.js';
 import { parseFileContent } from '../services/file-parser.js';
+import { summarizeFile } from '../services/file-summarizer.js';
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -57,6 +58,12 @@ export async function fileRoutes(fastify: FastifyInstance) {
           parse_error: result.error || undefined,
         });
         console.log(`[Files] Parsed ${originalName}: ${result.error ? 'FAILED - ' + result.error : `${result.text.length} chars`}`);
+        // Chain LLM summarization after successful parse
+        if (!result.error && result.text.length > 50) {
+          summarizeFile(file.id, userId).catch((err) =>
+            console.error(`[Files] Summarize error for ${originalName}:`, err)
+          );
+        }
       }).catch((err) => {
         console.error(`[Files] Parse error for ${originalName}:`, err);
         db.updateNotebookFile(file.id, userId, { parse_status: 'failed', parse_error: 'Unexpected parse error' });
