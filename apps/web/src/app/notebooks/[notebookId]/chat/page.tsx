@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import { BalanceBar } from '@/components/BalanceBar';
@@ -173,19 +173,26 @@ export default function NotebookChatPage() {
     return undefined;
   };
 
-  // Throttled markdown rendering during streaming (re-render every 500ms)
-  const [renderTick, setRenderTick] = useState(0);
-  useEffect(() => {
-    if (!isStreaming || !streamingContent) return;
-    const timer = setInterval(() => setRenderTick((t) => t + 1), 500);
-    return () => clearInterval(timer);
-  }, [isStreaming, streamingContent]);
+  // Throttled markdown rendering during streaming
+  const [renderedHtml, setRenderedHtml] = useState('');
+  const streamingContentRef = useRef('');
+  streamingContentRef.current = streamingContent;
 
-  const streamingHtml = useMemo(() => {
-    if (!streamingContent) return '';
-    void renderTick; // dependency to trigger re-render
-    return decorateHtml(renderMarkdown(streamingContent));
-  }, [streamingContent, renderTick]);
+  useEffect(() => {
+    if (!isStreaming) {
+      // Final render when streaming ends
+      if (streamingContentRef.current) {
+        setRenderedHtml(decorateHtml(renderMarkdown(streamingContentRef.current)));
+      }
+      return;
+    }
+    const timer = setInterval(() => {
+      if (streamingContentRef.current) {
+        setRenderedHtml(decorateHtml(renderMarkdown(streamingContentRef.current)));
+      }
+    }, 500);
+    return () => clearInterval(timer);
+  }, [isStreaming]);
 
   function getStreamingBody() {
     if (streamingContent) {
@@ -194,7 +201,7 @@ export default function NotebookChatPage() {
           {streamingThinking && <ThinkingBlock content={streamingThinking} isActive={false} />}
           <div
             className="message-content leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: streamingHtml }}
+            dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />
           <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
         </>
