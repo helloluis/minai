@@ -508,6 +508,7 @@ export function Sidebar() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -1046,8 +1047,21 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* ── Footer: Settings link ── */}
-        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2">
+        {/* ── Footer: Video + Settings ── */}
+        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-0.5">
+          <button
+            onClick={() => setShowVideo(true)}
+            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm
+              text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900
+              hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            <img
+              src="https://img.youtube.com/vi/KE8L3n1X7V4/default.jpg"
+              alt="Why we built minai"
+              className="w-8 h-6 rounded object-cover flex-shrink-0"
+            />
+            <span className="truncate">Why we built minai ❤️</span>
+          </button>
           <button
             onClick={() => router.push('/settings')}
             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm
@@ -1062,6 +1076,33 @@ export function Sidebar() {
             <span>Settings</span>
           </button>
         </div>
+
+        {/* YouTube lightbox */}
+        {showVideo && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowVideo(false)}
+          >
+            <div
+              className="relative w-full max-w-3xl mx-4 aspect-video"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowVideo(false)}
+                className="absolute -top-10 right-0 text-white/70 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+              <iframe
+                src="https://www.youtube.com/embed/KE8L3n1X7V4?autoplay=1"
+                title="Why we built minai"
+                className="w-full h-full rounded-xl"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
