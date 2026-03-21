@@ -1049,7 +1049,7 @@ export function Sidebar() {
 
         {/* ── Footer: Video + Settings ── */}
         <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800">
-          <div
+          {!isExpanded && <div
             onClick={(e) => { e.stopPropagation(); setShowVideo(true); }}
             className="w-full cursor-pointer group"
             role="button"
@@ -1063,7 +1063,7 @@ export function Sidebar() {
             <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors text-center">
               Why we built minai ❤️
             </div>
-          </div>
+          </div>}
           <div className="px-3 pb-2">
           <button
             onClick={() => router.push('/settings')}
