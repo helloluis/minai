@@ -550,8 +550,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             properties: {
               action: {
                 type: 'string',
-                enum: ['type', 'click', 'select', 'wait', 'wait_ms'],
-                description: 'type: enter text into an input field. click: click a button/link. select: choose a dropdown option. wait: wait for an element to appear. wait_ms: pause for N milliseconds.',
+                enum: ['type', 'click', 'click_and_wait', 'submit', 'evaluate', 'select', 'wait', 'wait_ms'],
+                description: 'type: enter text into an input. click: click element. click_and_wait: click and wait for page navigation (use for form submits, ASPX postbacks, pagination links). submit: programmatically submit a form. evaluate: run JavaScript on the page (pass JS in "text" field). select: choose dropdown option. wait: wait for element. wait_ms: pause N ms.',
               },
               selector: {
                 type: 'string',

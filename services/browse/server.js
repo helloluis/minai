@@ -88,6 +88,50 @@ async function executeActions(page, actions) {
           log.push(`clicked ${selector}`);
           break;
 
+        case 'click_and_wait':
+          // Click and wait for navigation (for form submits, ASPX postbacks, etc.)
+          if (!selector) throw new Error('click_and_wait requires "selector"');
+          await page.waitForSelector(selector, { timeout: 5000 });
+          try {
+            await Promise.all([
+              page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: waitTimeout || 10000 }),
+              page.click(selector),
+            ]);
+            log.push(`clicked ${selector} and navigated to ${page.url()}`);
+          } catch (navErr) {
+            // Navigation might not happen (e.g. JS-only update) — that's okay
+            log.push(`clicked ${selector} (no navigation: ${navErr.message})`);
+          }
+          break;
+
+        case 'submit':
+          // Programmatically submit a form by selector (or first form)
+          try {
+            const formSelector = selector || 'form';
+            await page.evaluate((sel) => {
+              const form = document.querySelector(sel);
+              if (form && form.submit) form.submit();
+              else throw new Error('Form not found: ' + sel);
+            }, formSelector);
+            // Wait for navigation after submit
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: waitTimeout || 10000 }).catch(() => {});
+            log.push(`submitted form ${formSelector}, now at ${page.url()}`);
+          } catch (submitErr) {
+            log.push(`submit ${selector || 'form'} failed: ${submitErr.message}`);
+          }
+          break;
+
+        case 'evaluate':
+          // Run arbitrary JavaScript and return the result
+          if (!text) throw new Error('evaluate requires "text" (the JS expression)');
+          try {
+            const evalResult = await page.evaluate(text);
+            log.push(`eval: ${JSON.stringify(evalResult)}`.slice(0, 200));
+          } catch (evalErr) {
+            log.push(`eval failed: ${evalErr.message}`);
+          }
+          break;
+
         case 'select':
           if (!selector || value === undefined) throw new Error('select requires "selector" and "value"');
           await page.waitForSelector(selector, { timeout: 5000 });
