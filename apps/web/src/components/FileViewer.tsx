@@ -28,6 +28,9 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
   const [loading, setLoading] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
+  // Detect mobile — on mobile, open PDFs in a new tab instead of iframe
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
   }, [onClose]);
@@ -38,15 +41,16 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
   }, [handleKey]);
 
   // Fetch PDF/image as blob (iframe/img can't send auth cookies)
+  // Skip on mobile — blob URLs in iframes don't work reliably on Android/iOS
   useEffect(() => {
-    if (!isPdf && !isImage) return;
+    if (isMobile || (!isPdf && !isImage)) return;
     fetch(viewUrl, { credentials: 'include' })
       .then((res) => res.blob())
       .then((blob) => setBlobUrl(URL.createObjectURL(blob)))
       .catch(() => setPreviewError('Failed to load file'));
     return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewUrl, isPdf, isImage]);
+  }, [viewUrl, isPdf, isImage, isMobile]);
 
   // Fetch preview for non-PDF/non-image files
   useEffect(() => {
@@ -97,8 +101,23 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-auto">
+          {/* Mobile fallback for PDF/images */}
+          {isMobile && (isPdf || isImage) && (
+            <div className="text-center py-12 space-y-4">
+              <p className="text-sm text-gray-500">Tap below to view this file</p>
+              <a
+                href={downloadUrl}
+                target="_blank"
+                rel="noopener"
+                className="inline-block px-6 py-3 rounded-xl bg-minai-600 hover:bg-minai-700 text-white text-sm font-medium transition-colors"
+              >
+                Open {isPdf ? 'PDF' : 'image'}
+              </a>
+            </div>
+          )}
+
           {/* Images */}
-          {isImage && blobUrl && (
+          {isImage && blobUrl && !isMobile && (
             <div className="flex items-center justify-center p-4">
               <img
                 src={blobUrl}
@@ -109,7 +128,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
           )}
 
           {/* PDF */}
-          {isPdf && blobUrl && (
+          {isPdf && blobUrl && !isMobile && (
             <iframe
               src={blobUrl}
               title={file.display_name}
@@ -118,7 +137,7 @@ export function FileViewer({ file, conversationId, onClose }: FileViewerProps) {
           )}
 
           {/* Loading blob */}
-          {(isPdf || isImage) && !blobUrl && !previewError && (
+          {!isMobile && (isPdf || isImage) && !blobUrl && !previewError && (
             <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
