@@ -204,6 +204,7 @@ export const useChatStore = create<ChatState>()(
           input_tokens: 0,
           output_tokens: 0,
           token_cost_usd: 0,
+          tool_cost_usd: 0,
           created_at: new Date().toISOString(),
           deleted_at: null,
           images,

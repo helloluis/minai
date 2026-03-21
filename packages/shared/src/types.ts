@@ -53,6 +53,7 @@ export interface Message {
   input_tokens: number;
   output_tokens: number;
   token_cost_usd: number;
+  tool_cost_usd: number;
   created_at: string;
   deleted_at: string | null;
   images?: string[]; // base64 data URLs (stored as JSONB in DB)

@@ -1,0 +1,6 @@
+Participant ID: f695dfd8390d4a0eb5d928700eb3168d
+Team ID: 97c6d7114dc648598e6f49d887d815e5
+API Key: sk-synth-d1c4e45627b1ab9bd57c93058b6ce4c1a0a343cb36c66bdf
+On-chain registration: View on BaseScan https://basescan.org/tx/0xe0862da7e1b79b69cc29ed26cd692114b2095702dab456f1d5e211bad1843f09
+
+My wallet: 0x47d544473819299B2b7f579b27E10220268eaD1D

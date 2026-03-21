@@ -335,31 +335,40 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
           </div>
         )}
 
-        {/* Assistant: model icon, tokens, cost, time, duration */}
-        {!isUser && (message.output_tokens > 0 || message.created_at) && (
-          <div className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-2">
-            {message.model && (
-              <span className="flex items-center gap-0.5" title={message.model === 'qwen3.5-flash' ? 'Fast mode' : 'Deep mode'}>
-                {message.model === 'qwen3.5-flash' ? <FlashIcon /> : <DeepIcon />}
-                <span>{message.model === 'qwen3.5-flash' ? 'Fast' : 'Deep'}</span>
-              </span>
-            )}
-            {message.output_tokens > 0 && (
-              <span title={`${message.input_tokens} in · ${message.output_tokens} out`}>
-                {message.input_tokens + message.output_tokens} tokens
-              </span>
-            )}
-            {message.token_cost_usd > 0 && (
-              <span>${Number(message.token_cost_usd).toFixed(4)}</span>
-            )}
-            {message.created_at && (
-              <span>{formatTime(message.created_at)}</span>
-            )}
-            {duration && (
-              <span>({duration})</span>
-            )}
-          </div>
-        )}
+        {/* Assistant footer: [model] [$cost] [timestamp] [(duration)] */}
+        {!isUser && (message.output_tokens > 0 || message.created_at) && (() => {
+          const totalCost = Number(message.token_cost_usd);
+          const toolCost = Number(message.tool_cost_usd ?? 0);
+          const inferenceCost = totalCost - toolCost;
+          const tokens = message.input_tokens + message.output_tokens;
+          const tooltipLines = [];
+          if (tokens > 0) tooltipLines.push(`${message.input_tokens} in + ${message.output_tokens} out = ${tokens} tokens`);
+          if (inferenceCost > 0) tooltipLines.push(`Inference: $${inferenceCost.toFixed(4)}`);
+          if (toolCost > 0) tooltipLines.push(`Tools: $${toolCost.toFixed(4)}`);
+          if (totalCost > 0 && toolCost > 0) tooltipLines.push(`Total: $${totalCost.toFixed(4)}`);
+
+          return (
+            <div className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-2">
+              {message.model && (
+                <span className="flex items-center gap-0.5">
+                  {message.model === 'qwen3.5-flash' ? <FlashIcon /> : <DeepIcon />}
+                  <span>{message.model === 'qwen3.5-flash' ? 'Fast' : 'Deep'}</span>
+                </span>
+              )}
+              {totalCost > 0 && (
+                <span title={tooltipLines.join('\n')} className="cursor-help border-b border-dotted border-gray-600">
+                  ${totalCost.toFixed(4)}
+                </span>
+              )}
+              {message.created_at && (
+                <span>{formatTime(message.created_at)}</span>
+              )}
+              {duration && (
+                <span>({duration})</span>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
     </>

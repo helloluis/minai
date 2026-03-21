@@ -6,6 +6,7 @@ import * as gcal from './google-calendar.js';
 import * as db from './db.js';
 import * as imageGen from './image-gen.js';
 import { PRICING } from '../config/pricing.js';
+import { searchPlaces, PLACES_COST_USD } from './places.js';
 
 export interface ContextImage {
   url: string;           // base64 data URL or https:// URL
@@ -86,6 +87,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ['topic'],
+    },
+  },
+  {
+    name: 'search_places',
+    description: 'Search for real businesses, restaurants, cafes, hotels, gyms, etc. using Google Places. Returns verified names, addresses, ratings, phone numbers, and Google Maps links. ALWAYS use this instead of guessing about local businesses. Results are real-time and accurate.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query including location. Examples: "quiet coffee shops in Quezon City", "fine dining restaurants near Trinoma Mall Manila", "gyms in BGC Taguig"',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum results to return (1-10, default 5)',
+        },
+      },
+      required: ['query'],
     },
   },
   {
@@ -1062,6 +1081,30 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'web_search':
       content = await webSearch(args as { query: string });
       break;
+
+    case 'search_places': {
+      const query = args.query as string;
+      const maxResults = Math.min(Math.max((args.max_results as number) || 5, 1), 10);
+      try {
+        const places = await searchPlaces(query, maxResults);
+        if (places.length === 0) {
+          content = `No places found for "${query}".`;
+        } else {
+          content = places.map((p, i) => {
+            const stars = p.rating ? `${p.rating}★ (${p.userRatingCount} reviews)` : '';
+            const open = p.openNow !== null ? (p.openNow ? '✅ Open now' : '❌ Closed') : '';
+            const phone = p.phoneNumber ? `📞 ${p.phoneNumber}` : '';
+            const web = p.websiteUrl ? `🌐 ${p.websiteUrl}` : '';
+            const map = p.googleMapsUrl ? `📍 ${p.googleMapsUrl}` : '';
+            return `${i + 1}. **${p.name}**\n   ${p.address}\n   ${[stars, open, phone, web, map].filter(Boolean).join('\n   ')}`;
+          }).join('\n\n');
+        }
+        toolCost = (toolCost ?? 0) + PLACES_COST_USD;
+      } catch (err) {
+        content = `Places search failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+      break;
+    }
     case 'minipay_info':
       content = await minipayInfo(args as { topic: string });
       break;

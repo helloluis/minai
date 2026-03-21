@@ -560,9 +560,9 @@ export async function* streamResponse(
   // Calculate token usage, deduct from free tier then balance
   if (totalUsage) {
     const tokenCost = calculateCost(model, totalUsage.inputTokens, totalUsage.outputTokens);
-    const toolCostAccum = totalUsage.cost ?? 0; // accumulated fixed tool costs (e.g. image gen)
+    const toolCostAccum = totalUsage.cost ?? 0; // accumulated fixed tool costs (e.g. image gen, places)
     const cost = tokenCost + toolCostAccum;
-    await db.updateMessageTokens(messageId, totalUsage.inputTokens, totalUsage.outputTokens, cost);
+    await db.updateMessageTokens(messageId, totalUsage.inputTokens, totalUsage.outputTokens, cost, toolCostAccum);
 
     // Deduct from free credit first ($1.00 USD), then charge balance for remainder
     const freeCreditUsed = await db.deductFreeCredit(userId, cost);

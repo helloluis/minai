@@ -11,5 +11,8 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@9.15.4",
+  "dependencies": {
+    "pdfkit": "^0.18.0"
+  }
 }

@@ -40,6 +40,7 @@ async function migrate() {
       '018_file_llm_summary.sql',
       '019_file_summary_cost.sql',
       '020_user_memory_text.sql',
+      '021_message_tool_cost.sql',
     ];
 
     for (const migration of migrations) {

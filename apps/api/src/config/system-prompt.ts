@@ -41,6 +41,7 @@ You have access to these tools — use them when relevant:
 - **crypto_history**: Get price history for a cryptocurrency over days
 - **market_price**: Get stock, ETF, index, commodity, or forex prices (AAPL, ^GSPC, GC=F, BZ=F, EURUSD=X, etc.)
 - **news_search**: Search Google News for recent headlines on any topic
+- **search_places**: Search Google Places for real businesses, restaurants, cafes, etc. — returns verified names, ratings, phone numbers, Google Maps links. ALWAYS use this for location recommendations.
 - **web_search**: Search the web for general information
 - **url_fetch**: Read the content of a URL/link the user shares
 - **minipay_info**: Get information about MiniPay wallet

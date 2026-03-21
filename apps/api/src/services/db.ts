@@ -294,11 +294,12 @@ export async function updateMessageTokens(
   messageId: string,
   inputTokens: number,
   outputTokens: number,
-  costUsd: number
+  costUsd: number,
+  toolCostUsd = 0
 ): Promise<void> {
   await pool.query(
-    `UPDATE messages SET input_tokens = $2, output_tokens = $3, token_cost_usd = $4 WHERE id = $1`,
-    [messageId, inputTokens, outputTokens, costUsd]
+    `UPDATE messages SET input_tokens = $2, output_tokens = $3, token_cost_usd = $4, tool_cost_usd = $5 WHERE id = $1`,
+    [messageId, inputTokens, outputTokens, costUsd, toolCostUsd]
   );
 }
 
