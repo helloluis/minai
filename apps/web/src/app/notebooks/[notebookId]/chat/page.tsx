@@ -6,8 +6,7 @@ import { useChatStore } from '@/hooks/useChatStore';
 import { BalanceBar } from '@/components/BalanceBar';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatInput } from '@/components/ChatInput';
-import { MessageBubble, renderMarkdown } from '@/components/MessageBubble';
-import { decorateHtml } from '@/lib/decorator';
+import { MessageBubble } from '@/components/MessageBubble';
 import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
@@ -173,36 +172,15 @@ export default function NotebookChatPage() {
     return undefined;
   };
 
-  // Throttled markdown rendering during streaming
-  const renderedHtmlRef = useRef('');
-  const [renderedHtml, setRenderedHtml] = useState('');
-
-  useEffect(() => {
-    if (!isStreaming) return;
-    // Reset on new stream
-    renderedHtmlRef.current = '';
-    setRenderedHtml('');
-    const timer = setInterval(() => {
-      const content = useChatStore.getState().streamingContent;
-      if (content && content !== renderedHtmlRef.current) {
-        const html = decorateHtml(renderMarkdown(content));
-        renderedHtmlRef.current = content;
-        setRenderedHtml(html);
-      }
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isStreaming]);
-
   function getStreamingBody() {
     if (streamingContent) {
       return (
         <>
           {streamingThinking && <ThinkingBlock content={streamingThinking} isActive={false} />}
-          <div
-            className="message-content leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: renderedHtml }}
-          />
-          <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
+          <div className="message-content leading-relaxed">
+            {streamingContent}
+            <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
+          </div>
         </>
       );
     }
