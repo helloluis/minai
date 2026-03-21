@@ -532,6 +532,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['query'],
     },
   },
+  {
+    name: 'browse_web',
+    description: 'Navigate to a URL and extract its text content using a headless browser. Works with JavaScript-rendered pages, server-rendered ASPX sites, old web archives, and dynamic SPAs that url_fetch cannot handle. Use this when url_fetch returns empty/useless content, or when the page requires JavaScript to render. Returns page text, title, and up to 30 links found on the page.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The URL to browse (must be http:// or https://)',
+        },
+        selector: {
+          type: 'string',
+          description: 'Optional CSS selector to extract only a specific part of the page (e.g. "#main-content", ".article-body")',
+        },
+      },
+      required: ['url'],
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -1295,6 +1313,32 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       content = results.map((r) =>
         `**${r.display_name}** (ID: ${r.id}):\n  ...${r.snippet}...`
       ).join('\n\n');
+      break;
+    }
+
+    case 'browse_web': {
+      const browseUrl = args.url as string;
+      const browseSelector = args.selector as string | undefined;
+      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
+      try {
+        const resp = await fetch(`${BROWSE_SERVICE_URL}/browse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: browseUrl, selector: browseSelector, timeout: 15000 }),
+          signal: AbortSignal.timeout(20000),
+        });
+        const data = await resp.json() as { ok: boolean; url?: string; title?: string; text?: string; links?: { text: string; href: string }[]; length?: number; error?: string };
+        if (!data.ok) {
+          content = `Failed to browse ${browseUrl}: ${data.error ?? 'Unknown error'}`;
+        } else {
+          const linkList = data.links?.length
+            ? '\n\nLinks found on page:\n' + data.links.map((l) => `- [${l.text}](${l.href})`).join('\n')
+            : '';
+          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars\n\n${data.text}${linkList}`;
+        }
+      } catch (err) {
+        content = `Browse failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
       break;
     }
 

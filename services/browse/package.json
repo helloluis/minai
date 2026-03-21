@@ -1,0 +1,13 @@
+{
+  "name": "@minai/browse",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@lightpanda/browser": "^1.2.0",
+    "puppeteer-core": "^24.0.0"
+  }
+}
