@@ -21,10 +21,33 @@ const MODEL_DEEP: ModelId = 'qwen3.5-plus';
 const MAX_TOOL_ITERATIONS = 30;
 
 // Classifier config — switch via env vars
-const CLASSIFIER_PROVIDER = process.env.CLASSIFIER_PROVIDER ?? 'dashscope'; // 'dashscope' | 'ollama'
-const CLASSIFIER_COMPARE = process.env.CLASSIFIER_COMPARE === 'true';        // run both, log disagreements
+// CLASSIFIER_PROVIDER: 'dashscope' (remote, 5-15s) | 'ollama' (local/remote GPU, ~400ms)
+// Set OLLAMA_BASE_URL to a remote GPU box for fast classification without local GPU
+const CLASSIFIER_PROVIDER = process.env.CLASSIFIER_PROVIDER ?? 'dashscope';
+const CLASSIFIER_COMPARE = process.env.CLASSIFIER_COMPARE === 'true';
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen3.5:0.8B';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen3:4b';
+
+// Few-shot prompt for Ollama binary classifier (tools vs chitchat)
+const OLLAMA_CLASSIFIER_PROMPT = `Classify: tools or chitchat
+
+"hello" chitchat
+"yes" tools
+"ok do it" tools
+"sure" tools
+"create event" tools
+"check calendar" tools
+"summarize PDF" tools
+"make image" tools
+"bitcoin price" tools
+"kumusta" tools
+"whats 2+2" chitchat
+"hello" chitchat
+"thanks" chitchat
+"ok thanks" chitchat
+"good morning" chitchat
+
+`;
 
 /**
  * Convert our tool definitions to OpenAI-compatible format for the provider.
@@ -71,29 +94,31 @@ async function classifyWithDashscope(userMessage: string, recentContext?: string
   }
 }
 
-/** Classify via local Ollama */
-async function classifyWithOllama(userMessage: string, recentContext?: string): Promise<ClassifyResult & { latencyMs: number }> {
+/** Classify via Ollama (local or remote GPU box) using few-shot binary prompt */
+async function classifyWithOllama(userMessage: string, _recentContext?: string): Promise<ClassifyResult & { latencyMs: number }> {
   const t0 = Date.now();
   try {
-    const res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+    // Use the raw generate API with few-shot completion (not chat API — avoids thinking mode issues)
+    const prompt = `${OLLAMA_CLASSIFIER_PROMPT}"${userMessage}"`;
+    const res = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        messages: [
-          { role: 'system', content: AUTO_CLASSIFIER_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        max_tokens: 16,
-        temperature: 0,
+        prompt,
         stream: false,
+        options: { num_predict: 3, temperature: 0 },
+        raw: true,
+        think: false,
       }),
     });
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
-    const data = await res.json() as { choices: { message: { content: string } }[] };
-    const content = data.choices?.[0]?.message?.content ?? '';
+    const data = await res.json() as { response: string };
+    const raw = data.response?.trim().toLowerCase() ?? '';
+    // Binary classification: "chitchat" → simple, anything else → balanced
+    const classification = raw.includes('chitchat') ? 'simple' as const : 'balanced' as const;
     const latencyMs = Date.now() - t0;
-    return { classification: parseClassification(content), usage: null, latencyMs };
+    return { classification, usage: null, latencyMs };
   } catch (err) {
     const latencyMs = Date.now() - t0;
     console.error('[Router:ollama] Classification failed, falling back to dashscope:', err);
