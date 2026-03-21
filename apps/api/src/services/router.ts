@@ -345,27 +345,40 @@ export async function* streamResponse(
     classification = 'deep';
   } else {
     // Auto mode: 3-way classify → simple / balanced / deep
-    // Fetch last 2 messages for classifier context (enough for confirmation detection)
-    // Truncate aggressively — classifier only needs to know the topic, not full content
-    const recentMsgs = await db.getMessages(conversationId, 2);
-    const recentContext = recentMsgs.length > 0
-      ? recentMsgs.map((m) => `[${m.role}]: ${m.content.slice(0, 100)}`).join('\n')
-      : undefined;
+    const classifyStart = Date.now();
 
-    const result = await classifyPrompt(userMessage, recentContext);
-    classifierUsage = result.usage;
-    classification = result.classification;
-    if (classification === 'deep') {
-      model = MODEL_DEEP;
-      enableThinking = true;
-    } else if (classification === 'balanced') {
+    // Short messages: skip the LLM classifier entirely (saves 5-15s round-trip)
+    // Default to "balanced" which is safe — slightly more expensive but tools always work
+    const msgLen = userMessage.trim().length;
+    if (msgLen <= 30) {
+      // Short messages in active conversations almost always need tools or context
+      classification = 'balanced';
       model = MODEL_DEEP;
       enableThinking = false;
+      console.log(`[Router] Auto skip-classify "${userMessage.slice(0, 50)}" (${msgLen} chars) → balanced (0ms)`);
     } else {
-      model = MODEL_FAST;
-      enableThinking = false;
+      // Longer messages: use LLM classifier with conversation context
+      const recentMsgs = await db.getMessages(conversationId, 2);
+      const recentContext = recentMsgs.length > 0
+        ? recentMsgs.map((m) => `[${m.role}]: ${m.content.slice(0, 100)}`).join('\n')
+        : undefined;
+
+      const result = await classifyPrompt(userMessage, recentContext);
+      classifierUsage = result.usage;
+      classification = result.classification;
+      if (classification === 'deep') {
+        model = MODEL_DEEP;
+        enableThinking = true;
+      } else if (classification === 'balanced') {
+        model = MODEL_DEEP;
+        enableThinking = false;
+      } else {
+        model = MODEL_FAST;
+        enableThinking = false;
+      }
+      const classifyMs = Date.now() - classifyStart;
+      console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model} (${classifyMs}ms)`);
     }
-    console.log(`[Router] Auto classified "${userMessage.slice(0, 50)}..." as ${classification} → ${model}${enableThinking ? ' (thinking)' : ''}`);
   }
 
   // Emit start event with classification so the client can show the right placeholder
