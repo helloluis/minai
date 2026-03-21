@@ -18,7 +18,7 @@ const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
 const MODEL_FAST: ModelId = 'qwen3.5-flash';
 const MODEL_DEEP: ModelId = 'qwen3.5-plus';
-const MAX_TOOL_ITERATIONS = 30;
+const MAX_TOOL_ITERATIONS = 50;
 
 // Classifier config — switch via env vars
 // CLASSIFIER_PROVIDER: 'dashscope' (remote, 5-15s) | 'ollama' (local/remote GPU, ~400ms)
