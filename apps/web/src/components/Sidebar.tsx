@@ -1079,33 +1079,34 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* YouTube lightbox */}
-        {showVideo && (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => setShowVideo(false)}
-          >
-            <div
-              className="relative w-full max-w-3xl mx-4 aspect-video"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setShowVideo(false)}
-                className="absolute -top-10 right-0 text-white/70 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-              <iframe
-                src="https://www.youtube.com/embed/KE8L3n1X7V4?autoplay=1"
-                title="Why we built minai"
-                className="w-full h-full rounded-xl"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* YouTube lightbox — outside sidebar panel so it covers full viewport */}
+      {showVideo && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90"
+          onClick={() => setShowVideo(false)}
+        >
+          <div
+            className="relative w-full max-w-4xl mx-4 aspect-video"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideo(false)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white text-3xl leading-none"
+            >
+              ×
+            </button>
+            <iframe
+              src="https://www.youtube.com/embed/KE8L3n1X7V4?autoplay=1"
+              title="Why we built minai"
+              className="w-full h-full rounded-xl"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
