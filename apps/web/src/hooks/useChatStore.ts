@@ -103,12 +103,17 @@ export const useChatStore = create<ChatState>()(
       login: async () => {
         const session = await api.login();
         set({ session, isAuthenticated: true });
+        window.gtag?.('event', 'login', { method: 'guest' });
       },
 
       checkSession: async () => {
         try {
           const session = await api.getMe();
           set({ session, isAuthenticated: true });
+          // Track authenticated session in GA
+          const method = session.user.google_id ? 'google' : 'guest';
+          window.gtag?.('event', 'login', { method });
+          window.gtag?.('set', 'user_properties', { auth_method: method });
           // Sync browser timezone to server (fire-and-forget)
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           if (tz) api.setTimezone(tz).catch(() => {});
