@@ -586,8 +586,12 @@ export function Sidebar() {
       const note = await api.createNote(convId, '', '');
       setNotesByConv(prev => ({
         ...prev,
-        [convId]: [...(prev[convId] ?? []), note],
+        [convId]: [note, ...(prev[convId] ?? [])],
       }));
+      // Scroll to top so the new empty note is visible
+      requestAnimationFrame(() => {
+        document.getElementById(`note-${note.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch (e) { console.error(e); }
   };
 
