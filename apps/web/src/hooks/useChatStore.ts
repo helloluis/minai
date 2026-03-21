@@ -48,6 +48,7 @@ interface ChatState {
 
   // Actions
   login: () => Promise<void>;
+  walletLogin: (address: string, signature: string, message: string) => Promise<void>;
   checkSession: () => Promise<void>;
   logout: () => void;
 
@@ -106,12 +107,18 @@ export const useChatStore = create<ChatState>()(
         window.gtag?.('event', 'login', { method: 'guest' });
       },
 
+      walletLogin: async (address: string, signature: string, message: string) => {
+        const session = await api.walletLogin(address, signature, message);
+        set({ session, isAuthenticated: true });
+        window.gtag?.('event', 'login', { method: 'wallet' });
+      },
+
       checkSession: async () => {
         try {
           const session = await api.getMe();
           set({ session, isAuthenticated: true });
           // Track authenticated session in GA
-          const method = session.user.google_id ? 'google' : 'guest';
+          const method = session.user.google_id ? 'google' : session.user.wallet_address ? 'wallet' : 'guest';
           window.gtag?.('event', 'login', { method });
           window.gtag?.('set', 'user_properties', { auth_method: method });
           // Sync browser timezone to server (fire-and-forget)

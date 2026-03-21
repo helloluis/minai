@@ -227,6 +227,15 @@ async function buildMessages(
   const userTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
   systemPrompt += `\n\n## Current Date & Time\nRight now it is **${userDate}** at **${userTime}** (${tz}). Always use this when the user references "today", "tomorrow", "yesterday", "this week", etc.`;
 
+  // Inject auth context so the LLM knows what's available
+  if (user?.wallet_address && !user?.google_id) {
+    systemPrompt += `\n\n## User Auth Context\nThis user signed in via **MiniPay wallet** (${user.wallet_address.slice(0, 6)}...${user.wallet_address.slice(-4)}). They do NOT have Google connected, so calendar tools are unavailable. If they ask about calendar features, let them know they can connect Google from Settings to unlock calendar management. Top-up is extra easy for them since they're already in a wallet — just mention topping up with cUSD.`;
+  } else if (user?.google_id && !user?.wallet_address) {
+    systemPrompt += `\n\n## User Auth Context\nThis user signed in via **Google**. Calendar tools are available.`;
+  } else if (user?.google_id && user?.wallet_address) {
+    systemPrompt += `\n\n## User Auth Context\nThis user has both **Google** and **wallet** (${user.wallet_address.slice(0, 6)}...${user.wallet_address.slice(-4)}) connected. All features including calendar are available.`;
+  }
+
   if (memories.length > 0) {
     const memoryContext = memories.map((m) => `- ${m.key}: ${m.value}`).join('\n');
     systemPrompt += `\n\n## What you know about this user\n${memoryContext}`;

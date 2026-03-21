@@ -15,6 +15,7 @@ export interface User {
   id: string;
   session_token: string;
   google_id: string | null;
+  wallet_address: string | null;
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
@@ -152,6 +153,6 @@ export interface ConversationListItem {
 }
 
 export interface SessionResponse {
-  user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id'>;
+  user: Pick<User, 'id' | 'created_at' | 'email' | 'display_name' | 'avatar_url' | 'google_id' | 'wallet_address'>;
   balance: Pick<UserBalance, 'balance_usd' | 'free_credit_usd' | 'balance_high_water'>;
 }

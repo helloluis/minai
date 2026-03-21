@@ -37,6 +37,22 @@ export async function getUserById(userId: string): Promise<User | null> {
   return rows[0] ?? null;
 }
 
+export async function getUserByWallet(walletAddress: string): Promise<User | null> {
+  const { rows } = await pool.query<User>(
+    `SELECT * FROM users WHERE wallet_address = $1 AND deleted_at IS NULL`,
+    [walletAddress.toLowerCase()]
+  );
+  return rows[0] ?? null;
+}
+
+export async function createWalletUser(sessionToken: string, walletAddress: string): Promise<User> {
+  const { rows } = await pool.query<User>(
+    `INSERT INTO users (session_token, wallet_address) VALUES ($1, $2) RETURNING *`,
+    [sessionToken, walletAddress.toLowerCase()]
+  );
+  return rows[0];
+}
+
 export async function updateUserDisplayName(userId: string, name: string): Promise<void> {
   await pool.query(
     `UPDATE users SET display_name = $2 WHERE id = $1`,
