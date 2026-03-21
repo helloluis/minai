@@ -41,6 +41,7 @@ async function migrate() {
       '019_file_summary_cost.sql',
       '020_user_memory_text.sql',
       '021_message_tool_cost.sql',
+      '022_user_wallet_address.sql',
     ];
 
     for (const migration of migrations) {
