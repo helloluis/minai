@@ -126,8 +126,8 @@ function MemoryEditor() {
   }, []);
 
   const handleChange = (value: string) => {
-    if (value.length > MAX_MEMORY_CHARS) return;
-    setText(value);
+    const trimmed = value.slice(0, MAX_MEMORY_CHARS);
+    setText(trimmed);
     setSaved(false);
     // Debounced auto-save
     if (saveTimerRef[0]) clearTimeout(saveTimerRef[0]);
