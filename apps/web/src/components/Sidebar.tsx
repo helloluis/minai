@@ -1058,7 +1058,7 @@ export function Sidebar() {
               alt="Why we built minai"
               className="w-full aspect-video object-cover group-hover:brightness-110 transition-all"
             />
-            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors text-left">
+            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors text-center">
               Why we built minai ❤️
             </div>
           </button>
