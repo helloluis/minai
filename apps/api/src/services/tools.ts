@@ -534,7 +534,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'browse_web',
-    description: 'Navigate to a URL and extract its text content using a headless browser. Works with JavaScript-rendered pages, server-rendered ASPX sites, old web archives, and dynamic SPAs that url_fetch cannot handle. Use this when url_fetch returns empty/useless content, or when the page requires JavaScript to render. Returns page text, title, and up to 30 links found on the page.',
+    description: 'Navigate to a URL and extract its text content using a headless browser with optional page interactions. Works with JavaScript-rendered pages, server-rendered ASPX sites, old web archives, and dynamic SPAs. Returns page text, title, links, and available form fields. Use "actions" to type into search fields, click buttons, select dropdowns, etc. before extracting content. Call this tool multiple times to navigate through multi-page results.',
     parameters: {
       type: 'object',
       properties: {
@@ -542,9 +542,40 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: 'string',
           description: 'The URL to browse (must be http:// or https://)',
         },
+        actions: {
+          type: 'array',
+          description: 'Optional list of interactions to perform on the page before extracting content. Executed in order.',
+          items: {
+            type: 'object',
+            properties: {
+              action: {
+                type: 'string',
+                enum: ['type', 'click', 'select', 'wait', 'wait_ms'],
+                description: 'type: enter text into an input field. click: click a button/link. select: choose a dropdown option. wait: wait for an element to appear. wait_ms: pause for N milliseconds.',
+              },
+              selector: {
+                type: 'string',
+                description: 'CSS selector for the target element (required for type, click, select, wait)',
+              },
+              text: {
+                type: 'string',
+                description: 'Text to type (for "type" action)',
+              },
+              value: {
+                type: 'string',
+                description: 'Option value to select (for "select" action)',
+              },
+              ms: {
+                type: 'number',
+                description: 'Milliseconds to wait (for "wait_ms" action, max 5000)',
+              },
+            },
+            required: ['action'],
+          },
+        },
         selector: {
           type: 'string',
-          description: 'Optional CSS selector to extract only a specific part of the page (e.g. "#main-content", ".article-body")',
+          description: 'Optional CSS selector to extract only a specific part of the page (e.g. "#main-content", ".results-table")',
         },
       },
       required: ['url'],
@@ -1318,23 +1349,39 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
 
     case 'browse_web': {
       const browseUrl = args.url as string;
+      const browseActions = args.actions as { action: string; selector?: string; text?: string; value?: string; ms?: number }[] | undefined;
       const browseSelector = args.selector as string | undefined;
       const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
       try {
         const resp = await fetch(`${BROWSE_SERVICE_URL}/browse`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: browseUrl, selector: browseSelector, timeout: 15000 }),
+          body: JSON.stringify({ url: browseUrl, actions: browseActions, selector: browseSelector, timeout: 15000 }),
           signal: AbortSignal.timeout(20000),
         });
-        const data = await resp.json() as { ok: boolean; url?: string; title?: string; text?: string; links?: { text: string; href: string }[]; length?: number; error?: string };
+        const data = await resp.json() as {
+          ok: boolean; url?: string; title?: string; text?: string;
+          links?: { text: string; href: string }[];
+          forms?: { tag: string; type?: string; name?: string; id?: string; placeholder?: string; label?: string; selector: string }[];
+          length?: number; error?: string;
+          actions_performed?: string[];
+        };
         if (!data.ok) {
           content = `Failed to browse ${browseUrl}: ${data.error ?? 'Unknown error'}`;
         } else {
           const linkList = data.links?.length
             ? '\n\nLinks found on page:\n' + data.links.map((l) => `- [${l.text}](${l.href})`).join('\n')
             : '';
-          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars\n\n${data.text}${linkList}`;
+          const formList = data.forms?.length
+            ? '\n\nForm fields on page:\n' + data.forms.map((f) => {
+                const desc = [f.label, f.placeholder, f.name].filter(Boolean).join(' / ');
+                return `- ${f.selector} (${f.tag}${f.type ? `[${f.type}]` : ''})${desc ? ': ' + desc : ''}`;
+              }).join('\n')
+            : '';
+          const actionLog = data.actions_performed?.length
+            ? '\n\nActions performed: ' + data.actions_performed.join(' → ')
+            : '';
+          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars${actionLog}\n\n${data.text}${linkList}${formList}`;
         }
       } catch (err) {
         content = `Browse failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
