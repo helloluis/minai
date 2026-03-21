@@ -1,68 +1,63 @@
 /**
- * Lightpanda Browse Service
+ * Browse Service — Playwright + Chromium
  *
- * Thin HTTP wrapper around Lightpanda headless browser.
+ * Thin HTTP wrapper around a headless Chromium browser.
  * Accepts POST /browse with { url, actions?, selector?, timeout? }
- * Returns { ok, url, title, text, links? } or { ok: false, error }.
+ * Returns { ok, url, title, text, links?, forms? } or { ok: false, error }.
  *
  * Actions let callers interact with the page before extracting content:
- *   - { action: "type", selector, text }  — type into an input/textarea
- *   - { action: "click", selector }       — click a button/link/element
- *   - { action: "select", selector, value } — pick an <option> in a <select>
- *   - { action: "wait", selector, timeout? } — wait for an element to appear
- *   - { action: "wait_ms", ms }           — sleep for N milliseconds
- *
- * Serializes requests through a queue (Lightpanda beta has a
- * multi-client bug where closing one CDP connection kills others).
+ *   - { action: "type", selector, text }       — type into an input/textarea
+ *   - { action: "click", selector }            — click a button/link/element
+ *   - { action: "click_and_wait", selector }   — click and wait for navigation
+ *   - { action: "submit", selector? }          — programmatically submit a form
+ *   - { action: "evaluate", text }             — run arbitrary JS on the page
+ *   - { action: "select", selector, value }    — pick an <option> in a <select>
+ *   - { action: "wait", selector, timeout? }   — wait for an element to appear
+ *   - { action: "wait_ms", ms }                — sleep for N milliseconds
  */
 
 import http from 'node:http';
-import { lightpanda } from '@lightpanda/browser';
-import puppeteer from 'puppeteer-core';
+import { chromium } from 'playwright';
 
 const PORT = parseInt(process.env.PORT ?? '3100', 10);
-const CDP_PORT = parseInt(process.env.CDP_PORT ?? '9222', 10);
 const MAX_TEXT_LENGTH = parseInt(process.env.MAX_TEXT_LENGTH ?? '30000', 10);
 const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT ?? '15000', 10);
 const MAX_ACTIONS = 20;
 
-// ─── Lightpanda CDP server ───
+// ─── Persistent browser instance ───
 
-let cdpProc = null;
+let browser = null;
 
-async function ensureCDP() {
-  if (cdpProc) return;
-  console.log(`[Browse] Starting Lightpanda CDP server on port ${CDP_PORT}...`);
-  cdpProc = await lightpanda.serve({ host: '127.0.0.1', port: CDP_PORT });
-  console.log('[Browse] Lightpanda CDP server ready');
-}
-
-// ─── Request queue (serialize to avoid multi-client bug) ───
-
-let busy = false;
-const queue = [];
-
-function enqueue(fn) {
-  return new Promise((resolve, reject) => {
-    queue.push(() => fn().then(resolve, reject));
-    drain();
+async function getBrowser() {
+  if (browser && browser.isConnected()) return browser;
+  console.log('[Browse] Launching Chromium...');
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--no-first-run',
+    ],
   });
+  console.log('[Browse] Chromium ready');
+  return browser;
 }
 
-function drain() {
-  if (busy || queue.length === 0) return;
-  busy = true;
-  const next = queue.shift();
-  next().finally(() => { busy = false; drain(); });
-}
-
-// ─── Browse logic ───
+// ─── Safety ───
 
 const BLOCKED_PATTERNS = [
   /^file:/i,
   /^data:/i,
   /^(https?:\/\/)?(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|localhost|0\.0\.0\.0)/i,
 ];
+
+// ─── Actions ───
 
 async function executeActions(page, actions) {
   const log = [];
@@ -73,9 +68,7 @@ async function executeActions(page, actions) {
         case 'type':
           if (!selector || !text) throw new Error('type requires "selector" and "text"');
           await page.waitForSelector(selector, { timeout: 5000 });
-          // Clear existing value first, then type
-          await page.$eval(selector, (el) => { el.value = ''; });
-          await page.type(selector, text);
+          await page.fill(selector, text);
           log.push(`typed "${text}" into ${selector}`);
           break;
 
@@ -83,13 +76,11 @@ async function executeActions(page, actions) {
           if (!selector) throw new Error('click requires "selector"');
           await page.waitForSelector(selector, { timeout: 5000 });
           await page.click(selector);
-          // Brief pause for navigation/rendering after click
-          await new Promise((r) => setTimeout(r, 500));
+          await page.waitForTimeout(500);
           log.push(`clicked ${selector}`);
           break;
 
         case 'click_and_wait':
-          // Click and wait for navigation (for form submits, ASPX postbacks, etc.)
           if (!selector) throw new Error('click_and_wait requires "selector"');
           await page.waitForSelector(selector, { timeout: 5000 });
           try {
@@ -97,32 +88,31 @@ async function executeActions(page, actions) {
               page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: waitTimeout || 10000 }),
               page.click(selector),
             ]);
-            log.push(`clicked ${selector} and navigated to ${page.url()}`);
+            log.push(`clicked ${selector} → navigated to ${page.url()}`);
           } catch (navErr) {
-            // Navigation might not happen (e.g. JS-only update) — that's okay
             log.push(`clicked ${selector} (no navigation: ${navErr.message})`);
           }
           break;
 
         case 'submit':
-          // Programmatically submit a form by selector (or first form)
           try {
             const formSelector = selector || 'form';
-            await page.evaluate((sel) => {
-              const form = document.querySelector(sel);
-              if (form && form.submit) form.submit();
-              else throw new Error('Form not found: ' + sel);
-            }, formSelector);
-            // Wait for navigation after submit
-            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: waitTimeout || 10000 }).catch(() => {});
-            log.push(`submitted form ${formSelector}, now at ${page.url()}`);
+            await page.waitForSelector(formSelector, { timeout: 5000 });
+            await Promise.all([
+              page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: waitTimeout || 10000 }),
+              page.evaluate((sel) => {
+                const form = document.querySelector(sel);
+                if (form && form.submit) form.submit();
+                else throw new Error('Form not found: ' + sel);
+              }, formSelector),
+            ]);
+            log.push(`submitted ${formSelector} → ${page.url()}`);
           } catch (submitErr) {
             log.push(`submit ${selector || 'form'} failed: ${submitErr.message}`);
           }
           break;
 
         case 'evaluate':
-          // Run arbitrary JavaScript and return the result
           if (!text) throw new Error('evaluate requires "text" (the JS expression)');
           try {
             const evalResult = await page.evaluate(text);
@@ -135,7 +125,7 @@ async function executeActions(page, actions) {
         case 'select':
           if (!selector || value === undefined) throw new Error('select requires "selector" and "value"');
           await page.waitForSelector(selector, { timeout: 5000 });
-          await page.select(selector, value);
+          await page.selectOption(selector, value);
           log.push(`selected "${value}" in ${selector}`);
           break;
 
@@ -146,7 +136,7 @@ async function executeActions(page, actions) {
           break;
 
         case 'wait_ms':
-          await new Promise((r) => setTimeout(r, Math.min(ms || 1000, 5000)));
+          await page.waitForTimeout(Math.min(ms || 1000, 5000));
           log.push(`waited ${Math.min(ms || 1000, 5000)}ms`);
           break;
 
@@ -155,11 +145,12 @@ async function executeActions(page, actions) {
       }
     } catch (err) {
       log.push(`${action} ${selector || ''} failed: ${err.message}`);
-      // Don't stop on action failure — continue with remaining actions
     }
   }
   return log;
 }
+
+// ─── Page extraction ───
 
 async function extractPage(page, selector) {
   let text;
@@ -183,7 +174,6 @@ async function extractPage(page, selector) {
       .filter((l) => l.href && l.text);
   }).catch(() => []);
 
-  // Also extract form fields so the LLM knows what's available to interact with
   const forms = await page.evaluate(() => {
     const inputs = Array.from(document.querySelectorAll('input, textarea, select, button[type="submit"], input[type="submit"]'));
     return inputs.slice(0, 40).map((el) => {
@@ -195,7 +185,7 @@ async function extractPage(page, selector) {
       const label = id ? document.querySelector(`label[for="${id}"]`)?.textContent?.trim() : '';
       const value = (tag === 'select')
         ? Array.from(el.options || []).map((o) => `${o.value}:${o.text.trim()}`).join(', ')
-        : el.value || '';
+        : '';
       const selectorParts = [];
       if (id) selectorParts.push(`#${id}`);
       else if (name) selectorParts.push(`${tag}[name="${name}"]`);
@@ -221,46 +211,42 @@ async function extractPage(page, selector) {
   return { title, text: truncated, links: links.slice(0, 30), forms, length: trimmed.length };
 }
 
+// ─── Browse logic ───
+
 async function browse(url, actions, selector, timeout) {
-  // Safety: block local/private URLs
   for (const pat of BLOCKED_PATTERNS) {
     if (pat.test(url)) {
       return { ok: false, error: `Blocked URL pattern: ${url}` };
     }
   }
 
-  // Ensure URL has protocol
   if (!/^https?:\/\//i.test(url)) {
     url = 'https://' + url;
   }
 
-  await ensureCDP();
-
-  const browser = await puppeteer.connect({
-    browserWSEndpoint: `ws://127.0.0.1:${CDP_PORT}`,
+  const b = await getBrowser();
+  const context = await b.newContext({
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
   });
 
   try {
-    const page = await browser.newPage();
+    const page = await context.newPage();
+    page.setDefaultTimeout(timeout);
 
     try {
-      await page.goto(url, {
-        waitUntil: 'domcontentloaded',
-        timeout,
-      });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
 
-      // Execute actions if provided
       let actionLog = [];
       if (actions && actions.length > 0) {
         actionLog = await executeActions(page, actions);
       }
 
-      // Extract page content
       const extracted = await extractPage(page, selector);
 
       return {
         ok: true,
-        url: page.url(), // may have changed after clicks/navigation
+        url: page.url(),
         ...extracted,
         actions_performed: actionLog.length > 0 ? actionLog : undefined,
       };
@@ -268,17 +254,16 @@ async function browse(url, actions, selector, timeout) {
       await page.close().catch(() => {});
     }
   } finally {
-    await browser.disconnect().catch(() => {});
+    await context.close().catch(() => {});
   }
 }
 
 // ─── HTTP server ───
 
 const server = http.createServer(async (req, res) => {
-  // Health check
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, queue: queue.length, busy }));
+    res.end(JSON.stringify({ ok: true, engine: 'playwright-chromium' }));
     return;
   }
 
@@ -288,7 +273,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Read body
   let body = '';
   for await (const chunk of req) body += chunk;
 
@@ -313,12 +297,10 @@ const server = http.createServer(async (req, res) => {
   const startMs = Date.now();
   const actionSummary = actions?.length ? ` | ${actions.length} actions` : '';
 
-  console.log(`[Browse] ${ts} | ${callerIp} | REQ ${url}${actionSummary}${selector ? ` (selector: ${selector})` : ''} | queue: ${queue.length}`);
+  console.log(`[Browse] ${ts} | ${callerIp} | REQ ${url}${actionSummary}${selector ? ` (${selector})` : ''}`);
 
   try {
-    const result = await enqueue(() =>
-      browse(url, actions || [], selector || null, timeout || DEFAULT_TIMEOUT)
-    );
+    const result = await browse(url, actions || [], selector || null, timeout || DEFAULT_TIMEOUT);
     const elapsed = Date.now() - startMs;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
@@ -332,9 +314,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Browse] HTTP server listening on port ${PORT}`);
+  console.log(`[Browse] HTTP server listening on port ${PORT} (Playwright + Chromium)`);
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => { cdpProc?.kill(); process.exit(0); });
-process.on('SIGTERM', () => { cdpProc?.kill(); process.exit(0); });
+process.on('SIGINT', async () => { await browser?.close(); process.exit(0); });
+process.on('SIGTERM', async () => { await browser?.close(); process.exit(0); });
