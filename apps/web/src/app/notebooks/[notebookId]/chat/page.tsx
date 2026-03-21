@@ -174,21 +174,20 @@ export default function NotebookChatPage() {
   };
 
   // Throttled markdown rendering during streaming
+  const renderedHtmlRef = useRef('');
   const [renderedHtml, setRenderedHtml] = useState('');
-  const streamingContentRef = useRef('');
-  streamingContentRef.current = streamingContent;
 
   useEffect(() => {
-    if (!isStreaming) {
-      // Final render when streaming ends
-      if (streamingContentRef.current) {
-        setRenderedHtml(decorateHtml(renderMarkdown(streamingContentRef.current)));
-      }
-      return;
-    }
+    if (!isStreaming) return;
+    // Reset on new stream
+    renderedHtmlRef.current = '';
+    setRenderedHtml('');
     const timer = setInterval(() => {
-      if (streamingContentRef.current) {
-        setRenderedHtml(decorateHtml(renderMarkdown(streamingContentRef.current)));
+      const content = useChatStore.getState().streamingContent;
+      if (content && content !== renderedHtmlRef.current) {
+        const html = decorateHtml(renderMarkdown(content));
+        renderedHtmlRef.current = content;
+        setRenderedHtml(html);
       }
     }, 500);
     return () => clearInterval(timer);
