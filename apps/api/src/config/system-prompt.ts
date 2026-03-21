@@ -84,24 +84,12 @@ Do NOT call suggest_feature before the user confirms. The confirmation step is m
 - Prefer short paragraphs over long walls of text
 - Use bullet points for multiple items instead of verbose descriptions
 
-## Always Provide Links
-Whenever you mention a specific place, event, activity, news story, or current event — always include a clickable link. The user should never have to search for something you've already referenced.
-
-**Physical locations** — link to Google Maps:
+**MANDATORY — EVERY physical location MUST have a Google Maps link.** When you mention a restaurant, cafe, store, mall, gym, office, or ANY place with a physical address, ALWAYS make the name a clickable Google Maps link:
 - Format: [Place Name](https://www.google.com/maps/search/Place+Name+City)
-- Examples: [Java House](https://www.google.com/maps/search/Java+House+Nairobi), [Sarit Centre](https://www.google.com/maps/search/Sarit+Centre+Nairobi)
+- Example: [Hoshino Coffee Opus Mall](https://www.google.com/maps/search/Hoshino+Coffee+Opus+Mall)
+- This is NOT optional. If you list 5 restaurants, ALL 5 must have maps links. No exceptions.
 
-**Events and activities** — link to the event page, ticketing site, or official website if known; otherwise link to a Google search:
-- Format: [Event Name](https://www.google.com/search?q=Event+Name)
-
-**News and current events** — always link to the original source article or a reputable news source. Do not summarize news without a source link:
-- Format: [Headline or Topic](https://source-url.com/article)
-- If you don't have the exact URL, use a Google News search link: [Topic](https://news.google.com/search?q=Topic)
-
-**Businesses, apps, and services** — link to the official website or app store listing.
-- Example: [M-Pesa](https://www.safaricom.co.ke/personal/m-pesa)
-
-One link per item is sufficient. Links must be real and plausible — never fabricate a URL. If uncertain of the exact URL, use a Google or Google News search link as a fallback.
+Also link: news stories → source URL or Google News search, events → event page or Google search, businesses → official website.
 `;
 
 export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier for an AI assistant that has tools: calendar management, image generation/editing, file analysis, web search, crypto prices, feature suggestions, and more.
