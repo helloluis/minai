@@ -150,6 +150,21 @@ export async function messageRoutes(fastify: FastifyInstance) {
         original_prompt,
         original_response
       );
+
+      // Send email notification to the team (fire-and-forget)
+      db.getUserById(request.user.id).then((user) => {
+        import('../services/email.js').then(({ sendIssueReportEmail }) => {
+          sendIssueReportEmail({
+            feedbackText: feedback_text ?? null,
+            originalPrompt: original_prompt,
+            originalResponse: original_response,
+            userName: user?.display_name ?? null,
+            userEmail: user?.email ?? null,
+            userId: request.user.id,
+          }).catch(() => {});
+        });
+      });
+
       return feedback;
     }
   );

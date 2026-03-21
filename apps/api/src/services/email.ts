@@ -58,6 +58,58 @@ export async function sendFeatureSuggestionEmail(opts: {
   }
 }
 
+export async function sendIssueReportEmail(opts: {
+  feedbackText: string | null;
+  originalPrompt: string;
+  originalResponse: string;
+  userName: string | null;
+  userEmail: string | null;
+  userId: string;
+}): Promise<void> {
+  const { feedbackText, originalPrompt, originalResponse, userName, userEmail, userId } = opts;
+
+  const contactInfo = userEmail
+    ? `${userName ?? 'Anonymous'} (${userEmail})`
+    : `${userName ?? 'Anonymous'} (no email — user ID: ${userId})`;
+
+  const truncate = (s: string, max: number) => s.length > max ? s.slice(0, max) + '…' : s;
+
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 600px;">
+      <h2 style="color: #dc2626;">Issue Report</h2>
+      ${feedbackText ? `<blockquote style="border-left: 3px solid #dc2626; padding: 8px 16px; margin: 16px 0; background: #fef2f2; color: #333;">${escapeHtml(feedbackText).replace(/\n/g, '<br>')}</blockquote>` : '<p><em>No description provided</em></p>'}
+      <h4 style="margin-bottom: 4px;">User message:</h4>
+      <pre style="background: #f3f4f6; padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 13px;">${escapeHtml(truncate(originalPrompt, 2000))}</pre>
+      <h4 style="margin-bottom: 4px;">Assistant response:</h4>
+      <pre style="background: #f3f4f6; padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 13px;">${escapeHtml(truncate(originalResponse, 3000))}</pre>
+      <p><strong>From:</strong> ${escapeHtml(contactInfo)}</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+      <p style="color: #888; font-size: 12px;">Sent from minai issue reporting system</p>
+    </div>
+  `;
+
+  if (!resend) {
+    console.log(`[Email] Resend not configured — would have sent issue report to ${TEAM_EMAILS.join(', ')}`);
+    console.log(`[Email] From: ${contactInfo}`);
+    return;
+  }
+
+  try {
+    const subject = feedbackText
+      ? `[minai] Issue: ${feedbackText.slice(0, 60)}${feedbackText.length > 60 ? '…' : ''}`
+      : '[minai] Issue report (no description)';
+    await resend.emails.send({
+      from: FROM,
+      to: TEAM_EMAILS,
+      subject,
+      html,
+    });
+    console.log(`[Email] Issue report sent to ${TEAM_EMAILS.join(', ')}`);
+  } catch (err) {
+    console.error('[Email] Failed to send issue report:', err);
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
