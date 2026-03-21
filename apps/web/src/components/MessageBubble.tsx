@@ -70,7 +70,7 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
  * Markdown-to-HTML renderer.
  * Handles: bold, italic, inline code, code blocks, links, lists, tables, blockquotes, headers.
  */
-function renderMarkdown(text: string): string {
+export function renderMarkdown(text: string): string {
   // 1. Extract code blocks first (protect from further processing)
   const codeBlocks: string[] = [];
   let html = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {

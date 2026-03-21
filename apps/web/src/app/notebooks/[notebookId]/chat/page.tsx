@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import { BalanceBar } from '@/components/BalanceBar';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatInput } from '@/components/ChatInput';
-import { MessageBubble } from '@/components/MessageBubble';
+import { MessageBubble, renderMarkdown } from '@/components/MessageBubble';
+import { decorateHtml } from '@/lib/decorator';
 import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
@@ -172,15 +173,30 @@ export default function NotebookChatPage() {
     return undefined;
   };
 
+  // Throttled markdown rendering during streaming (re-render every 500ms)
+  const [renderTick, setRenderTick] = useState(0);
+  useEffect(() => {
+    if (!isStreaming || !streamingContent) return;
+    const timer = setInterval(() => setRenderTick((t) => t + 1), 500);
+    return () => clearInterval(timer);
+  }, [isStreaming, streamingContent]);
+
+  const streamingHtml = useMemo(() => {
+    if (!streamingContent) return '';
+    void renderTick; // dependency to trigger re-render
+    return decorateHtml(renderMarkdown(streamingContent));
+  }, [streamingContent, renderTick]);
+
   function getStreamingBody() {
     if (streamingContent) {
       return (
         <>
           {streamingThinking && <ThinkingBlock content={streamingThinking} isActive={false} />}
-          <div className="message-content leading-relaxed">
-            {streamingContent}
-            <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
-          </div>
+          <div
+            className="message-content leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: streamingHtml }}
+          />
+          <span className="inline-block w-1.5 h-4 bg-minai-500 ml-0.5 animate-pulse" />
         </>
       );
     }
