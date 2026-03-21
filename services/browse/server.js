@@ -166,17 +166,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  console.log(`[Browse] Request: ${url}${selector ? ` (selector: ${selector})` : ''}`);
+  const callerIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const ts = new Date().toISOString();
+  const startMs = Date.now();
+
+  console.log(`[Browse] ${ts} | ${callerIp} | REQ ${url}${selector ? ` (selector: ${selector})` : ''} | queue: ${queue.length}`);
 
   try {
     const result = await enqueue(() =>
       browse(url, selector || null, timeout || DEFAULT_TIMEOUT)
     );
+    const elapsed = Date.now() - startMs;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
-    console.log(`[Browse] Done: ${url} (${result.ok ? `${result.length} chars` : result.error})`);
+    console.log(`[Browse] ${ts} | ${callerIp} | OK  ${url} | ${result.length} chars | ${elapsed}ms`);
   } catch (err) {
-    console.error(`[Browse] Error: ${url}`, err.message);
+    const elapsed = Date.now() - startMs;
+    console.error(`[Browse] ${ts} | ${callerIp} | ERR ${url} | ${err.message} | ${elapsed}ms`);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: err.message || 'Browse failed' }));
   }
