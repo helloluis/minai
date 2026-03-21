@@ -1048,20 +1048,21 @@ export function Sidebar() {
         )}
 
         {/* ── Footer: Video + Settings ── */}
-        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 py-2 space-y-0.5">
+        <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800">
           <button
             onClick={() => setShowVideo(true)}
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm
-              text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900
-              hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            className="w-full group"
           >
             <img
-              src="https://img.youtube.com/vi/KE8L3n1X7V4/default.jpg"
+              src="https://img.youtube.com/vi/KE8L3n1X7V4/mqdefault.jpg"
               alt="Why we built minai"
-              className="w-8 h-6 rounded object-cover flex-shrink-0"
+              className="w-full aspect-video object-cover group-hover:brightness-110 transition-all"
             />
-            <span className="truncate">Why we built minai ❤️</span>
+            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors text-left">
+              Why we built minai ❤️
+            </div>
           </button>
+          <div className="px-3 pb-2">
           <button
             onClick={() => router.push('/settings')}
             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm
@@ -1075,6 +1076,7 @@ export function Sidebar() {
             </svg>
             <span>Settings</span>
           </button>
+          </div>
         </div>
 
         {/* YouTube lightbox */}
