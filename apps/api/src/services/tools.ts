@@ -338,6 +338,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'update_user_memory',
+    description: "Append a fact about the user to their personal memory. Call this when the user shares something about themselves that would be useful to remember in future conversations — dietary restrictions, travel preferences, family details, health conditions, work habits, etc. Do NOT store client/project info here — only facts about the user themselves.",
+    parameters: {
+      type: 'object',
+      properties: {
+        fact: {
+          type: 'string',
+          description: 'A concise fact about the user. Example: "Vegan — no animal products", "Prefers window seats on flights", "Has a daughter named Sofia (age 7)"',
+        },
+      },
+      required: ['fact'],
+    },
+  },
+  {
     name: 'suggest_feature',
     description: "Submit a feature suggestion from the user to the Minai team. The user can earn up to $10 in app credits if their suggestion is accepted. Use this when a user describes a feature they'd like to see, a tool they'd find useful, or an improvement to Minai.",
     parameters: {
@@ -1095,6 +1109,21 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       if (!userId) { content = 'Authentication required.'; break; }
       content = await setPreferredName(userId, args as { name: string });
       break;
+
+    case 'update_user_memory': {
+      if (!userId) { content = 'Authentication required.'; break; }
+      const fact = (args.fact as string).trim();
+      if (!fact) { content = 'No fact provided.'; break; }
+      // Append to existing memory text (max 2000 chars)
+      const { rows } = await db.pool.query<{ memory_text: string }>('SELECT memory_text FROM users WHERE id = $1', [userId]);
+      const existing = rows[0]?.memory_text ?? '';
+      const separator = existing.trim() ? '\n' : '';
+      const updated = (existing + separator + '• ' + fact).slice(0, 2000);
+      await db.pool.query('UPDATE users SET memory_text = $1 WHERE id = $2', [updated, userId]);
+      console.log(`[Memory] Updated for ${userId.slice(0, 8)}: "${fact}"`);
+      content = JSON.stringify({ success: true, message: 'Noted! I\'ll remember that.' });
+      break;
+    }
 
     case 'suggest_feature':
       if (!userId) { content = 'Authentication required.'; break; }

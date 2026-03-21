@@ -19,6 +19,7 @@ export interface User {
   display_name: string | null;
   avatar_url: string | null;
   timezone: string;
+  memory_text: string;
   created_at: string;
   deleted_at: string | null;
 }

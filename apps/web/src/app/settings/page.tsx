@@ -107,6 +107,66 @@ function UsageChart({ data }: { data: DailyUsage[] }) {
   );
 }
 
+// ─── User Memory Editor ──────────────────────────────────────────────────────
+
+const MAX_MEMORY_CHARS = 2000;
+
+function MemoryEditor() {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const saveTimerRef = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    api.getUserMemory()
+      .then(({ memory_text }) => setText(memory_text))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleChange = (value: string) => {
+    if (value.length > MAX_MEMORY_CHARS) return;
+    setText(value);
+    setSaved(false);
+    // Debounced auto-save
+    if (saveTimerRef[0]) clearTimeout(saveTimerRef[0]);
+    saveTimerRef[0] = setTimeout(() => {
+      setSaving(true);
+      api.setUserMemory(value)
+        .then(() => { setSaved(true); setTimeout(() => setSaved(false), 2000); })
+        .catch(console.error)
+        .finally(() => setSaving(false));
+    }, 800);
+  };
+
+  return (
+    <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-semibold text-gray-100">User Memory</h2>
+        <span className="text-xs text-gray-500">
+          {saving ? 'Saving...' : saved ? '✓ Saved' : `${text.length} / ${MAX_MEMORY_CHARS}`}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500 mb-3">
+        Personal facts about you that minai remembers across conversations. minai also adds to this when you share something important in chat.
+      </p>
+      {loading ? (
+        <div className="h-32 flex items-center justify-center text-gray-500 text-sm">Loading...</div>
+      ) : (
+        <textarea
+          value={text}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="e.g. I'm vegan, I prefer window seats, my daughter's name is Sofia..."
+          rows={6}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-200
+            placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-minai-500/30 resize-none"
+        />
+      )}
+    </section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function SettingsPageInner() {
@@ -241,6 +301,9 @@ function SettingsPageInner() {
             </div>
           </div>
         </section>
+
+        {/* ── User Memory ───────────────────────────────────────── */}
+        <MemoryEditor />
 
         {/* ── Token usage chart ───────────────────────────────── */}
         <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">

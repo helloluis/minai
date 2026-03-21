@@ -39,6 +39,7 @@ async function migrate() {
       '017_balance_high_water.sql',
       '018_file_llm_summary.sql',
       '019_file_summary_cost.sql',
+      '020_user_memory_text.sql',
     ];
 
     for (const migration of migrations) {

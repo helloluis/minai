@@ -231,6 +231,11 @@ async function buildMessages(
     const memoryContext = memories.map((m) => `- ${m.key}: ${m.value}`).join('\n');
     systemPrompt += `\n\n## What you know about this user\n${memoryContext}`;
   }
+  // User's personal memory — editable free text with facts about themselves
+  const memoryText = user?.memory_text;
+  if (memoryText?.trim()) {
+    systemPrompt += `\n\n## User's Personal Notes\nThe user has saved these facts about themselves. Use this to personalize responses:\n${memoryText}`;
+  }
   // Include compacted context from older messages
   const compactedContext = await getCompactedContext(conversationId);
   if (compactedContext) {

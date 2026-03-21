@@ -188,6 +188,16 @@ export function getFileDownloadUrl(conversationId: string, fileId: string): stri
 export const getFilePreview = (conversationId: string, fileId: string) =>
   fetchAPI<{ type: 'text' | 'html'; content: string }>(`/api/conversations/${conversationId}/files/${fileId}/preview`);
 
+// User Memory
+export const getUserMemory = () =>
+  fetchAPI<{ memory_text: string }>('/api/settings/memory');
+
+export const setUserMemory = (memory_text: string) =>
+  fetchAPI<{ success: boolean; memory_text: string; chars: number; max: number }>('/api/settings/memory', {
+    method: 'PUT',
+    body: JSON.stringify({ memory_text }),
+  });
+
 // Settings
 export const setTimezone = (timezone: string) =>
   fetchAPI<{ success: boolean }>('/api/settings/timezone', {
