@@ -107,7 +107,7 @@ export default function NotebookChatPage() {
     } else {
       // No saved position — go to bottom
       requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView();
+        if (el) el.scrollTop = el.scrollHeight;
       });
     }
   }, [messages, notebookId]);
@@ -117,11 +117,12 @@ export default function NotebookChatPage() {
     hasRestoredScroll.current = false;
   }, [notebookId]);
 
-  // When user sends a message (streaming starts), force scroll to bottom
+  // When user sends a message (streaming starts), scroll to bottom
   useEffect(() => {
     if (isStreaming) {
       isNearBottomRef.current = true;
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const el = scrollContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     }
   }, [isStreaming]);
 
@@ -129,7 +130,8 @@ export default function NotebookChatPage() {
   useEffect(() => {
     if (!hasRestoredScroll.current) return; // don't fight the restore
     if (isNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const el = scrollContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     }
   }, [messages, streamingContent, streamingThinking]);
 
@@ -160,7 +162,8 @@ export default function NotebookChatPage() {
   }, [hasMoreMessages, isLoadingMore, loadOlderMessages]);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, []);
 
   if (!isAuthenticated) {

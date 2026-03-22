@@ -273,8 +273,15 @@ export const useChatStore = create<ChatState>()(
             }
           }
 
-          // Reload messages from server to get proper IDs (images are persisted in DB)
-          await get().loadMessages(activeConversationId);
+          // Reload tail from server to get proper IDs, but preserve older messages
+          const PAGE_SIZE = 40;
+          const fresh = await api.getMessages(activeConversationId, PAGE_SIZE);
+          set((s) => {
+            // Keep older messages that aren't in the fresh batch
+            const freshIds = new Set(fresh.map((m) => m.id));
+            const older = s.messages.filter((m) => !m.id.startsWith('temp-') && !freshIds.has(m.id));
+            return { messages: [...older, ...fresh] };
+          });
           await get().loadConversations();
         } catch (err) {
           console.error('[Chat] Send error:', err);
