@@ -165,7 +165,8 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
         href="https://minai.work"
         className="block border-t border-gray-800 bg-gray-900/50 hover:bg-gray-900 transition-colors"
       >
-        <div className="max-w-2xl mx-auto px-6 py-6 text-center">
+        <div className="max-w-2xl mx-auto px-6 py-6 flex items-center justify-center gap-2">
+          <img src="/icon.svg" alt="minai" className="w-5 h-5" />
           <p className="text-sm text-gray-400">
             <span className="text-minai-400 font-semibold">minai.work</span> is AI for the rest of us! Try it for free today.
           </p>
