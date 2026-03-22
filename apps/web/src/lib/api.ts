@@ -227,6 +227,18 @@ export interface UsageResponse {
 export const getUsage = (days = 30) =>
   fetchAPI<UsageResponse>(`/api/settings/usage?days=${days}`);
 
+// Payments
+export interface PaymentRecord {
+  id: string;
+  amount_usd: number;
+  tx_hash: string | null;
+  token: string | null;
+  payment_method: string;
+  created_at: string;
+}
+
+export const getPayments = () => fetchAPI<PaymentRecord[]>('/api/settings/payments');
+
 // Streaming
 export function streamMessage(
   conversationId: string,

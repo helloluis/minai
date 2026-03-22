@@ -35,6 +35,11 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // GET /api/settings/payments — top-up history
+  fastify.get('/api/settings/payments', async (request) => {
+    return db.getPaymentHistory(request.user.id);
+  });
+
   // GET /api/settings/usage?days=30
   fastify.get('/api/settings/usage', async (request) => {
     const { days } = (request.query as { days?: string });

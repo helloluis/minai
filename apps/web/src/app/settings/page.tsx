@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChatStore } from '@/hooks/useChatStore';
 import * as api from '@/lib/api';
-import type { DailyUsage } from '@/lib/api';
+import type { DailyUsage, PaymentRecord } from '@/lib/api';
 
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
 
@@ -167,6 +167,75 @@ function MemoryEditor() {
   );
 }
 
+// ─── Top-up History ──────────────────────────────────────────────────────────
+
+function TopUpHistory() {
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getPayments()
+      .then(setPayments)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <h2 className="font-semibold text-gray-100 mb-1">Top-up History</h2>
+      <p className="text-xs text-gray-500 mb-4">Your recent deposits and credits.</p>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-20">
+          <div className="w-5 h-5 border-2 border-minai-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : payments.length === 0 ? (
+        <div className="flex items-center justify-center h-20 text-gray-500 text-sm">
+          No top-ups yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {payments.map((p) => {
+            const date = new Date(p.created_at);
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const celoscanUrl = p.tx_hash ? `https://celoscan.io/tx/${p.tx_hash}` : null;
+            return (
+              <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-900/40 flex items-center justify-center text-green-400 text-sm font-bold">
+                    +
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-200">
+                      ${p.amount_usd.toFixed(2)}
+                      {p.token && <span className="text-gray-500 font-normal ml-1">({p.token})</span>}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {dateStr} at {timeStr}
+                    </div>
+                  </div>
+                </div>
+                {celoscanUrl && (
+                  <a
+                    href={celoscanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-minai-400 hover:text-minai-300 transition-colors"
+                    title={p.tx_hash ?? ''}
+                  >
+                    {p.tx_hash!.slice(0, 6)}...{p.tx_hash!.slice(-4)}
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function SettingsPageInner() {
@@ -304,6 +373,9 @@ function SettingsPageInner() {
 
         {/* ── User Memory ───────────────────────────────────────── */}
         <MemoryEditor />
+
+        {/* ── Top-up History ──────────────────────────────────── */}
+        <TopUpHistory />
 
         {/* ── Token usage chart ───────────────────────────────── */}
         <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">

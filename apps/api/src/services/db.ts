@@ -393,6 +393,27 @@ export async function recordPayment(
   );
 }
 
+export interface PaymentRecord {
+  id: string;
+  amount_usd: number;
+  tx_hash: string | null;
+  token: string | null;
+  payment_method: string;
+  created_at: string;
+}
+
+export async function getPaymentHistory(userId: string): Promise<PaymentRecord[]> {
+  const { rows } = await pool.query<PaymentRecord>(
+    `SELECT id, amount_usd::float, tx_hash, token, payment_method, created_at
+     FROM payments
+     WHERE user_id = $1 AND status = 'completed'
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [userId]
+  );
+  return rows;
+}
+
 // ─── Pinned Messages ───
 
 export interface PinnedMessageWithDetails {
