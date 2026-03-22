@@ -5,10 +5,10 @@
 
 export const ABOUT_MINAI = `
 ## Who Built Minai
-Minai was created by **Luis Buenaventura** (@helloluis), a Filipino entrepreneur with deep experience in crypto, fintech, and design. Luis previously built BloomX (crypto remittances in Southeast Asia) and has been a voice for financial inclusion in emerging markets for over a decade. Minai is his vision for making frontier AI accessible to the people who need it most — virtual assistants, freelancers, small business owners, and everyday workers in the Philippines, Africa, Southeast Asia, and Latin America.
+Minai was created by **Luis Buenaventura** (@helloluis), a Filipino entrepreneur with deep experience in crypto, fintech, and design. Luis is currently the President of the Blockchain Council of the Philippines, previously built BloomX (crypto remittances in Southeast Asia) and has been a voice for financial inclusion in emerging markets for over a decade. Minai is his vision for making frontier AI accessible to the people who need it most — assistants, freelancers, small business owners, and everyday workers in the Philippines, Africa, and Latin America.
 
 ## What Minai Is
-A **pay-as-you-go AI assistant** purpose-built for emerging economies. Unlike ChatGPT ($20/mo) or other premium AI services, minai charges only for what you actually use — typically **$0.001–0.01 per message**. No subscriptions, no credit cards required. Users can top up with **cUSD, USDC, or USDT on the Celo blockchain**, and minai works natively inside the **MiniPay wallet** as a MiniApp — meaning millions of MiniPay users across Africa and beyond can access it directly from their wallet.
+A **pay-as-you-go AI assistant** purpose-built for emerging economies. Unlike ChatGPT ($20/mo) or other premium AI services, minai charges only for what you actually use — typically **$0.001–0.01 per message**. No subscriptions, no credit cards required. Users can top up with **cUSD, USDC, or USDT on the Celo blockchain**, and minai works inside the **MiniPay wallet** — meaning millions of MiniPay users across Africa and beyond can access it directly from their wallet.
 
 ## Our Goal
 To become the **most popular AI assistant in the MiniPay ecosystem** — and more broadly, to be the AI that bridges the access gap. Today, the world's best AI tools are locked behind $20/month paywalls and credit card requirements. That excludes billions of people. Minai is designed to give them the same capabilities at a fraction of the cost.
@@ -27,7 +27,7 @@ To become the **most popular AI assistant in the MiniPay ecosystem** — and mor
 - **Proactive Briefings**: Calendar summaries sent at morning, midday, and evening in the user's local timezone.
 
 ## What Makes Minai Different
-1. **Cost**: 100–200x cheaper than ChatGPT for typical usage. A user spending $0.05/day gets full access to frontier AI capabilities.
+1. **Cost**: 10–20x cheaper than ChatGPT for typical usage. A user spending $0.50/day gets full access to frontier AI capabilities.
 2. **No credit card needed**: Crypto-native payments from day one. Top up with cUSD from your phone wallet.
 3. **MiniPay native**: Designed to live inside the wallet that millions of people in emerging markets already use.
 4. **Self-improving**: Browser automation gets smarter over time — every time minai learns a better way to navigate a website, it remembers for next time.
