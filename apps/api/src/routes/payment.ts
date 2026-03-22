@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getOrCreateDepositAddress, verifyDeposit, SUPPORTED_TOKENS } from '../services/wallet.js';
-import { addBalance, recordPayment, getBalance } from '../services/db.js';
+import { addBalance, recordPayment, getBalance, getUserById } from '../services/db.js';
 
 export default async function paymentRoutes(fastify: FastifyInstance) {
   // GET /api/payment/address — returns (or creates) the user's deposit address
@@ -43,11 +43,29 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
       await recordPayment(userId, deposit.amount_usd, 'deposit', deposit.tx_hash, 'celo', deposit.token);
 
       const balance = await getBalance(userId);
+      const newBalanceUsd = balance?.balance_usd ?? 0;
+
+      // Send receipt email if user has an email address (fire-and-forget)
+      getUserById(userId).then((user) => {
+        if (user?.email) {
+          import('../services/email.js').then(({ sendTopUpReceiptEmail }) => {
+            sendTopUpReceiptEmail({
+              userEmail: user.email!,
+              userName: user.display_name,
+              amountUsd: deposit.amount_usd,
+              token: deposit.token,
+              txHash: deposit.tx_hash,
+              newBalanceUsd,
+            }).catch(() => {});
+          });
+        }
+      });
+
       return {
         success: true,
         credited_usd: deposit.amount_usd,
         token: deposit.token,
-        new_balance_usd: balance?.balance_usd ?? 0,
+        new_balance_usd: newBalanceUsd,
       };
     }
   );

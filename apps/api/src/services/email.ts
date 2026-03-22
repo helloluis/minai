@@ -110,6 +110,60 @@ export async function sendIssueReportEmail(opts: {
   }
 }
 
+export async function sendTopUpReceiptEmail(opts: {
+  userEmail: string;
+  userName: string | null;
+  amountUsd: number;
+  token: string;
+  txHash: string;
+  newBalanceUsd: number;
+}): Promise<void> {
+  const { userEmail, userName, amountUsd, token, txHash, newBalanceUsd } = opts;
+  const greeting = userName ? `Hi ${escapeHtml(userName)}` : 'Hi there';
+  const celoscanUrl = `https://celoscan.io/tx/${txHash}`;
+
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 600px;">
+      <h2 style="color: #16a34a; margin-bottom: 8px;">Top-up received!</h2>
+      <p>${greeting}, thank you for topping up your minai account.</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Amount credited</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600;">$${amountUsd.toFixed(2)} (${escapeHtml(token)})</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Current balance</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 600;">$${newBalanceUsd.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #666;">Transaction</td>
+          <td style="padding: 8px 0; text-align: right;"><a href="${celoscanUrl}" style="color: #16a34a;">${txHash.slice(0, 10)}...${txHash.slice(-8)}</a></td>
+        </tr>
+      </table>
+      <p style="color: #666; font-size: 13px;">Your credits will be used automatically as you chat. You can check your balance anytime in the app.</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+      <p style="color: #888; font-size: 12px;">minai — <a href="https://minai.work" style="color: #16a34a;">minai.work</a></p>
+    </div>
+  `;
+
+  if (!resend) {
+    console.log(`[Email] Resend not configured — would have sent top-up receipt to ${userEmail}`);
+    return;
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: [userEmail],
+      subject: `[minai] Top-up received — $${amountUsd.toFixed(2)} credited`,
+      html,
+    });
+    console.log(`[Email] Top-up receipt sent to ${userEmail}`);
+  } catch (err) {
+    console.error('[Email] Failed to send top-up receipt:', err);
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
