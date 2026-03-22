@@ -40,7 +40,7 @@ function UsageChart({ data }: { data: DailyUsage[] }) {
 
   return (
     <div className="relative">
-      <div className="flex items-end gap-0.5 h-40">
+      <div className="flex gap-0.5 h-40">
         {days.map((day, i) => {
           const total = day.input + day.output;
           const heightPct = total / maxTokens;
@@ -51,13 +51,13 @@ function UsageChart({ data }: { data: DailyUsage[] }) {
           return (
             <div
               key={day.date}
-              className="flex-1 flex flex-col justify-end cursor-default group"
+              className="flex-1 flex flex-col justify-end cursor-default"
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
             >
               {/* Tooltip */}
               {isHovered && total > 0 && (
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10
+                <div className="absolute bottom-full mb-2 z-10
                   bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl pointer-events-none"
                   style={{ left: `${(i / days.length) * 100}%` }}
                 >
@@ -68,16 +68,14 @@ function UsageChart({ data }: { data: DailyUsage[] }) {
                 </div>
               )}
               {/* Stacked bar */}
-              <div className="flex flex-col justify-end w-full" style={{ height: '100%' }}>
-                <div
-                  className="w-full rounded-sm bg-minai-300 dark:bg-minai-300 transition-opacity"
-                  style={{ height: `${outputH * 100}%`, opacity: isHovered ? 1 : 0.75 }}
-                />
-                <div
-                  className="w-full rounded-sm bg-minai-600 dark:bg-minai-600 transition-opacity"
-                  style={{ height: `${inputH * 100}%`, opacity: isHovered ? 1 : 0.75 }}
-                />
-              </div>
+              <div
+                className="w-full rounded-sm bg-minai-300 transition-opacity"
+                style={{ height: `${outputH * 100}%`, minHeight: total > 0 ? 1 : 0, opacity: isHovered ? 1 : 0.75 }}
+              />
+              <div
+                className="w-full rounded-sm bg-minai-600 transition-opacity"
+                style={{ height: `${inputH * 100}%`, minHeight: total > 0 ? 1 : 0, opacity: isHovered ? 1 : 0.75 }}
+              />
             </div>
           );
         })}
@@ -167,9 +165,18 @@ function MemoryEditor() {
   );
 }
 
-// ─── Top-up History ──────────────────────────────────────────────────────────
+// ─── Transaction History (credits + daily debits) ───────────────────────────
 
-function TopUpHistory() {
+interface LedgerEntry {
+  type: 'credit' | 'debit';
+  date: Date;
+  amount: number;
+  label: string;
+  detail?: string;
+  txHash?: string | null;
+}
+
+function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -180,53 +187,80 @@ function TopUpHistory() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Merge credits and daily debits into a single timeline
+  const entries: LedgerEntry[] = [];
+
+  for (const p of payments) {
+    entries.push({
+      type: 'credit',
+      date: new Date(p.created_at),
+      amount: p.amount_usd,
+      label: p.payment_method === 'celo' ? `Top-up (${p.token ?? 'crypto'})` : 'Free credit',
+      txHash: p.tx_hash,
+    });
+  }
+
+  for (const d of dailyUsage) {
+    if (d.cost_usd > 0) {
+      const tokens = d.input_tokens + d.output_tokens;
+      entries.push({
+        type: 'debit',
+        date: new Date(d.date + 'T12:00:00'),
+        amount: d.cost_usd,
+        label: 'Usage',
+        detail: `${tokens.toLocaleString()} tokens (${d.message_count} messages)`,
+      });
+    }
+  }
+
+  entries.sort((a, b) => b.date.getTime() - a.date.getTime());
+
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-      <h2 className="font-semibold text-gray-100 mb-1">Top-up History</h2>
-      <p className="text-xs text-gray-500 mb-4">Your recent deposits and credits.</p>
+      <h2 className="font-semibold text-gray-100 mb-1">Transaction History</h2>
+      <p className="text-xs text-gray-500 mb-4">Credits and daily usage.</p>
 
       {loading ? (
         <div className="flex items-center justify-center h-20">
           <div className="w-5 h-5 border-2 border-minai-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : payments.length === 0 ? (
+      ) : entries.length === 0 ? (
         <div className="flex items-center justify-center h-20 text-gray-500 text-sm">
-          No top-ups yet.
+          No transactions yet.
         </div>
       ) : (
-        <div className="space-y-2">
-          {payments.map((p) => {
-            const date = new Date(p.created_at);
-            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-            const celoscanUrl = p.tx_hash ? `https://celoscan.io/tx/${p.tx_hash}` : null;
+        <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          {entries.map((e, i) => {
+            const dateStr = e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const isCredit = e.type === 'credit';
+            const celoscanUrl = e.txHash ? `https://celoscan.io/tx/${e.txHash}` : null;
+
             return (
-              <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/50">
+              <div key={i} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-800/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-900/40 flex items-center justify-center text-green-400 text-sm font-bold">
-                    +
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+                    ${isCredit ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
+                    {isCredit ? '+' : '-'}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-200">
-                      ${p.amount_usd.toFixed(2)}
-                      {p.token && <span className="text-gray-500 font-normal ml-1">({p.token})</span>}
+                    <div className="text-sm text-gray-200">
+                      {e.label}
+                      {celoscanUrl && (
+                        <a href={celoscanUrl} target="_blank" rel="noopener noreferrer"
+                          className="ml-1.5 text-xs text-minai-400 hover:text-minai-300">
+                          {e.txHash!.slice(0, 6)}...{e.txHash!.slice(-4)}
+                        </a>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {dateStr} at {timeStr}
+                      {dateStr}
+                      {e.detail && <span className="ml-1">— {e.detail}</span>}
                     </div>
                   </div>
                 </div>
-                {celoscanUrl && (
-                  <a
-                    href={celoscanUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-minai-400 hover:text-minai-300 transition-colors"
-                    title={p.tx_hash ?? ''}
-                  >
-                    {p.tx_hash!.slice(0, 6)}...{p.tx_hash!.slice(-4)}
-                  </a>
-                )}
+                <div className={`text-sm font-medium ${isCredit ? 'text-green-400' : 'text-gray-400'}`}>
+                  {isCredit ? '+' : '-'}${e.amount.toFixed(4)}
+                </div>
               </div>
             );
           })}
@@ -374,8 +408,8 @@ function SettingsPageInner() {
         {/* ── User Memory ───────────────────────────────────────── */}
         <MemoryEditor />
 
-        {/* ── Top-up History ──────────────────────────────────── */}
-        <TopUpHistory />
+        {/* ── Transaction History ──────────────────────────────── */}
+        <TransactionHistory dailyUsage={usage?.daily ?? []} />
 
         {/* ── Token usage chart ───────────────────────────────── */}
         <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
