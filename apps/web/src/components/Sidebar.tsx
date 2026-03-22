@@ -127,12 +127,27 @@ function NotebookRow({
               dark:border-minai-700 rounded px-1.5 py-0.5 outline-none text-gray-800 dark:text-gray-100"
           />
         ) : (
-          <span className={`flex-1 text-sm font-medium truncate
-            ${isActive ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}>
+          <span
+            onDoubleClick={startEditing}
+            className={`flex-1 text-sm font-medium truncate
+            ${isActive ? 'text-white' : 'text-gray-700 dark:text-gray-200'}`}
+            title="Double-click to rename"
+          >
             {displayTitle}
           </span>
         )}
 
+        {!editing && isActive && (
+          <button
+            onClick={startEditing}
+            className="p-1 rounded transition-colors flex-shrink-0 text-minai-200 hover:bg-minai-500"
+            title="Rename notebook"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        )}
         {!editing && (
           <button
             onClick={(e) => { e.stopPropagation(); onExpandNotes(); }}

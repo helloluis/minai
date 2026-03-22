@@ -1097,8 +1097,44 @@ async function createNotebook(userId: string, args: { title: string }): Promise<
   });
 }
 
+/** Convert markdown to HTML for Tiptap note editor */
+function markdownToHtml(md: string): string {
+  // Code blocks
+  const codeBlocks: string[] = [];
+  let html = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _l, code) => {
+    const i = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${code.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`);
+    return `\x00CB${i}\x00`;
+  });
+  const lines = html.split('\n');
+  const result: string[] = [];
+  let inList = false, tag = '';
+  for (const line of lines) {
+    if (line.includes('\x00CB')) { if (inList) { result.push(`</${tag}>`); inList = false; } const i = parseInt(line.match(/\x00CB(\d+)\x00/)?.[1] ?? '0'); result.push(codeBlocks[i]); continue; }
+    if (line.startsWith('### ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h3>${inlineMd(line.slice(4))}</h3>`); continue; }
+    if (line.startsWith('## ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h2>${inlineMd(line.slice(3))}</h2>`); continue; }
+    if (line.startsWith('# ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h1>${inlineMd(line.slice(2))}</h1>`); continue; }
+    if (/^\s*[-*]\s/.test(line)) { if (!inList || tag !== 'ul') { if (inList) result.push(`</${tag}>`); result.push('<ul>'); inList = true; tag = 'ul'; } result.push(`<li>${inlineMd(line.replace(/^\s*[-*]\s/, ''))}</li>`); continue; }
+    if (/^\s*\d+\.\s/.test(line)) { if (!inList || tag !== 'ol') { if (inList) result.push(`</${tag}>`); result.push('<ol>'); inList = true; tag = 'ol'; } result.push(`<li>${inlineMd(line.replace(/^\s*\d+\.\s/, ''))}</li>`); continue; }
+    if (inList) { result.push(`</${tag}>`); inList = false; }
+    if (!line.trim()) { result.push(''); continue; }
+    result.push(`<p>${inlineMd(line)}</p>`);
+  }
+  if (inList) result.push(`</${tag}>`);
+  return result.join('\n');
+}
+function inlineMd(t: string): string {
+  let s = t;
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  return s;
+}
+
 async function createNoteInNotebook(userId: string, args: { notebook_id: string; title: string; content: string }): Promise<string> {
-  const note = await db.createNote(args.notebook_id, userId, args.title, args.content);
+  const htmlContent = markdownToHtml(args.content);
+  const note = await db.createNote(args.notebook_id, userId, args.title, htmlContent);
   return JSON.stringify({
     success: true,
     note_id: note.id,
