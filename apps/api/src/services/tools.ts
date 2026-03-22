@@ -581,6 +581,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['url'],
     },
   },
+  {
+    name: 'browse_page_memory',
+    description: 'Save a learning about how to best browse a specific website domain. Call this after you discover a better URL, navigation path, or interaction pattern for a site. These learnings are automatically surfaced in future browse_web calls to the same domain. Example: "For philgeps.gov.ph, use /Indexes/index for keyword search instead of the homepage search form."',
+    parameters: {
+      type: 'object',
+      properties: {
+        domain: {
+          type: 'string',
+          description: 'The website domain (e.g. "philgeps.gov.ph", "sec.gov"). Do not include protocol or path.',
+        },
+        learning: {
+          type: 'string',
+          description: 'A concise, actionable tip about how to navigate or search this site effectively.',
+        },
+      },
+      required: ['domain', 'learning'],
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -1363,12 +1381,16 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
           ok: boolean; url?: string; title?: string; text?: string;
           links?: { text: string; href: string }[];
           forms?: { tag: string; type?: string; name?: string; id?: string; placeholder?: string; label?: string; selector: string }[];
+          memories?: string[];
           length?: number; error?: string;
           actions_performed?: string[];
         };
         if (!data.ok) {
           content = `Failed to browse ${browseUrl}: ${data.error ?? 'Unknown error'}`;
         } else {
+          const memoryTips = data.memories?.length
+            ? '\n\n**Domain tips (from previous learnings):**\n' + data.memories.map((m) => `- ${m}`).join('\n')
+            : '';
           const linkList = data.links?.length
             ? '\n\nLinks found on page:\n' + data.links.map((l) => `- [${l.text}](${l.href})`).join('\n')
             : '';
@@ -1381,10 +1403,34 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
           const actionLog = data.actions_performed?.length
             ? '\n\nActions performed: ' + data.actions_performed.join(' → ')
             : '';
-          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars${actionLog}\n\n${data.text}${linkList}${formList}`;
+          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars${actionLog}${memoryTips}\n\n${data.text}${linkList}${formList}`;
         }
       } catch (err) {
         content = `Browse failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+      break;
+    }
+
+    case 'browse_page_memory': {
+      const domain = (args.domain as string).replace(/^www\./, '').toLowerCase();
+      const learning = args.learning as string;
+      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
+      try {
+        const resp = await fetch(`${BROWSE_SERVICE_URL}/browse/memories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain, learning }),
+          signal: AbortSignal.timeout(5000),
+        });
+        const data = await resp.json() as { ok: boolean; id?: number; error?: string };
+        if (data.ok) {
+          content = `Saved browse tip for ${domain}: "${learning}"`;
+          console.log(`[Tools] Browse memory saved for ${domain}: "${learning.slice(0, 80)}"`);
+        } else {
+          content = `Failed to save browse tip: ${data.error ?? 'Unknown error'}`;
+        }
+      } catch (err) {
+        content = `Failed to save browse tip: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
       break;
     }

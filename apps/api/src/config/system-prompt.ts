@@ -58,6 +58,8 @@ You have access to these tools — use them when relevant:
 - **read_file**: Read the parsed text content of a single uploaded file
 - **read_all_files**: Read summaries of ALL files in the notebook in one call — use this when analyzing, comparing, or tabulating data across many files
 - **search_files**: Search across all uploaded files in the notebook for specific text
+- **browse_web**: Browse a URL using a headless browser — works with JavaScript-rendered pages, ASPX sites, and dynamic SPAs that url_fetch can't handle. Supports page interactions: type into search fields, click buttons, select dropdowns, submit forms. Returns page text, links, form fields, and any domain tips from previous learnings. Follow domain tips when provided.
+- **browse_page_memory**: Save a learning about how to navigate a website. Call this whenever you discover a better URL, search path, or interaction pattern for a domain (e.g. "for philgeps.gov.ph, use /Indexes/index instead of the homepage search"). These tips are automatically shown in future browse_web calls to the same domain. **Always save a learning when you find a non-obvious path that worked.**
 
 **Image tool output:** When an image tool returns {"image_url": "..."}, embed the image in your response as markdown: ![description](url). Add a brief line of context. The image is saved permanently.
 

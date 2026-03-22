@@ -1,9 +1,13 @@
 /**
- * Browse Service — Playwright + Chromium
+ * Browse Service — Playwright + Chromium + Domain Memories
  *
  * Thin HTTP wrapper around a headless Chromium browser.
- * Accepts POST /browse with { url, actions?, selector?, timeout? }
- * Returns { ok, url, title, text, links?, forms? } or { ok: false, error }.
+ *
+ * Endpoints:
+ *   POST /browse           — browse a URL with optional actions
+ *   GET  /browse/memories   — get learnings for a domain
+ *   POST /browse/memories   — save a learning for a domain
+ *   GET  /health            — health check
  *
  * Actions let callers interact with the page before extracting content:
  *   - { action: "type", selector, text }       — type into an input/textarea
@@ -14,15 +18,56 @@
  *   - { action: "select", selector, value }    — pick an <option> in a <select>
  *   - { action: "wait", selector, timeout? }   — wait for an element to appear
  *   - { action: "wait_ms", ms }                — sleep for N milliseconds
+ *
+ * Domain Memories:
+ *   The service maintains a SQLite database of per-domain learnings.
+ *   When /browse is called, any memories matching the URL's domain are
+ *   automatically included in the response so the LLM can use them.
  */
 
 import http from 'node:http';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import Database from 'better-sqlite3';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3100', 10);
 const MAX_TEXT_LENGTH = parseInt(process.env.MAX_TEXT_LENGTH ?? '30000', 10);
 const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT ?? '15000', 10);
 const MAX_ACTIONS = 20;
+
+// ─── SQLite: Domain Memories ───
+
+const db = new Database(join(__dirname, 'browse_memories.db'));
+db.pragma('journal_mode = WAL');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS browse_page_memories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain TEXT NOT NULL,
+    learning TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_browse_memories_domain ON browse_page_memories (domain);
+`);
+
+const stmtGetMemories = db.prepare('SELECT id, domain, learning, created_at FROM browse_page_memories WHERE domain = ? ORDER BY created_at ASC');
+const stmtInsertMemory = db.prepare('INSERT INTO browse_page_memories (domain, learning) VALUES (?, ?)');
+const stmtAllMemories = db.prepare('SELECT id, domain, learning, created_at FROM browse_page_memories ORDER BY domain, created_at ASC');
+const stmtDeleteMemory = db.prepare('DELETE FROM browse_page_memories WHERE id = ?');
+
+function extractDomain(url) {
+  try {
+    return new URL(url.startsWith('http') ? url : 'https://' + url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function getMemoriesForDomain(domain) {
+  return stmtGetMemories.all(domain);
+}
 
 // ─── Persistent browser instance ───
 
@@ -244,11 +289,16 @@ async function browse(url, actions, selector, timeout) {
 
       const extracted = await extractPage(page, selector);
 
+      // Look up domain memories
+      const domain = extractDomain(url);
+      const memories = domain ? getMemoriesForDomain(domain) : [];
+
       return {
         ok: true,
         url: page.url(),
         ...extracted,
         actions_performed: actionLog.length > 0 ? actionLog : undefined,
+        memories: memories.length > 0 ? memories.map((m) => m.learning) : undefined,
       };
     } finally {
       await page.close().catch(() => {});
@@ -258,65 +308,109 @@ async function browse(url, actions, selector, timeout) {
   }
 }
 
+// ─── Route helpers ───
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => resolve(body));
+  });
+}
+
+function json(res, status, data) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+function parseUrl(reqUrl) {
+  return new URL(reqUrl, 'http://localhost');
+}
+
 // ─── HTTP server ───
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === 'GET' && req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, engine: 'playwright-chromium' }));
+  const parsed = parseUrl(req.url);
+  const path = parsed.pathname;
+
+  // ── Health check ──
+  if (req.method === 'GET' && path === '/health') {
+    const memCount = db.prepare('SELECT COUNT(*) AS n FROM browse_page_memories').get();
+    return json(res, 200, { ok: true, engine: 'playwright-chromium', memories: memCount.n });
+  }
+
+  // ── GET /browse/memories?domain=... ──
+  if (req.method === 'GET' && path === '/browse/memories') {
+    const domain = parsed.searchParams.get('domain');
+    if (domain) {
+      const memories = getMemoriesForDomain(domain.replace(/^www\./, ''));
+      return json(res, 200, { ok: true, domain, memories });
+    }
+    // No domain filter → return all
+    const all = stmtAllMemories.all();
+    return json(res, 200, { ok: true, memories: all });
+  }
+
+  // ── POST /browse/memories ──
+  if (req.method === 'POST' && path === '/browse/memories') {
+    const body = await readBody(req);
+    let data;
+    try { data = JSON.parse(body); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+
+    const { domain, learning } = data;
+    if (!domain || !learning) return json(res, 400, { ok: false, error: 'Missing "domain" and "learning"' });
+
+    const cleanDomain = domain.replace(/^www\./, '').toLowerCase();
+    const result = stmtInsertMemory.run(cleanDomain, learning);
+    console.log(`[Memory] Saved for ${cleanDomain}: "${learning.slice(0, 80)}"`);
+    return json(res, 201, { ok: true, id: result.lastInsertRowid, domain: cleanDomain, learning });
+  }
+
+  // ── DELETE /browse/memories/:id ──
+  if (req.method === 'DELETE' && path.startsWith('/browse/memories/')) {
+    const id = parseInt(path.split('/').pop(), 10);
+    if (isNaN(id)) return json(res, 400, { ok: false, error: 'Invalid ID' });
+    stmtDeleteMemory.run(id);
+    return json(res, 200, { ok: true, deleted: id });
+  }
+
+  // ── POST /browse ──
+  if (req.method === 'POST' && path === '/browse') {
+    const body = await readBody(req);
+    let data;
+    try { data = JSON.parse(body); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+
+    const { url, actions, selector, timeout } = data;
+    if (!url || typeof url !== 'string') return json(res, 400, { ok: false, error: 'Missing "url" field' });
+
+    const callerIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ts = new Date().toISOString();
+    const startMs = Date.now();
+    const actionSummary = actions?.length ? ` | ${actions.length} actions` : '';
+
+    console.log(`[Browse] ${ts} | ${callerIp} | REQ ${url}${actionSummary}${selector ? ` (${selector})` : ''}`);
+
+    try {
+      const result = await browse(url, actions || [], selector || null, timeout || DEFAULT_TIMEOUT);
+      const elapsed = Date.now() - startMs;
+      json(res, 200, result);
+      const memTag = result.memories?.length ? ` | ${result.memories.length} memories` : '';
+      console.log(`[Browse] ${ts} | ${callerIp} | OK  ${url} | ${result.length} chars | ${elapsed}ms${memTag}`);
+    } catch (err) {
+      const elapsed = Date.now() - startMs;
+      console.error(`[Browse] ${ts} | ${callerIp} | ERR ${url} | ${err.message} | ${elapsed}ms`);
+      json(res, 500, { ok: false, error: err.message || 'Browse failed' });
+    }
     return;
   }
 
-  if (req.method !== 'POST' || req.url !== '/browse') {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Not found' }));
-    return;
-  }
-
-  let body = '';
-  for await (const chunk of req) body += chunk;
-
-  let parsed;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
-    return;
-  }
-
-  const { url, actions, selector, timeout } = parsed;
-  if (!url || typeof url !== 'string') {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'Missing "url" field' }));
-    return;
-  }
-
-  const callerIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const ts = new Date().toISOString();
-  const startMs = Date.now();
-  const actionSummary = actions?.length ? ` | ${actions.length} actions` : '';
-
-  console.log(`[Browse] ${ts} | ${callerIp} | REQ ${url}${actionSummary}${selector ? ` (${selector})` : ''}`);
-
-  try {
-    const result = await browse(url, actions || [], selector || null, timeout || DEFAULT_TIMEOUT);
-    const elapsed = Date.now() - startMs;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(result));
-    console.log(`[Browse] ${ts} | ${callerIp} | OK  ${url} | ${result.length} chars | ${elapsed}ms`);
-  } catch (err) {
-    const elapsed = Date.now() - startMs;
-    console.error(`[Browse] ${ts} | ${callerIp} | ERR ${url} | ${err.message} | ${elapsed}ms`);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: err.message || 'Browse failed' }));
-  }
+  json(res, 404, { ok: false, error: 'Not found' });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Browse] HTTP server listening on port ${PORT} (Playwright + Chromium)`);
+  console.log(`[Browse] HTTP server listening on port ${PORT} (Playwright + Chromium + Memories)`);
 });
 
 // Graceful shutdown
-process.on('SIGINT', async () => { await browser?.close(); process.exit(0); });
-process.on('SIGTERM', async () => { await browser?.close(); process.exit(0); });
+process.on('SIGINT', async () => { db.close(); await browser?.close(); process.exit(0); });
+process.on('SIGTERM', async () => { db.close(); await browser?.close(); process.exit(0); });
