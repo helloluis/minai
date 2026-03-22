@@ -117,7 +117,15 @@ export default function NotebookChatPage() {
     hasRestoredScroll.current = false;
   }, [notebookId]);
 
-  // Auto-scroll to bottom only if user is near the bottom (during streaming)
+  // When user sends a message (streaming starts), force scroll to bottom
+  useEffect(() => {
+    if (isStreaming) {
+      isNearBottomRef.current = true;
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isStreaming]);
+
+  // Auto-scroll to bottom during streaming if user hasn't scrolled away
   useEffect(() => {
     if (!hasRestoredScroll.current) return; // don't fight the restore
     if (isNearBottomRef.current) {
