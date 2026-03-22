@@ -56,10 +56,27 @@ export function BalanceBar() {
   const toggleSidebar = useChatStore((s) => s.toggleSidebar);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
+  const [usageStats, setUsageStats] = useState<{ today_cost: number; today_messages: number; total_cost: number } | null>(null);
 
   const balance = Number(session?.balance?.balance_usd ?? 0);
   const freeCredit = Number(session?.balance?.free_credit_usd ?? 0);
   const displayName = session?.user?.display_name;
+
+  // Fetch usage stats when tooltip opens
+  useEffect(() => {
+    if (!showTooltip) return;
+    import('@/lib/api').then(({ getUsage }) => {
+      getUsage(30).then((data) => {
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const todayData = data.daily.find((d) => d.date === todayKey);
+        setUsageStats({
+          today_cost: todayData?.cost_usd ?? 0,
+          today_messages: todayData?.message_count ?? 0,
+          total_cost: data.totals.total_cost,
+        });
+      }).catch(() => {});
+    });
+  }, [showTooltip]);
 
   // Total available = free credit + paid balance
   const totalAvailable = freeCredit + balance;
@@ -157,6 +174,25 @@ export function BalanceBar() {
                   <span className="font-medium">${balance.toFixed(2)}</span>
                 </div>
               )}
+
+              {/* Usage stats */}
+              {usageStats && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+                  <div className="flex justify-between mb-1">
+                    <span className="text-gray-500">Today</span>
+                    <span className="font-medium">
+                      ${Number(usageStats.today_cost).toFixed(4)}
+                      <span className="text-gray-500 font-normal ml-1">({usageStats.today_messages} msgs)</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">All-time spent</span>
+                    <span className="font-medium">${Number(usageStats.total_cost).toFixed(4)}</span>
+                  </div>
+                </>
+              )}
+
               {freeCredit > 0 && balance === 0 && (
                 <div className="text-gray-400 mt-1.5">
                   After free credit is used, top up to continue.
