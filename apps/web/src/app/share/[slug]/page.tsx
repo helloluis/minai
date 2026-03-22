@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { decorateHtml } from '@/lib/decorator';
 
@@ -92,6 +93,14 @@ function inl(text: string): string {
   s = s.replace(/\x00IC(\d+)\x00/g, (_m, i) => codes[parseInt(i)]);
   s = s.replace(/\x00LK(\d+)\x00/g, (_m, i) => links[parseInt(i)]);
   return s;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPost(slug);
+  return {
+    title: post ? `${post.title} | minai — AI for the rest of us` : 'minai — AI for the rest of us',
+  };
 }
 
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
