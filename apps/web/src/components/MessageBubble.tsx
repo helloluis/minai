@@ -264,22 +264,26 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
       id={`message-${message.id}`}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}
     >
-      {/* Logo + actions for assistant messages */}
+      {/* Logo for assistant messages */}
       {!isUser && (
-        <div className="flex-shrink-0 mr-1.5 self-start mt-1 flex flex-col items-center gap-1">
+        <div className="flex-shrink-0 mr-1.5 self-start mt-1">
           <MinaiLogo className="w-6 h-6" />
-          <MessageActions message={message} previousUserMessage={previousUserMessage} />
         </div>
       )}
 
       <div
-        className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
+        className={`relative max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
           ${isUser
             ? 'bg-minai-600 text-white rounded-br-md message-bubble-user'
             : 'bg-gray-100 dark:bg-gray-800 rounded-bl-md'
           }`}
       >
-        {/* Model badge removed — icon now in footer */}
+        {/* Actions menu — upper right, visible on hover */}
+        {!isUser && (
+          <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <MessageActions message={message} previousUserMessage={previousUserMessage} />
+          </div>
+        )}
 
         {/* Attached images */}
         {message.images && message.images.length > 0 && (

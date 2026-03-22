@@ -18,6 +18,10 @@ export const authPlugin = fp(async function authPlugin(fastify: FastifyInstance)
     if (publicPrefixes.some(p => request.url.startsWith(p))) {
       return;
     }
+    // Public GET for shared posts
+    if (request.method === 'GET' && request.url.startsWith('/api/share/')) {
+      return;
+    }
 
     const sessionToken = request.cookies?.session;
     if (!sessionToken) {

@@ -239,6 +239,22 @@ export interface PaymentRecord {
 
 export const getPayments = () => fetchAPI<PaymentRecord[]>('/api/settings/payments');
 
+// Share
+export interface ShareResponse {
+  ok: boolean;
+  slug: string;
+  title: string;
+  content: string;
+  url: string;
+  already_shared?: boolean;
+}
+
+export const createShare = (messageId: string) =>
+  fetchAPI<ShareResponse>('/api/share', {
+    method: 'POST',
+    body: JSON.stringify({ message_id: messageId }),
+  });
+
 // Streaming
 export function streamMessage(
   conversationId: string,
