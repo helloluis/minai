@@ -168,7 +168,7 @@ function MemoryEditor() {
 // ─── Transaction History (credits + daily debits) ───────────────────────────
 
 interface LedgerEntry {
-  type: 'credit' | 'debit';
+  type: 'credit' | 'debit' | 'grant';
   date: Date;
   amount: number;
   label: string;
@@ -191,11 +191,12 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
   const entries: LedgerEntry[] = [];
 
   for (const p of payments) {
+    const isRealTopUp = p.payment_method === 'celo';
     entries.push({
-      type: 'credit',
+      type: isRealTopUp ? 'credit' : 'grant',
       date: new Date(p.created_at),
       amount: p.amount_usd,
-      label: p.payment_method === 'celo' ? `Top-up (${p.token ?? 'crypto'})` : 'Free credit',
+      label: isRealTopUp ? `Top-up (${p.token ?? 'crypto'})` : 'Free credit',
       txHash: p.tx_hash,
     });
   }
@@ -233,6 +234,7 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
           {entries.map((e, i) => {
             const dateStr = e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const isCredit = e.type === 'credit';
+            const isDebit = e.type === 'debit';
             const celoscanUrl = e.txHash ? `https://celoscan.io/tx/${e.txHash}` : null;
 
             return (
@@ -240,7 +242,7 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
                 <div className="flex items-center gap-3">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
                     ${isCredit ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
-                    {isCredit ? '+' : '-'}
+                    {isDebit ? '-' : '+'}
                   </div>
                   <div>
                     <div className="text-sm text-gray-200">
@@ -259,7 +261,7 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
                   </div>
                 </div>
                 <div className={`text-sm font-medium ${isCredit ? 'text-green-400' : 'text-gray-400'}`}>
-                  {isCredit ? '+' : '-'}${e.amount.toFixed(4)}
+                  {isDebit ? '-' : '+'}${e.amount.toFixed(4)}
                 </div>
               </div>
             );
