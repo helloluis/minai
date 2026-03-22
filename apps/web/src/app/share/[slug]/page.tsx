@@ -8,7 +8,7 @@ interface SharedPost {
 }
 
 async function getPost(slug: string): Promise<SharedPost | null> {
-  const apiBase = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiBase = process.env.INTERNAL_API_URL || 'http://localhost:3006';
   try {
     const res = await fetch(`${apiBase}/api/share/${slug}`, { cache: 'no-store' });
     if (!res.ok) return null;

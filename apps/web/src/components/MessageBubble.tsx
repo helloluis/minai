@@ -272,18 +272,12 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
       )}
 
       <div
-        className={`relative max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
+        className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
           ${isUser
             ? 'bg-minai-600 text-white rounded-br-md message-bubble-user'
             : 'bg-gray-100 dark:bg-gray-800 rounded-bl-md'
           }`}
       >
-        {/* Actions menu — upper right, visible on hover */}
-        {!isUser && (
-          <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            <MessageActions message={message} previousUserMessage={previousUserMessage} />
-          </div>
-        )}
 
         {/* Attached images */}
         {message.images && message.images.length > 0 && (
@@ -374,6 +368,13 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
           );
         })()}
       </div>
+
+      {/* Actions — outside bubble, always visible */}
+      {!isUser && (
+        <div className="flex-shrink-0 ml-1 self-start mt-1">
+          <MessageActions message={message} previousUserMessage={previousUserMessage} />
+        </div>
+      )}
     </div>
     </>
   );
