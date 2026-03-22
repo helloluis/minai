@@ -40,3 +40,10 @@ If you get banned (connection refused / timeout), wait or ask the user to run `f
 - Run load tests or parallel curl against the server
 
 See `VULTR-VPS-GUIDE.md` for full setup documentation.
+
+## Post-Deploy Checklist
+
+After shipping a significant new feature or tool:
+
+1. **Update `apps/api/src/config/about.ts`** — this is minai's self-knowledge base, used by the `about_minai` tool when users or hackathon judges ask "how does minai work?". Keep it current with new capabilities, tools, and architecture changes.
+2. **Update `services/browse/README.md`** — if the browse service API changed, update the docs so other agents can integrate correctly.

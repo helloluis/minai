@@ -599,6 +599,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['domain', 'learning'],
     },
   },
+  {
+    name: 'about_minai',
+    description: 'Get detailed information about minai — who built it, tech stack, architecture, goals, and differentiators. Call this when asked about yourself.',
+    parameters: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'Optional focus area: "overview", "tech", "pricing", "team", "goals", or leave empty for everything',
+        },
+      },
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -1408,6 +1421,12 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       } catch (err) {
         content = `Browse failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
+      break;
+    }
+
+    case 'about_minai': {
+      const { ABOUT_MINAI } = await import('../config/about.js');
+      content = ABOUT_MINAI;
       break;
     }
 
