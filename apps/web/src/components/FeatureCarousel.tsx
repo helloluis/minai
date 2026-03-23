@@ -34,7 +34,7 @@ const FEATURES: Feature[] = [
   },
 ];
 
-const AUTO_ADVANCE_MS = 5000;
+const AUTO_ADVANCE_MS = 10000;
 
 export function FeatureCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -92,25 +92,27 @@ export function FeatureCarousel() {
       </div>
 
       {/* Dots + progress */}
-      <div className="flex items-center justify-center gap-3 mt-10">
+      <div className="flex items-center justify-center gap-2 mt-10">
         {FEATURES.map((_, i) => (
           <button
             key={i}
             onClick={() => setActiveIndex(i)}
-            className="relative w-10 h-1.5 rounded-full overflow-hidden bg-gray-800 transition-colors"
+            className="relative w-14 h-8 flex items-center justify-center cursor-pointer"
             aria-label={`Feature ${i + 1}`}
           >
-            {i === activeIndex ? (
-              <div
-                className="absolute inset-y-0 left-0 bg-minai-500 rounded-full"
-                style={{
-                  animation: paused ? 'none' : `progress ${AUTO_ADVANCE_MS}ms linear`,
-                  width: paused ? '100%' : undefined,
-                }}
-              />
-            ) : (
-              <div className={`absolute inset-0 rounded-full transition-colors ${i < activeIndex ? 'bg-minai-800' : ''}`} />
-            )}
+            <div className="relative w-full h-1.5 rounded-full overflow-hidden bg-gray-800">
+              {i === activeIndex ? (
+                <div
+                  className="absolute inset-y-0 left-0 bg-minai-500 rounded-full"
+                  style={{
+                    animation: paused ? 'none' : `progress ${AUTO_ADVANCE_MS}ms linear`,
+                    width: paused ? '100%' : undefined,
+                  }}
+                />
+              ) : (
+                <div className={`absolute inset-0 rounded-full transition-colors ${i < activeIndex ? 'bg-minai-800' : ''}`} />
+              )}
+            </div>
           </button>
         ))}
       </div>
