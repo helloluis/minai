@@ -228,12 +228,18 @@ async function buildMessages(
   systemPrompt += `\n\n## Current Date & Time\nRight now it is **${userDate}** at **${userTime}** (${tz}). Always use this when the user references "today", "tomorrow", "yesterday", "this week", etc.`;
 
   // Inject auth context so the LLM knows what's available
-  if (user?.wallet_address && !user?.google_id) {
-    systemPrompt += `\n\n## User Auth Context\nThis user signed in via **MiniPay wallet** (${user.wallet_address.slice(0, 6)}...${user.wallet_address.slice(-4)}). They do NOT have Google connected, so calendar tools are unavailable. If they ask about calendar features, let them know they can connect Google from Settings to unlock calendar management. Top-up is extra easy for them since they're already in a wallet — just mention topping up with cUSD.`;
-  } else if (user?.google_id && !user?.wallet_address) {
-    systemPrompt += `\n\n## User Auth Context\nThis user signed in via **Google**. Calendar tools are available.`;
-  } else if (user?.google_id && user?.wallet_address) {
-    systemPrompt += `\n\n## User Auth Context\nThis user has both **Google** and **wallet** (${user.wallet_address.slice(0, 6)}...${user.wallet_address.slice(-4)}) connected. All features including calendar are available.`;
+  const hasGoogle = !!user?.google_id;
+  const hasWallet = !!user?.wallet_address;
+  const hasMicrosoft = !!(await db.getMicrosoftTokens(userId));
+  const calProviders = [hasGoogle ? 'Google' : '', hasMicrosoft ? 'Microsoft Teams' : ''].filter(Boolean);
+  const calStatus = calProviders.length > 0
+    ? `Calendar tools are available via **${calProviders.join(' and ')}**.`
+    : 'No calendar connected. The user can connect Google Calendar or Microsoft Teams Calendar from Settings.';
+
+  if (hasWallet && !hasGoogle) {
+    systemPrompt += `\n\n## User Auth Context\nThis user signed in via **MiniPay wallet** (${user!.wallet_address!.slice(0, 6)}...${user!.wallet_address!.slice(-4)}). ${calStatus} Top-up is easy since they're already in a wallet.`;
+  } else {
+    systemPrompt += `\n\n## User Auth Context\n${calStatus}`;
   }
 
   if (memories.length > 0) {

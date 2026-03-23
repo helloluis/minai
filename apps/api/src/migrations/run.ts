@@ -44,6 +44,7 @@ async function migrate() {
       '022_user_wallet_address.sql',
       '023_shared_posts.sql',
       '024_coupon_codes.sql',
+      '025_microsoft_tokens.sql',
     ];
 
     for (const migration of migrations) {

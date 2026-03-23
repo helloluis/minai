@@ -3,6 +3,7 @@
  */
 
 import * as gcal from './google-calendar.js';
+import * as mscal from './microsoft-calendar.js';
 import * as db from './db.js';
 import * as imageGen from './image-gen.js';
 import { PRICING } from '../config/pricing.js';
@@ -981,10 +982,21 @@ async function urlFetch(args: { url: string }): Promise<string> {
   }
 }
 
+// ─── Calendar provider detection ─────────────────────────────────────────────
+
+async function getCalendarProvider(userId: string): Promise<{ provider: 'google' | 'microsoft'; mod: typeof gcal | typeof mscal }> {
+  const googleTokens = await db.getGoogleTokens(userId);
+  if (googleTokens) return { provider: 'google', mod: gcal };
+  const msTokens = await db.getMicrosoftTokens(userId);
+  if (msTokens) return { provider: 'microsoft', mod: mscal };
+  throw new Error('No calendar is connected. Ask the user to go to Settings and connect Google Calendar or Microsoft Calendar.');
+}
+
 // ─── Calendar tool executors ──────────────────────────────────────────────────
 
 async function calendarListCalendars(userId: string): Promise<string> {
-  const calendars = await gcal.listCalendars(userId);
+  const { mod } = await getCalendarProvider(userId);
+  const calendars = await mod.listCalendars(userId);
   if (calendars.length === 0) return 'No calendars found.';
 
   const lines = calendars.map((c) => {
@@ -997,7 +1009,8 @@ async function calendarListCalendars(userId: string): Promise<string> {
 }
 
 async function calendarGetEvents(userId: string, args: Record<string, unknown>): Promise<string> {
-  const events = await gcal.getEvents({
+  const { mod } = await getCalendarProvider(userId);
+  const events = await mod.getEvents({
     userId,
     calendarId: args.calendar_id as string,
     startDate: args.start_date as string,
@@ -1028,7 +1041,8 @@ async function calendarCreateEvent(userId: string, args: Record<string, unknown>
   }
   if (!timezone) timezone = 'UTC';
 
-  const result = await gcal.createEvent({
+  const { mod } = await getCalendarProvider(userId);
+  const result = await mod.createEvent({
     userId,
     calendarId: args.calendar_id as string,
     title: args.title as string,
@@ -1044,7 +1058,8 @@ async function calendarCreateEvent(userId: string, args: Record<string, unknown>
 }
 
 async function calendarUpdateEvent(userId: string, args: Record<string, unknown>): Promise<string> {
-  const result = await gcal.updateEvent({
+  const { mod } = await getCalendarProvider(userId);
+  const result = await mod.updateEvent({
     userId,
     calendarId: args.calendar_id as string,
     eventId: args.event_id as string,
@@ -1061,7 +1076,8 @@ async function calendarUpdateEvent(userId: string, args: Record<string, unknown>
 }
 
 async function calendarDeleteEvent(userId: string, args: Record<string, unknown>): Promise<string> {
-  await gcal.deleteEvent({
+  const { mod } = await getCalendarProvider(userId);
+  await mod.deleteEvent({
     userId,
     calendarId: args.calendar_id as string,
     eventId: args.event_id as string,
@@ -1070,7 +1086,8 @@ async function calendarDeleteEvent(userId: string, args: Record<string, unknown>
 }
 
 async function calendarFindFreeSlots(userId: string, args: Record<string, unknown>): Promise<string> {
-  const slots = await gcal.findFreeSlots({
+  const { mod } = await getCalendarProvider(userId);
+  const slots = await mod.findFreeSlots({
     userId,
     calendarIds: args.calendar_ids as string[],
     date: args.date as string,

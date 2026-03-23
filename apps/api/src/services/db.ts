@@ -634,6 +634,52 @@ export async function getGoogleTokens(userId: string): Promise<GoogleTokens | nu
   return rows[0] ?? null;
 }
 
+// ─── Microsoft Tokens ────────────────────────────────────────────────────────
+
+export interface MicrosoftTokens {
+  access_token: string;
+  refresh_token: string | null;
+  token_expiry: string | null;
+  microsoft_id: string | null;
+  email: string | null;
+  display_name: string | null;
+}
+
+export async function saveMicrosoftTokens(
+  userId: string,
+  accessToken: string,
+  refreshToken: string | null,
+  tokenExpiry: Date | null,
+  microsoftId: string | null,
+  email: string | null,
+  displayName: string | null,
+): Promise<void> {
+  await pool.query(`
+    INSERT INTO microsoft_tokens (user_id, access_token, refresh_token, token_expiry, microsoft_id, email, display_name, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+    ON CONFLICT (user_id) DO UPDATE SET
+      access_token = EXCLUDED.access_token,
+      refresh_token = COALESCE(EXCLUDED.refresh_token, microsoft_tokens.refresh_token),
+      token_expiry = EXCLUDED.token_expiry,
+      microsoft_id = COALESCE(EXCLUDED.microsoft_id, microsoft_tokens.microsoft_id),
+      email = COALESCE(EXCLUDED.email, microsoft_tokens.email),
+      display_name = COALESCE(EXCLUDED.display_name, microsoft_tokens.display_name),
+      updated_at = now()
+  `, [userId, accessToken, refreshToken, tokenExpiry, microsoftId, email, displayName]);
+}
+
+export async function getMicrosoftTokens(userId: string): Promise<MicrosoftTokens | null> {
+  const { rows } = await pool.query<MicrosoftTokens>(
+    `SELECT access_token, refresh_token, token_expiry, microsoft_id, email, display_name FROM microsoft_tokens WHERE user_id = $1`,
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteMicrosoftTokens(userId: string): Promise<void> {
+  await pool.query('DELETE FROM microsoft_tokens WHERE user_id = $1', [userId]);
+}
+
 // ─── Notebook-Calendar associations ──────────────────────────────────────────
 
 export interface CalendarAssociation {

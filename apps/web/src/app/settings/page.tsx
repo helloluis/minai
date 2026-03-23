@@ -293,6 +293,95 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
   );
 }
 
+// ─── Microsoft Calendar ──────────────────────────────────────────────────────
+
+function MicrosoftCalendarSection() {
+  const [status, setStatus] = useState<{ connected: boolean; email: string | null; display_name: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/auth/microsoft/status', { credentials: 'include' })
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setStatus({ connected: false, email: null, display_name: null }))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDisconnect = async () => {
+    await fetch('/api/auth/microsoft/disconnect', { method: 'POST', credentials: 'include' });
+    setStatus({ connected: false, email: null, display_name: null });
+  };
+
+  if (loading) return null;
+
+  return (
+    <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+          <svg className="w-6 h-6" viewBox="0 0 24 24">
+            <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+            <rect x="13" y="1" width="10" height="10" fill="#7FBA00"/>
+            <rect x="1" y="13" width="10" height="10" fill="#00A4EF"/>
+            <rect x="13" y="13" width="10" height="10" fill="#FFB900"/>
+          </svg>
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-semibold text-gray-100">Microsoft Teams Calendar</h2>
+            {status?.connected && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                bg-green-900/50 border border-green-700 text-green-400 text-xs font-medium">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                </svg>
+                Connected
+              </span>
+            )}
+          </div>
+
+          {status?.connected ? (
+            <>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div>
+                  {status.display_name && <div className="text-sm font-medium text-gray-200">{status.display_name}</div>}
+                  {status.email && <div className="text-xs text-gray-400">{status.email}</div>}
+                </div>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-700
+                  text-gray-500 text-xs hover:border-red-800 hover:text-red-400 transition-colors"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-400 mb-4">
+                Connect your Microsoft account to manage Teams meetings, Outlook calendar events,
+                and check availability — all from minai.
+              </p>
+              <button
+                onClick={() => window.location.href = '/api/auth/microsoft'}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-gray-50
+                  text-gray-800 text-sm font-medium transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                  <rect x="13" y="1" width="10" height="10" fill="#7FBA00"/>
+                  <rect x="1" y="13" width="10" height="10" fill="#00A4EF"/>
+                  <rect x="13" y="13" width="10" height="10" fill="#FFB900"/>
+                </svg>
+                Connect Microsoft Calendar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function SettingsPageInner() {
@@ -427,6 +516,9 @@ function SettingsPageInner() {
             </div>
           </div>
         </section>
+
+        {/* ── Microsoft Calendar ─────────────────────────────── */}
+        <MicrosoftCalendarSection />
 
         {/* ── User Memory ───────────────────────────────────────── */}
         <MemoryEditor />

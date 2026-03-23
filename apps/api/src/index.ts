@@ -18,6 +18,7 @@ import { googleAuthRoutes } from './routes/google-auth.js';
 import paymentRoutes from './routes/payment.js';
 import { fileRoutes } from './routes/files.js';
 import { shareRoutes } from './routes/share.js';
+import { microsoftAuthRoutes } from './routes/microsoft-auth.js';
 import multipart from '@fastify/multipart';
 
 const port = parseInt(process.env.API_PORT || '3001');
@@ -89,6 +90,7 @@ async function start() {
   await fastify.register(paymentRoutes);
   await fastify.register(fileRoutes);
   await fastify.register(shareRoutes);
+  await fastify.register(microsoftAuthRoutes);
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
