@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getDepositAddress, verifyDeposit, type DepositAddress } from '@/lib/api';
+import { getDepositAddress, verifyDeposit, redeemCoupon, type DepositAddress } from '@/lib/api';
 import { useChatStore } from '@/hooks/useChatStore';
 import {
   detectWallet,
@@ -18,7 +18,7 @@ interface Props {
 
 type Step = 'loading' | 'ready' | 'verifying' | 'success' | 'error';
 type WalletStatus = 'idle' | 'connecting' | 'switching' | 'confirming' | 'sent' | 'verifying';
-type Tab = 'wallet' | 'manual';
+type Tab = 'wallet' | 'manual' | 'coupon';
 
 const PRESET_AMOUNTS = ['1', '2', '5', '10'];
 
@@ -194,6 +194,16 @@ export function TopUpModal({ onClose }: Props) {
                 >
                   Manual Deposit
                 </button>
+                <button
+                  onClick={() => { setTab('coupon'); setErrorMsg(''); }}
+                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                    tab === 'coupon'
+                      ? 'bg-minai-600 text-white'
+                      : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Coupon Code
+                </button>
               </div>
               {tab === 'wallet' && (
                 <div className="flex justify-center">
@@ -301,6 +311,17 @@ export function TopUpModal({ onClose }: Props) {
                 </div>
               )}
 
+              {/* ── Coupon tab ─────────────────────────────────────── */}
+              {tab === 'coupon' && (
+                <CouponTab
+                  onSuccess={(amount, balance) => {
+                    setCredited({ amount, token: 'coupon', balance });
+                    refreshSession();
+                    setStep('success');
+                  }}
+                />
+              )}
+
               {/* ── Manual tab ─────────────────────────────────────── */}
               {tab === 'manual' && (
                 <div className="space-y-4">
@@ -383,7 +404,7 @@ export function TopUpModal({ onClose }: Props) {
                 ${credited.amount.toFixed(2)} credited
               </div>
               <div className="text-sm text-gray-500">
-                {credited.token} deposit confirmed on Celo
+                {credited.token === 'coupon' ? 'Coupon code redeemed!' : `${credited.token} deposit confirmed on Celo`}
               </div>
               <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
                 New balance: ${credited.balance.toFixed(2)}
@@ -411,6 +432,64 @@ export function TopUpModal({ onClose }: Props) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CouponTab({ onSuccess }: { onSuccess: (amount: number, balance: number) => void }) {
+  const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleRedeem = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 12) { setError('Coupon codes are 12 characters or fewer'); return; }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const result = await redeemCoupon(trimmed);
+      onSuccess(result.credited_usd, result.new_balance_usd);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to redeem coupon');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Enter a coupon code to add credits to your account.
+      </p>
+
+      <div>
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(''); }}
+          placeholder="Enter code"
+          maxLength={12}
+          disabled={submitting}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700
+            bg-white dark:bg-gray-800 text-center text-lg font-mono tracking-widest uppercase
+            placeholder-gray-300 dark:placeholder-gray-600
+            focus:outline-none focus:ring-2 focus:ring-minai-500 disabled:opacity-50"
+          onKeyDown={(e) => { if (e.key === 'Enter') handleRedeem(); }}
+        />
+      </div>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      <button
+        onClick={handleRedeem}
+        disabled={!code.trim() || submitting}
+        className="w-full py-2.5 rounded-xl bg-minai-600 hover:bg-minai-700 text-white text-sm
+          font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+      >
+        {submitting ? <><Spinner /> Redeeming…</> : 'Redeem Code'}
+      </button>
     </div>
   );
 }

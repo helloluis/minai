@@ -43,6 +43,7 @@ async function migrate() {
       '021_message_tool_cost.sql',
       '022_user_wallet_address.sql',
       '023_shared_posts.sql',
+      '024_coupon_codes.sql',
     ];
 
     for (const migration of migrations) {

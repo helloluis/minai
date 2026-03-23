@@ -143,6 +143,11 @@ export const verifyDeposit = (tx_hash: string) =>
     '/api/payment/verify',
     { method: 'POST', body: JSON.stringify({ tx_hash }) }
   );
+export const redeemCoupon = (code: string) =>
+  fetchAPI<{ success: boolean; code: string; credited_usd: number; new_balance_usd: number }>(
+    '/api/payment/coupon',
+    { method: 'POST', body: JSON.stringify({ code }) }
+  );
 
 // Files
 export interface NotebookFile {

@@ -190,7 +190,7 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
   // Merge credits and daily debits into a single timeline
   const entries: LedgerEntry[] = [];
 
-  // Group free credits by day, keep real top-ups as individual rows
+  // Group free credits by day, keep real top-ups and coupons as individual rows
   const grantsByDay = new Map<string, number>();
   for (const p of payments) {
     if (p.payment_method === 'celo') {
@@ -200,6 +200,13 @@ function TransactionHistory({ dailyUsage }: { dailyUsage: DailyUsage[] }) {
         amount: p.amount_usd,
         label: `Top-up (${p.token ?? 'crypto'})`,
         txHash: p.tx_hash,
+      });
+    } else if (p.payment_method === 'coupon') {
+      entries.push({
+        type: 'credit',
+        date: new Date(p.created_at),
+        amount: p.amount_usd,
+        label: 'Coupon code',
       });
     } else {
       const dayKey = new Date(p.created_at).toISOString().slice(0, 10);
