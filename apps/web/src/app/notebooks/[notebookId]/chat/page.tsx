@@ -63,7 +63,7 @@ export default function NotebookChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  const [viewingFile, setViewingFile] = useState<{ id: string; display_name: string; mime_type: string; conversation_id: string } | null>(null);
+  const [viewingFile, setViewingFile] = useState<api.NotebookFile | null>(null);
   // Track whether user has manually scrolled away from bottom
   const isNearBottomRef = useRef(true);
 
@@ -98,14 +98,7 @@ export default function NotebookChatPage() {
     if (generatedFileId && notebookId) {
       api.getFiles(notebookId).then((files) => {
         const file = files.find((f) => f.id === generatedFileId);
-        if (file) {
-          setViewingFile({
-            id: file.id,
-            display_name: file.display_name,
-            mime_type: file.mime_type,
-            conversation_id: notebookId,
-          });
-        }
+        if (file) setViewingFile(file);
       }).catch(console.error);
       useChatStore.setState({ generatedFileId: null });
     }
@@ -237,7 +230,7 @@ export default function NotebookChatPage() {
       {/* Auto-opened FileViewer for generated documents */}
       {viewingFile && (
         <FileViewer
-          file={{ ...viewingFile, original_name: viewingFile.display_name, parse_status: 'done' as const, file_size: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }}
+          file={viewingFile}
           conversationId={notebookId}
           onClose={() => setViewingFile(null)}
         />

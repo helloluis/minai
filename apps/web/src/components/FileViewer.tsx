@@ -193,6 +193,6 @@ export function getFileIcon(mimeType: string): string {
   if (mimeType === 'application/pdf') return '📕';
   if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') return '📘';
   if (mimeType.startsWith('image/')) return '🖼️';
-  if (mimeType === 'text/csv') return '📊';
+  if (mimeType.includes('spreadsheetml') || mimeType === 'text/csv') return '📊';
   return '📄';
 }

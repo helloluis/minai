@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { readFile } from 'fs/promises';
 import * as mammoth from 'mammoth';
+import ExcelJS from 'exceljs';
 import * as db from '../services/db.js';
 import { storeFile, getFullPath } from '../services/file-store.js';
 import { parseFileContent } from '../services/file-parser.js';
@@ -173,6 +174,34 @@ export async function fileRoutes(fastify: FastifyInstance) {
           return { type: 'html', content: result.value };
         }
 
+        // XLSX → render as HTML table
+        if (
+          file.mime_type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ) {
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.readFile(fullPath);
+
+          const htmlParts: string[] = [];
+          workbook.eachSheet((sheet) => {
+            htmlParts.push(`<h3 style="margin:16px 0 8px;font-size:14px;">${escapeHtml(sheet.name)}</h3>`);
+            htmlParts.push('<table style="border-collapse:collapse;width:100%;font-size:13px;">');
+            sheet.eachRow((row, rowNumber) => {
+              htmlParts.push('<tr>');
+              row.eachCell({ includeEmpty: true }, (cell) => {
+                const tag = rowNumber === 1 ? 'th' : 'td';
+                const style = rowNumber === 1
+                  ? 'background:#2E7D32;color:white;padding:6px 10px;text-align:left;font-weight:600;border:1px solid #ddd;'
+                  : `padding:6px 10px;border:1px solid #e0e0e0;${rowNumber % 2 === 0 ? 'background:#f9f9f9;' : ''}`;
+                htmlParts.push(`<${tag} style="${style}">${escapeHtml(String(cell.value ?? ''))}</${tag}>`);
+              });
+              htmlParts.push('</tr>');
+            });
+            htmlParts.push('</table>');
+          });
+
+          return { type: 'html', content: htmlParts.join('') };
+        }
+
         // Plain text family → raw content
         if (
           file.mime_type === 'text/plain' ||
@@ -196,4 +225,8 @@ export async function fileRoutes(fastify: FastifyInstance) {
       }
     }
   );
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
