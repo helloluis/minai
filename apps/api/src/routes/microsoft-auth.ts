@@ -125,10 +125,32 @@ export async function microsoftAuthRoutes(fastify: FastifyInstance) {
   // GET /api/auth/microsoft/status — check if Microsoft is connected
   fastify.get('/api/auth/microsoft/status', async (request) => {
     const tokens = await db.getMicrosoftTokens(request.user.id);
+    if (!tokens) return { connected: false, email: null, display_name: null };
+
+    // Backfill profile if missing (may have failed during initial OAuth)
+    if (!tokens.email && !tokens.display_name) {
+      try {
+        const profileRes = await fetch(`${GRAPH_URL}/me`, {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        if (profileRes.ok) {
+          const profile = await profileRes.json() as {
+            id: string; mail?: string; userPrincipalName?: string; displayName?: string;
+          };
+          const email = profile.mail || profile.userPrincipalName || null;
+          const name = profile.displayName || null;
+          if (email || name) {
+            await db.saveMicrosoftTokens(request.user.id, tokens.access_token, tokens.refresh_token, null, profile.id, email, name);
+            return { connected: true, email, display_name: name };
+          }
+        }
+      } catch { /* ignore — return what we have */ }
+    }
+
     return {
-      connected: !!tokens,
-      email: tokens?.email ?? null,
-      display_name: tokens?.display_name ?? null,
+      connected: true,
+      email: tokens.email ?? null,
+      display_name: tokens.display_name ?? null,
     };
   });
 

@@ -342,18 +342,31 @@ function MicrosoftCalendarSection() {
           {status?.connected ? (
             <>
               <div className="flex items-center gap-2.5 mb-4">
+                {/* Microsoft icon as avatar placeholder */}
+                <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {(status.display_name ?? 'M').charAt(0).toUpperCase()}
+                </div>
                 <div>
                   {status.display_name && <div className="text-sm font-medium text-gray-200">{status.display_name}</div>}
                   {status.email && <div className="text-xs text-gray-400">{status.email}</div>}
                 </div>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-700
-                  text-gray-500 text-xs hover:border-red-800 hover:text-red-400 transition-colors"
-              >
-                Disconnect
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.location.href = '/api/auth/microsoft'}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-700
+                    text-gray-400 text-xs hover:border-gray-600 hover:text-gray-300 transition-colors"
+                >
+                  Re-authorize
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-700
+                    text-gray-500 text-xs hover:border-red-800 hover:text-red-400 transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
             </>
           ) : (
             <>
