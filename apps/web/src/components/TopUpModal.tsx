@@ -182,7 +182,7 @@ export function TopUpModal({ onClose }: Props) {
                       : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
-                  Top up with MiniPay
+                  Pay with MiniPay
                 </button>
                 <button
                   onClick={() => { setTab('manual'); setErrorMsg(''); }}
