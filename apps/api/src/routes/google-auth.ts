@@ -148,8 +148,7 @@ export async function googleAuthRoutes(fastify: FastifyInstance) {
   });
 
   // POST /api/auth/google/disconnect — remove Google tokens
-  fastify.post('/api/auth/google/disconnect', async (request, reply) => {
-    if (!request.user?.id) return reply.code(401).send({ error: 'Not authenticated' });
+  fastify.post('/api/auth/google/disconnect', async (request) => {
     await db.saveGoogleTokens(request.user.id, '__disconnected__', null, null, null);
     // Clear by deleting instead
     await db.pool.query(

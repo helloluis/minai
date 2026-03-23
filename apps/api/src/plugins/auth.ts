@@ -14,7 +14,9 @@ export const authPlugin = fp(async function authPlugin(fastify: FastifyInstance)
 
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip auth for public routes
-    const publicPrefixes = ['/api/auth/login', '/api/auth/wallet', '/api/health', '/api/auth/google', '/api/uploads/'];
+    const publicPrefixes = ['/api/auth/login', '/api/auth/wallet', '/api/health', '/api/auth/google/callback', '/api/uploads/'];
+    // Also allow the Google OAuth redirect (exact match)
+    if (request.url === '/api/auth/google' || request.url.startsWith('/api/auth/google?')) return;
     if (publicPrefixes.some(p => request.url.startsWith(p))) {
       return;
     }
