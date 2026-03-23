@@ -555,6 +555,22 @@ export function Sidebar() {
     }
   }, [activeConversationId]);
 
+  // Refresh files + notes when a file may have been generated (streaming ends)
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const prevStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming && activeConversationId) {
+      // Streaming just ended — refresh files and notes
+      api.getFiles(activeConversationId).then(files => {
+        setFilesByConv(prev => ({ ...prev, [activeConversationId]: files }));
+      }).catch(console.error);
+      api.getNotes(activeConversationId).then(notes => {
+        setNotesByConv(prev => ({ ...prev, [activeConversationId]: notes }));
+      }).catch(console.error);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming, activeConversationId]);
+
   // Scroll to targetNoteId when sidebar is expanded
   useEffect(() => {
     if (!targetNoteId || sidebarWidth !== 'expanded') return;
