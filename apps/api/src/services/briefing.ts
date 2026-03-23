@@ -8,6 +8,7 @@
 
 import * as db from './db.js';
 import * as gcal from './google-calendar.js';
+import * as mscal from './microsoft-calendar.js';
 
 // Briefing schedule: [hour, minute, label, lookAheadHours]
 const BRIEFING_TIMES = [
@@ -54,52 +55,70 @@ async function sendBriefing(
   user: db.BriefingUser,
   bt: { label: string; lookAhead: number },
 ) {
-  // Fetch ALL the user's sub-calendars from Google
-  let calendars: gcal.CalendarEntry[];
-  try {
-    calendars = await gcal.listCalendars(user.id);
-  } catch (err) {
-    console.error(`[Briefing] Failed to list calendars for user ${user.id}:`, err);
-    return;
-  }
-
-  // Only include calendars the user owns or has write access to (skip "reader" shared ones
-  // that are just other people's calendars they subscribed to — unless explicitly linked)
-  const associations = await db.getCalendarAssociations(user.id);
-  const linkedIds = new Set(associations.map((a) => a.calendar_id));
-  const relevantCalendars = calendars.filter(
-    (c) => c.accessRole === 'owner' || linkedIds.has(c.id)
-  );
-
-  if (relevantCalendars.length === 0) return;
-
   // Compute time window
   const now = new Date();
   const startISO = now.toISOString();
   const endDate = new Date(now.getTime() + bt.lookAhead * 60 * 60 * 1000);
   const endISO = endDate.toISOString();
 
-  // Fetch events from each calendar separately (preserves grouping)
   const calendarGroups: CalendarEvents[] = [];
   let totalEvents = 0;
 
-  for (const cal of relevantCalendars) {
-    try {
-      const events = await gcal.getEvents({
-        userId: user.id,
-        calendarId: cal.id,
-        startDate: startISO,
-        endDate: endISO,
-        maxResults: 30,
-      });
-      if (events.length > 0) {
-        calendarGroups.push({ calendarName: cal.name, events });
-        totalEvents += events.length;
+  // ── Google Calendar ──
+  try {
+    const googleCalendars = await gcal.listCalendars(user.id);
+    const associations = await db.getCalendarAssociations(user.id);
+    const linkedIds = new Set(associations.map((a) => a.calendar_id));
+    const relevantGoogle = googleCalendars.filter(
+      (c) => c.accessRole === 'owner' || linkedIds.has(c.id)
+    );
+
+    for (const cal of relevantGoogle) {
+      try {
+        const events = await gcal.getEvents({
+          userId: user.id,
+          calendarId: cal.id,
+          startDate: startISO,
+          endDate: endISO,
+          maxResults: 30,
+        });
+        if (events.length > 0) {
+          calendarGroups.push({ calendarName: cal.name, events });
+          totalEvents += events.length;
+        }
+      } catch (err) {
+        console.error(`[Briefing] Failed to fetch Google calendar ${cal.id} for user ${user.id}:`, err);
       }
-    } catch (err) {
-      console.error(`[Briefing] Failed to fetch calendar ${cal.id} for user ${user.id}:`, err);
     }
+  } catch {
+    // Google not connected or token expired — skip silently
   }
+
+  // ── Microsoft Calendar ──
+  try {
+    const msCalendars = await mscal.listCalendars(user.id);
+    for (const cal of msCalendars) {
+      try {
+        const events = await mscal.getEvents({
+          userId: user.id,
+          calendarId: cal.id,
+          startDate: startISO,
+          endDate: endISO,
+          maxResults: 30,
+        });
+        if (events.length > 0) {
+          calendarGroups.push({ calendarName: `${cal.name} (Teams)`, events });
+          totalEvents += events.length;
+        }
+      } catch (err) {
+        console.error(`[Briefing] Failed to fetch Microsoft calendar ${cal.id} for user ${user.id}:`, err);
+      }
+    }
+  } catch {
+    // Microsoft not connected or token expired — skip silently
+  }
+
+  if (calendarGroups.length === 0 && totalEvents === 0) return;
 
   // Format and deliver
   const content = formatBriefing(user, bt.label, calendarGroups, totalEvents, user.timezone);
