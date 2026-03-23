@@ -629,7 +629,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         content: {
           type: 'string',
-          description: 'For DOCX and PDF: the content in markdown format. For XLSX: a JSON string with { "headers": ["col1", "col2"], "rows": [["val1", "val2"], ...] }',
+          description: 'For DOCX and PDF: the content in markdown format. For XLSX: a JSON string. Single sheet: { "headers": [...], "rows": [[...], ...] }. Multiple sheets/tabs: { "sheets": [{ "name": "Sheet1", "headers": [...], "rows": [[...], ...] }, ...] }. When a message has multiple tables, combine them into one spreadsheet with separate tabs.',
         },
       },
       required: ['format', 'title', 'content'],
@@ -1524,14 +1524,18 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
         let result;
 
         if (format === 'xlsx') {
-          let data: { headers: string[]; rows: (string | number)[][] };
+          let parsed: Record<string, unknown>;
           try {
-            data = JSON.parse(docContent);
+            parsed = JSON.parse(docContent);
           } catch {
-            content = 'Invalid XLSX data format. Provide JSON with { "headers": [...], "rows": [[...], ...] }';
+            content = 'Invalid XLSX data format. Provide JSON with { "headers": [...], "rows": [[...], ...] } or { "sheets": [...] }';
             break;
           }
-          result = await generateXlsx(docTitle, data, userId, conversationId);
+          // Normalize to multi-sheet format
+          const sheets = (parsed as { sheets?: unknown }).sheets
+            ? (parsed as { sheets: { name: string; headers: string[]; rows: (string | number)[][] }[] }).sheets
+            : [{ name: docTitle.slice(0, 31), headers: (parsed as { headers: string[] }).headers, rows: (parsed as { rows: (string | number)[][] }).rows }];
+          result = await generateXlsx(docTitle, sheets, userId, conversationId);
         } else if (format === 'pdf') {
           result = await generatePdf(docTitle, docContent, userId, conversationId);
         } else {

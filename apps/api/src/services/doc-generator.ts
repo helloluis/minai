@@ -305,7 +305,7 @@ export async function generateDocx(
 
 export async function generateXlsx(
   title: string,
-  data: { headers: string[]; rows: (string | number)[][] },
+  sheets: { name: string; headers: string[]; rows: (string | number)[][] }[],
   userId: string,
   conversationId: string,
 ): Promise<GenerateDocResult> {
@@ -313,48 +313,52 @@ export async function generateXlsx(
   workbook.creator = 'minai.work';
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet(title.slice(0, 31)); // Excel sheet name max 31 chars
+  for (const sheetData of sheets) {
+    // Excel sheet name: max 31 chars, no special chars
+    const sheetName = sheetData.name.replace(/[\\/*?[\]:]/g, '').slice(0, 31) || 'Sheet';
+    const sheet = workbook.addWorksheet(sheetName);
 
-  // Header row
-  const headerRow = sheet.addRow(data.headers);
-  headerRow.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
-  headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    // Header row
+    const headerRow = sheet.addRow(sheetData.headers);
+    headerRow.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-  // Data rows
-  for (const row of data.rows) {
-    const excelRow = sheet.addRow(row);
-    excelRow.font = { size: 11 };
-  }
-
-  // Auto-width columns
-  sheet.columns.forEach((col) => {
-    let maxLen = 10;
-    col.eachCell?.({ includeEmpty: false }, (cell) => {
-      const len = String(cell.value ?? '').length;
-      if (len > maxLen) maxLen = Math.min(len, 50);
-    });
-    col.width = maxLen + 2;
-  });
-
-  // Alternating row colors
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber > 1 && rowNumber % 2 === 0) {
-      row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+    // Data rows
+    for (const row of sheetData.rows) {
+      const excelRow = sheet.addRow(row);
+      excelRow.font = { size: 11 };
     }
-  });
 
-  // Borders
-  sheet.eachRow((row) => {
-    row.eachCell((cell) => {
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-        left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-        bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-        right: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-      };
+    // Auto-width columns
+    sheet.columns.forEach((col) => {
+      let maxLen = 10;
+      col.eachCell?.({ includeEmpty: false }, (cell) => {
+        const len = String(cell.value ?? '').length;
+        if (len > maxLen) maxLen = Math.min(len, 50);
+      });
+      col.width = maxLen + 2;
     });
-  });
+
+    // Alternating row colors
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1 && rowNumber % 2 === 0) {
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+      }
+    });
+
+    // Borders
+    sheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+          right: { style: 'thin', color: { argb: 'FFE0E0E0' } },
+        };
+      });
+    });
+  }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -362,7 +366,7 @@ export async function generateXlsx(
   const { storagePath } = await storeFile(userId, buffer, fileName);
   const file = await createNotebookFile(conversationId, userId, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer.length, storagePath);
 
-  console.log(`[DocGen] XLSX created: ${fileName} (${buffer.length} bytes)`);
+  console.log(`[DocGen] XLSX created: ${fileName} (${sheets.length} sheets, ${buffer.length} bytes)`);
   return { fileId: file.id, fileName, mimeType: file.mime_type, fileSize: buffer.length, conversationId };
 }
 
