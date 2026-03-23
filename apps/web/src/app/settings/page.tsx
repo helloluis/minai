@@ -469,6 +469,21 @@ function SettingsPageInner() {
           )}
         </section>
 
+        {/* ── Log out ─────────────────────────────────────────── */}
+        <div className="flex justify-center pt-4 pb-8">
+          <button
+            onClick={() => {
+              document.cookie = 'session=; path=/; max-age=0';
+              useChatStore.getState().logout();
+              router.push('/');
+            }}
+            className="px-6 py-2.5 rounded-xl border border-gray-700 text-gray-500 text-sm
+              hover:border-red-800 hover:text-red-400 transition-colors"
+          >
+            Log out
+          </button>
+        </div>
+
       </div>
     </div>
   );
