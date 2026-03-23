@@ -482,6 +482,8 @@ function SettingsPageInner() {
             onClick={() => {
               document.cookie = 'session=; path=/; max-age=0';
               useChatStore.getState().logout();
+              // Clear persisted Zustand store to prevent stale auth state
+              try { localStorage.removeItem('minai-chat'); } catch {}
               router.push('/');
             }}
             className="px-6 py-2.5 rounded-xl border border-gray-700 text-gray-500 text-sm
