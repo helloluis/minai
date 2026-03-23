@@ -41,6 +41,7 @@ interface ChatState {
   sidebarWidth: 'closed' | 'normal' | 'expanded';
   pendingNavigation: string | null;
   targetNoteId: string | null;
+  generatedFileId: string | null;
 
   // Pinned Messages
   pinnedMessages: PinnedMessageWithDetails[];
@@ -97,6 +98,7 @@ export const useChatStore = create<ChatState>()(
       sidebarWidth: 'closed' as const,
       pendingNavigation: null,
       targetNoteId: null,
+      generatedFileId: null,
       pinnedMessages: [],
       pinnedMenuOpen: false,
 
@@ -260,9 +262,10 @@ export const useChatStore = create<ChatState>()(
                 break;
               }
               case 'action': {
-                const actions = chunk.actions as { navigate?: string; open_sidebar?: boolean } | undefined;
+                const actions = chunk.actions as { navigate?: string; open_sidebar?: boolean; file_generated?: { file_id: string } } | undefined;
                 if (actions?.navigate) set({ pendingNavigation: actions.navigate });
                 if (actions?.open_sidebar) set((s) => ({ sidebarWidth: s.sidebarWidth === 'closed' ? 'normal' : s.sidebarWidth }));
+                if (actions?.file_generated) set({ generatedFileId: actions.file_generated.file_id });
                 break;
               }
               case 'done':

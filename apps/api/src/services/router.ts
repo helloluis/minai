@@ -540,9 +540,10 @@ export async function* streamResponse(
         // Emit action chunks for frontend directives embedded in tool results
         try {
           const parsed = JSON.parse(toolResult.content);
-          const actions: { navigate?: string; open_sidebar?: boolean } = {};
+          const actions: Record<string, unknown> = {};
           if (parsed.__navigate__) actions.navigate = parsed.__navigate__;
           if (parsed.__open_sidebar__) actions.open_sidebar = true;
+          if (parsed.file_id) actions.file_generated = { file_id: parsed.file_id, file_name: parsed.file_name };
           if (Object.keys(actions).length > 0) {
             yield { type: 'action', actions };
           }

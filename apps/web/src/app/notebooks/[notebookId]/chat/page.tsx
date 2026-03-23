@@ -11,6 +11,8 @@ import { ThinkingBlock } from '@/components/ThinkingBlock';
 import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
 import { GuestBanner } from '@/components/GuestBanner';
+import { FileViewer } from '@/components/FileViewer';
+import * as api from '@/lib/api';
 
 function AnimatedDots() {
   return (
@@ -55,11 +57,13 @@ export default function NotebookChatPage() {
     sidebarWidth,
     pendingNavigation,
     setPendingNavigation,
+    generatedFileId,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [viewingFile, setViewingFile] = useState<{ id: string; display_name: string; mime_type: string; conversation_id: string } | null>(null);
   // Track whether user has manually scrolled away from bottom
   const isNearBottomRef = useRef(true);
 
@@ -88,6 +92,24 @@ export default function NotebookChatPage() {
       router.push(pendingNavigation);
     }
   }, [pendingNavigation, setPendingNavigation, router]);
+
+  // Auto-open FileViewer when a document is generated
+  useEffect(() => {
+    if (generatedFileId && notebookId) {
+      api.getFiles(notebookId).then((files) => {
+        const file = files.find((f) => f.id === generatedFileId);
+        if (file) {
+          setViewingFile({
+            id: file.id,
+            display_name: file.display_name,
+            mime_type: file.mime_type,
+            conversation_id: notebookId,
+          });
+        }
+      }).catch(console.error);
+      useChatStore.setState({ generatedFileId: null });
+    }
+  }, [generatedFileId, notebookId]);
 
   // Restore saved scroll position on load, or zip to bottom
   const hasRestoredScroll = useRef(false);
@@ -211,6 +233,15 @@ export default function NotebookChatPage() {
       <GuestBanner />
       <Sidebar />
       <PinnedMessagesMenu />
+
+      {/* Auto-opened FileViewer for generated documents */}
+      {viewingFile && (
+        <FileViewer
+          file={{ ...viewingFile, original_name: viewingFile.display_name, parse_status: 'done' as const, file_size: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }}
+          conversationId={notebookId}
+          onClose={() => setViewingFile(null)}
+        />
+      )}
 
       <div
         ref={scrollContainerRef}

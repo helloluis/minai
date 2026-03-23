@@ -612,6 +612,29 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: 'generate_document',
+    description: 'Generate a downloadable document file (DOCX, XLSX, or PDF) from content you produced. The file is saved to the current notebook and automatically opened for the user. Use this when the user asks to export, download, or save your response as a document. For XLSX, provide structured data with headers and rows. For DOCX and PDF, provide the content as markdown.',
+    parameters: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          enum: ['docx', 'xlsx', 'pdf'],
+          description: 'The document format to generate',
+        },
+        title: {
+          type: 'string',
+          description: 'Document title (used as filename and displayed in the document header)',
+        },
+        content: {
+          type: 'string',
+          description: 'For DOCX and PDF: the content in markdown format. For XLSX: a JSON string with { "headers": ["col1", "col2"], "rows": [["val1", "val2"], ...] }',
+        },
+      },
+      required: ['format', 'title', 'content'],
+    },
+  },
 ];
 
 // ─── Binance API Endpoints ───
@@ -1486,6 +1509,47 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
         }
       } catch (err) {
         content = `Failed to save browse tip: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      }
+      break;
+    }
+
+    case 'generate_document': {
+      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+      const format = args.format as 'docx' | 'xlsx' | 'pdf';
+      const docTitle = args.title as string;
+      const docContent = args.content as string;
+
+      try {
+        const { generateDocx, generateXlsx, generatePdf } = await import('./doc-generator.js');
+        let result;
+
+        if (format === 'xlsx') {
+          let data: { headers: string[]; rows: (string | number)[][] };
+          try {
+            data = JSON.parse(docContent);
+          } catch {
+            content = 'Invalid XLSX data format. Provide JSON with { "headers": [...], "rows": [[...], ...] }';
+            break;
+          }
+          result = await generateXlsx(docTitle, data, userId, conversationId);
+        } else if (format === 'pdf') {
+          result = await generatePdf(docTitle, docContent, userId, conversationId);
+        } else {
+          result = await generateDocx(docTitle, docContent, userId, conversationId);
+        }
+
+        content = JSON.stringify({
+          success: true,
+          file_id: result.fileId,
+          file_name: result.fileName,
+          format,
+          file_size: result.fileSize,
+          __open_sidebar__: true,
+        });
+        console.log(`[Tools] Generated ${format.toUpperCase()}: ${result.fileName} (${result.fileSize} bytes)`);
+      } catch (err) {
+        content = `Document generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        console.error('[Tools] Document generation error:', err);
       }
       break;
     }
