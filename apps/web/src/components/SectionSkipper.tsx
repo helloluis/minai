@@ -29,7 +29,7 @@ export const SectionSkipper = memo(function SectionSkipper({
     >
       <div
         className="pointer-events-auto flex flex-col items-center"
-        style={{ width: 16, marginLeft: -8 }}
+        style={{ width: 16, marginLeft: 4 }}
       >
         <div className="relative flex flex-col items-center">
           {/* Continuous vertical line */}
