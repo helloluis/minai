@@ -59,7 +59,7 @@ export const SectionSkipper = memo(function SectionSkipper({
                   style={{
                     width: 16,
                     height: 16,
-                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                    backgroundColor: '#22c55e',
                     border: '2.5px solid #22c55e',
                   }}
                 />
