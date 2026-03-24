@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 interface SectionSkipperState {
   currentSection: number;
   skipperVisible: boolean;
+  avatarCenterX: number; // px from left edge of scroll container
   scrollToSection: (section: number) => void;
 }
 
@@ -16,6 +17,7 @@ export function useSectionSkipper(
 ): SectionSkipperState {
   const [currentSection, setCurrentSection] = useState(0);
   const [skipperVisible, setSkipperVisible] = useState(false);
+  const [avatarCenterX, setAvatarCenterX] = useState(0);
   const rafRef = useRef<number>(0);
   const activeMessageRef = useRef<HTMLElement | null>(null);
 
@@ -42,12 +44,8 @@ export function useSectionSkipper(
 
     for (const msg of assistantMessages) {
       const rect = msg.getBoundingClientRect();
-      const msgHeight = rect.height;
+      if (rect.height <= viewportHeight) continue;
 
-      // Only consider messages taller than the viewport
-      if (msgHeight <= viewportHeight) continue;
-
-      // Calculate overlap with the viewport (container bounds)
       const overlapTop = Math.max(rect.top, containerRect.top);
       const overlapBottom = Math.min(rect.bottom, containerRect.bottom);
       const overlap = Math.max(0, overlapBottom - overlapTop);
@@ -66,7 +64,7 @@ export function useSectionSkipper(
 
     activeMessageRef.current = bestMessage;
 
-    // Calculate scroll progress within this message
+    // Calculate scroll progress
     const msgRect = bestMessage.getBoundingClientRect();
     const scrollableDistance = msgRect.height - viewportHeight;
     if (scrollableDistance <= 0) {
@@ -79,9 +77,16 @@ export function useSectionSkipper(
 
     setCurrentSection(section);
     setSkipperVisible(true);
+
+    // Find the avatar position relative to the scroll container
+    const avatar = bestMessage.querySelector('.minai-logo-avatar');
+    if (avatar) {
+      const avatarRect = avatar.getBoundingClientRect();
+      setAvatarCenterX(avatarRect.left - containerRect.left + avatarRect.width / 2);
+    }
   }, [scrollContainerRef, isStreaming]);
 
-  // Scroll listener with rAF throttling
+  // Scroll listener — fires on every scroll event via rAF
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -92,9 +97,7 @@ export function useSectionSkipper(
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
-    // Also listen for resize
     window.addEventListener('resize', onScroll, { passive: true });
-    // Initial check with a delay to let messages render
     const timer = setTimeout(() => requestAnimationFrame(update), 500);
 
     return () => {
@@ -105,19 +108,17 @@ export function useSectionSkipper(
     };
   }, [scrollContainerRef, update]);
 
-  // Hide during streaming, re-check when streaming ends
+  // Hide during streaming, re-check when it ends
   useEffect(() => {
     if (isStreaming) {
       setSkipperVisible(false);
     } else {
-      // Re-check after streaming ends and messages settle
       const timer = setTimeout(() => requestAnimationFrame(update), 1000);
       return () => clearTimeout(timer);
     }
   }, [isStreaming, update]);
 
   const scrollToSection = useCallback((section: number) => {
-    // Immediately update the active dot
     setCurrentSection(section);
 
     const container = scrollContainerRef.current;
@@ -135,5 +136,5 @@ export function useSectionSkipper(
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
 
-  return { currentSection, skipperVisible, scrollToSection };
+  return { currentSection, skipperVisible, avatarCenterX, scrollToSection };
 }
