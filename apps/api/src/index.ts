@@ -1,5 +1,14 @@
 import './env.js'; // Load .env.local before anything else
 
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: 'https://03c94e3a4e5ca9d7cd5bb1b2722e12b0@o4511097194414080.ingest.de.sentry.io/4511097210929232',
+  environment: process.env.NODE_ENV ?? 'production',
+  tracesSampleRate: 0.1,
+  enabled: process.env.NODE_ENV !== 'test',
+});
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
@@ -91,6 +100,13 @@ async function start() {
   await fastify.register(fileRoutes);
   await fastify.register(shareRoutes);
   await fastify.register(microsoftAuthRoutes);
+
+  // Capture unhandled errors to Sentry
+  fastify.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+    Sentry.captureException(error, { extra: { url: request.url, method: request.method } });
+    fastify.log.error(error);
+    reply.status(error.statusCode ?? 500).send({ error: error.message ?? 'Internal Server Error' });
+  });
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
