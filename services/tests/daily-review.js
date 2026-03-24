@@ -201,14 +201,15 @@ ${conversationTexts.join('\n\n---\n\n')}`;
 // ─── Email ───
 
 async function sendReport(analysis, sampleCount) {
+  const bodyHtml = markdownToHtml(analysis);
   const html = `
-    <div style="font-family: -apple-system, sans-serif; max-width: 650px;">
+    <div style="font-family: -apple-system, sans-serif; max-width: 650px; color: #333;">
       <h2 style="color: #16a34a; margin-bottom: 4px;">minai Daily Conversation Review</h2>
       <p style="color: #888; font-size: 13px; margin-top: 0;">${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} — ${sampleCount} conversation(s) sampled</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
-      <div style="font-size: 14px; line-height: 1.6; color: #333; white-space: pre-wrap;">${escapeHtml(analysis)}</div>
+      <div style="font-size: 14px; line-height: 1.7;">${bodyHtml}</div>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
-      <p style="color: #888; font-size: 12px;">Automated daily review — minai.work</p>
+      <p style="color: #888; font-size: 12px;">Automated daily review — <a href="https://minai.work" style="color: #16a34a;">minai.work</a></p>
     </div>
   `;
 
@@ -234,12 +235,48 @@ async function sendReport(analysis, sampleCount) {
   console.log(`[Review] Report emailed to ${EMAIL_TO}`);
 }
 
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
+function esc(t) {
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function markdownToHtml(md) {
+  const lines = md.split('\n');
+  const result = [];
+  let inList = false, tag = '';
+
+  for (const line of lines) {
+    // Headers
+    if (line.startsWith('### ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h3 style="margin:16px 0 6px;font-size:15px;color:#1a1a1a;">${inline(line.slice(4))}</h3>`); continue; }
+    if (line.startsWith('## ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h2 style="margin:20px 0 8px;font-size:17px;color:#1a1a1a;">${inline(line.slice(3))}</h2>`); continue; }
+    if (line.startsWith('# ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h1 style="margin:20px 0 8px;font-size:20px;color:#1a1a1a;">${inline(line.slice(2))}</h1>`); continue; }
+
+    // Unordered list
+    if (/^\s*[-*]\s/.test(line)) {
+      if (!inList || tag !== 'ul') { if (inList) result.push(`</${tag}>`); result.push('<ul style="margin:8px 0;padding-left:24px;">'); inList = true; tag = 'ul'; }
+      result.push(`<li style="margin:3px 0;">${inline(line.replace(/^\s*[-*]\s/, ''))}</li>`);
+      continue;
+    }
+    // Ordered list
+    if (/^\s*\d+\.\s/.test(line)) {
+      if (!inList || tag !== 'ol') { if (inList) result.push(`</${tag}>`); result.push('<ol style="margin:8px 0;padding-left:24px;">'); inList = true; tag = 'ol'; }
+      result.push(`<li style="margin:3px 0;">${inline(line.replace(/^\s*\d+\.\s/, ''))}</li>`);
+      continue;
+    }
+
+    if (inList) { result.push(`</${tag}>`); inList = false; }
+    if (!line.trim()) { result.push('<br>'); continue; }
+    result.push(`<p style="margin:6px 0;">${inline(line)}</p>`);
+  }
+  if (inList) result.push(`</${tag}>`);
+  return result.join('\n');
+}
+
+function inline(text) {
+  let s = esc(text);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:13px;">$1</code>');
+  return s;
 }
 
 // ─── Main ───
