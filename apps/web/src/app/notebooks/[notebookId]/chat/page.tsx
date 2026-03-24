@@ -70,7 +70,7 @@ export default function NotebookChatPage() {
   const isNearBottomRef = useRef(true);
 
   // Section skipper for long messages
-  const { currentSection, skipperVisible, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
+  const { currentSection, skipperVisible, skipperTop, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
 
   // Check auth
   useEffect(() => {
@@ -241,18 +241,21 @@ export default function NotebookChatPage() {
         />
       )}
 
+      {/* Section skipper — fixed position, aligned to avatar */}
+      <SectionSkipper
+        currentSection={currentSection}
+        visible={skipperVisible}
+        top={skipperTop}
+        left={skipperLeft}
+        onJump={scrollToSection}
+      />
+
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto"
         onScroll={handleScroll}
       >
         <div className="max-w-3xl mx-auto px-4 py-4 relative">
-          {/* Section skipper — inside content column so it follows mx-auto centering */}
-          <SectionSkipper
-            currentSection={currentSection}
-            visible={skipperVisible}
-            onJump={scrollToSection}
-          />
           {/* Loading older messages indicator */}
           {isLoadingMore && (
             <div className="flex justify-center py-3">

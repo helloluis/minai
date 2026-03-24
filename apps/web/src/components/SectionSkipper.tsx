@@ -5,6 +5,8 @@ import { memo } from 'react';
 interface SectionSkipperProps {
   currentSection: number;
   visible: boolean;
+  top: number;
+  left: number;
   onJump: (section: number) => void;
 }
 
@@ -13,24 +15,23 @@ const NUM_SECTIONS = 6;
 export const SectionSkipper = memo(function SectionSkipper({
   currentSection,
   visible,
+  top,
+  left,
   onJump,
 }: SectionSkipperProps) {
-  if (!visible) return null;
-
   return (
     <div
-      className="sticky z-30 transition-opacity duration-300 pointer-events-none"
+      className="transition-opacity duration-300 pointer-events-none"
       style={{
-        top: '50%',
-        transform: 'translateY(-50%)',
-        height: 0, // don't affect layout
+        position: 'fixed',
+        top,
+        left,
+        zIndex: 30,
         opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
       }}
     >
-      <div
-        className="pointer-events-auto flex flex-col items-center"
-        style={{ width: 16, marginLeft: 4 }}
-      >
+      <div className="flex flex-col items-center" style={{ width: 16 }}>
         <div className="relative flex flex-col items-center">
           {/* Continuous vertical line */}
           <div
