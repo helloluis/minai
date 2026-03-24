@@ -7,6 +7,7 @@ const SECTION_COUNT = 6;
 export function useSectionSkipper(
   scrollContainerRef: React.RefObject<HTMLDivElement | null>,
   isStreaming: boolean,
+  messageCount: number = 0,
 ) {
   const [currentSection, setCurrentSection] = useState(-1);
   const [skipperVisible, setSkipperVisible] = useState(false);
@@ -117,7 +118,7 @@ export function useSectionSkipper(
       window.removeEventListener('resize', onResize);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [scrollContainerRef, isStreaming]);
+  }, [scrollContainerRef, isStreaming, messageCount]);
 
   const scrollToSection = useCallback((index: number) => {
     const container = scrollContainerRef.current;

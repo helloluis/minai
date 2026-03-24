@@ -70,7 +70,7 @@ export default function NotebookChatPage() {
   const isNearBottomRef = useRef(true);
 
   // Section skipper for long messages
-  const { currentSection, skipperVisible, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
+  const { currentSection, skipperVisible, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming, messages.length);
 
   // Check auth
   useEffect(() => {
