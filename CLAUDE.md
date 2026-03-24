@@ -45,5 +45,20 @@ See `VULTR-VPS-GUIDE.md` for full setup documentation.
 
 After shipping a significant new feature or tool:
 
-1. **Update `apps/api/src/config/about.ts`** — this is minai's self-knowledge base, used by the `about_minai` tool when users or hackathon judges ask "how does minai work?". Keep it current with new capabilities, tools, and architecture changes.
-2. **Update `services/browse/README.md`** — if the browse service API changed, update the docs so other agents can integrate correctly.
+1. **Run smoke tests** — verify nothing is broken:
+   ```
+   ssh minai "cd /var/www/minai/services/tests && node smoke.js"
+   ```
+   17 end-to-end tests covering auth, chat, tool calls (crypto, web search, browse), document generation, share, and settings. Takes ~35s, costs ~$0.01 in LLM tokens.
+2. **Update `apps/api/src/config/about.ts`** — this is minai's self-knowledge base, used by the `about_minai` tool when users or hackathon judges ask "how does minai work?". Keep it current with new capabilities, tools, and architecture changes.
+3. **Update `services/browse/README.md`** — if the browse service API changed, update the docs so other agents can integrate correctly.
+
+## Smoke Tests
+
+- **Location:** `services/tests/smoke.js`
+- **Daily cron:** runs at 00:15 UTC (8:15 AM Manila) — emails `lb@minai.work` on failure
+- **Logs:** `/var/log/minai-smoke.log` on the server
+- **Run on-demand:** `ssh minai "cd /var/www/minai/services/tests && node smoke.js"`
+- **Run locally:** `cd services/tests && node smoke.js` (browse test goes through the LLM, not direct)
+- **Verbose:** `VERBOSE=1 node smoke.js`
+- **Cost:** ~$0.01–0.03 per run (4 LLM chat messages with tool calls)
