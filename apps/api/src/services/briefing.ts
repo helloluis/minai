@@ -118,7 +118,11 @@ async function sendBriefing(
     // Microsoft not connected or token expired — skip silently
   }
 
-  if (calendarGroups.length === 0 && totalEvents === 0) return;
+  // Skip briefing entirely if no events — saves tokens and avoids noise
+  if (totalEvents === 0) {
+    console.log(`[Briefing] No events for ${user.display_name ?? user.id.slice(0, 8)} — skipping ${bt.label} briefing`);
+    return;
+  }
 
   // Format and deliver
   const content = formatBriefing(user, bt.label, calendarGroups, totalEvents, user.timezone);
