@@ -70,7 +70,7 @@ export default function NotebookChatPage() {
   const isNearBottomRef = useRef(true);
 
   // Section skipper for long messages
-  const { currentSection, skipperVisible, skipperTop, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
+  const { currentSection, skipperVisible, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
 
   // Check auth
   useEffect(() => {
@@ -241,11 +241,10 @@ export default function NotebookChatPage() {
         />
       )}
 
-      {/* Section skipper — fixed position, aligned to avatar */}
+      {/* Section skipper — fixed position, bottom-anchored, aligned to avatar */}
       <SectionSkipper
         currentSection={currentSection}
         visible={skipperVisible}
-        top={skipperTop}
         left={skipperLeft}
         onJump={scrollToSection}
       />

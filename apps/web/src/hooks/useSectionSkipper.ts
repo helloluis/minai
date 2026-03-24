@@ -2,170 +2,120 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface SectionSkipperState {
-  currentSection: number;
-  skipperVisible: boolean;
-  skipperTop: number;
-  skipperLeft: number;
-  scrollToSection: (section: number) => void;
-}
-
-const NUM_SECTIONS = 6;
-const SKIPPER_HEIGHT = NUM_SECTIONS * 36; // 6 dots × 36px each
+const SECTION_COUNT = 6;
 
 export function useSectionSkipper(
   scrollContainerRef: React.RefObject<HTMLDivElement | null>,
   isStreaming: boolean,
-): SectionSkipperState {
-  const [currentSection, setCurrentSection] = useState(0);
+) {
+  const [currentSection, setCurrentSection] = useState(-1);
   const [skipperVisible, setSkipperVisible] = useState(false);
-  const [skipperTop, setSkipperTop] = useState(0);
   const [skipperLeft, setSkipperLeft] = useState(0);
-  const rafRef = useRef<number>(0);
   const activeMessageRef = useRef<HTMLElement | null>(null);
-  const isStreamingRef = useRef(isStreaming);
-  isStreamingRef.current = isStreaming;
 
-  const update = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container || isStreamingRef.current) {
-      setSkipperVisible(false);
-      activeMessageRef.current = null;
-      return;
-    }
-
-    const viewportHeight = container.clientHeight;
-    const containerRect = container.getBoundingClientRect();
-
-    const assistantMessages = container.querySelectorAll<HTMLElement>('[data-role="assistant"]');
-    if (assistantMessages.length === 0) {
-      setSkipperVisible(false);
-      activeMessageRef.current = null;
-      return;
-    }
-
-    // Find the best qualifying message: taller than viewport, most overlap
-    let bestMessage: HTMLElement | null = null;
-    let bestOverlap = 0;
-
-    for (const msg of assistantMessages) {
-      const rect = msg.getBoundingClientRect();
-      if (rect.height <= viewportHeight) continue;
-
-      const overlapTop = Math.max(rect.top, containerRect.top);
-      const overlapBottom = Math.min(rect.bottom, containerRect.bottom);
-      const overlap = Math.max(0, overlapBottom - overlapTop);
-
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
-        bestMessage = msg;
-      }
-    }
-
-    if (!bestMessage) {
-      setSkipperVisible(false);
-      activeMessageRef.current = null;
-      return;
-    }
-
-    // Check if ANY other message is visible — if so, we're at the edge, hide skipper
-    const allMessages = container.querySelectorAll<HTMLElement>('[data-role]');
-    for (const msg of allMessages) {
-      if (msg === bestMessage) continue;
-      const rect = msg.getBoundingClientRect();
-      // If any part of another message is visible in the viewport, hide
-      if (rect.bottom > containerRect.top + 10 && rect.top < containerRect.bottom - 10) {
-        setSkipperVisible(false);
-        activeMessageRef.current = null;
-        return;
-      }
-    }
-
-    activeMessageRef.current = bestMessage;
-
-    // Calculate scroll progress within this message
-    const msgRect = bestMessage.getBoundingClientRect();
-    const scrollableDistance = msgRect.height - viewportHeight;
-    if (scrollableDistance <= 0) {
-      setSkipperVisible(false);
-      activeMessageRef.current = null;
-      return;
-    }
-
-    const progress = Math.max(0, Math.min(1, (containerRect.top - msgRect.top) / scrollableDistance));
-    const section = Math.round(progress * (NUM_SECTIONS - 1));
-
-    // Position: find the avatar for this message to align horizontally
-    const avatar = bestMessage.querySelector('.minai-logo-avatar');
-    if (avatar) {
-      const avatarRect = avatar.getBoundingClientRect();
-      setSkipperLeft(avatarRect.left + avatarRect.width / 2 - 8); // center on avatar
-    }
-
-    // Vertical position: clamp within the visible portion of the message
-    const visibleTop = Math.max(msgRect.top, containerRect.top);
-    const visibleBottom = Math.min(msgRect.bottom, containerRect.bottom);
-    const visibleMid = (visibleTop + visibleBottom) / 2;
-    const clampedTop = Math.max(
-      visibleTop + 20,
-      Math.min(visibleBottom - SKIPPER_HEIGHT - 20, visibleMid - SKIPPER_HEIGHT / 2)
-    );
-    setSkipperTop(clampedTop);
-
-    setCurrentSection(section);
-    setSkipperVisible(true);
-  }, [scrollContainerRef]);
-
-  // Scroll listener
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    let rafId: number | null = null;
+
+    const update = () => {
+      rafId = null;
+      const containerRect = container.getBoundingClientRect();
+
+      // Find active assistant message: tallest viewport overlap, must be taller than viewport
+      // Also count how many assistant messages are visible — hide skipper if > 1
+      const assistantEls = container.querySelectorAll<HTMLElement>('[data-role="assistant"]');
+      let bestEl: HTMLElement | null = null;
+      let bestOverlap = 0;
+      let visibleAvatarCount = 0;
+
+      for (const el of assistantEls) {
+        const rect = el.getBoundingClientRect();
+        const isVisible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+        if (isVisible) visibleAvatarCount++;
+        if (el.offsetHeight <= containerRect.height) continue;
+        const top = Math.max(rect.top, containerRect.top);
+        const bottom = Math.min(rect.bottom, containerRect.bottom);
+        const overlap = Math.max(0, bottom - top);
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestEl = el;
+        }
+      }
+
+      activeMessageRef.current = bestEl;
+
+      if (!bestEl) {
+        setSkipperVisible(false);
+        return;
+      }
+
+      // Calculate scroll progress through the message (0..1)
+      const msgRect = bestEl.getBoundingClientRect();
+      const scrollableRange = bestEl.offsetHeight - containerRect.height;
+      const scrolled = containerRect.top - msgRect.top;
+      const progress = Math.max(0, Math.min(1, scrolled / scrollableRange));
+      const section = Math.round(progress * (SECTION_COUNT - 1));
+      setCurrentSection(section);
+
+      // Visibility — hide if scrolled past or above the message
+      const pastBottom = msgRect.bottom < containerRect.top + 60;
+      const aboveTop = msgRect.top > containerRect.bottom;
+
+      // Hide during streaming if the streaming message is in view
+      let streamingInView = false;
+      if (isStreaming) {
+        const lastMsg = container.querySelector('[data-role]:last-of-type') as HTMLElement | null;
+        if (lastMsg) {
+          const lastRect = lastMsg.getBoundingClientRect();
+          streamingInView = lastRect.bottom > containerRect.top && lastRect.top < containerRect.bottom;
+          if (bestEl === lastMsg) streamingInView = true;
+        } else {
+          streamingInView = true;
+        }
+      }
+
+      setSkipperVisible(!pastBottom && !aboveTop && !streamingInView && visibleAvatarCount <= 1);
+
+      // Horizontal position — align with avatar
+      const avatar = bestEl.querySelector<HTMLElement>('.minai-logo-avatar');
+      if (avatar) {
+        const r = avatar.getBoundingClientRect();
+        setSkipperLeft(r.left + r.width / 2);
+      }
+    };
+
     const onScroll = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(update);
+      if (rafId) return;
+      rafId = requestAnimationFrame(update);
+    };
+
+    const onResize = () => {
+      if (!rafId) rafId = requestAnimationFrame(update);
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    const timer = setTimeout(() => requestAnimationFrame(update), 500);
+    window.addEventListener('resize', onResize);
+    rafId = requestAnimationFrame(update);
 
     return () => {
       container.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      cancelAnimationFrame(rafRef.current);
-      clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [scrollContainerRef, update]);
+  }, [scrollContainerRef, isStreaming]);
 
-  // Hide during streaming, re-check when it ends
-  useEffect(() => {
-    if (isStreaming) {
-      setSkipperVisible(false);
-    } else {
-      const timer = setTimeout(() => requestAnimationFrame(update), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isStreaming, update]);
-
-  const scrollToSection = useCallback((section: number) => {
+  const scrollToSection = useCallback((index: number) => {
     const container = scrollContainerRef.current;
-    const msg = activeMessageRef.current;
-    if (!container || !msg) return;
-
-    // Only scroll if message is still the active one
+    const el = activeMessageRef.current;
+    if (!container || !el) return;
     const containerRect = container.getBoundingClientRect();
-    const msgRect = msg.getBoundingClientRect();
-    if (msgRect.height <= containerRect.height) return;
-
-    setCurrentSection(section);
-
-    const scrollableDistance = msgRect.height - containerRect.height;
-    const targetProgress = section / (NUM_SECTIONS - 1);
-    const targetScrollTop = container.scrollTop + (msgRect.top - containerRect.top) + targetProgress * scrollableDistance;
-
+    const scrollableRange = el.offsetHeight - containerRect.height;
+    const targetProgress = index / (SECTION_COUNT - 1);
+    const targetScrollTop = el.offsetTop - container.offsetTop + targetProgress * scrollableRange;
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
 
-  return { currentSection, skipperVisible, skipperTop, skipperLeft, scrollToSection };
+  return { currentSection, skipperVisible, skipperLeft, scrollToSection };
 }

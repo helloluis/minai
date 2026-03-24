@@ -2,84 +2,45 @@
 
 import { memo } from 'react';
 
-interface SectionSkipperProps {
-  currentSection: number;
-  visible: boolean;
-  top: number;
-  left: number;
-  onJump: (section: number) => void;
-}
-
-const NUM_SECTIONS = 6;
+const SECTION_COUNT = 6;
 
 export const SectionSkipper = memo(function SectionSkipper({
   currentSection,
   visible,
-  top,
   left,
   onJump,
-}: SectionSkipperProps) {
+}: {
+  currentSection: number;
+  visible: boolean;
+  left: number;
+  onJump: (index: number) => void;
+}) {
+  if (!visible || left === 0) return null;
+
+  const sections = Array.from({ length: SECTION_COUNT }, (_, i) => i);
+
   return (
     <div
-      className="transition-opacity duration-300 pointer-events-none"
-      style={{
-        position: 'fixed',
-        top,
-        left,
-        zIndex: 30,
-        opacity: visible ? 1 : 0,
-        pointerEvents: visible ? 'auto' : 'none',
-      }}
+      className={`fixed z-20 flex flex-col items-center transition-opacity duration-300 ${
+        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+      style={{ left, bottom: 260, transform: 'translateX(-50%)' }}
     >
-      <div className="flex flex-col items-center" style={{ width: 16 }}>
-        <div className="relative flex flex-col items-center">
-          {/* Continuous vertical line */}
-          <div
-            className="absolute bg-stone-600"
-            style={{
-              top: 18,
-              bottom: 18,
-              left: '50%',
-              width: 1,
-              marginLeft: -0.5,
-            }}
-          />
+      <div className="relative flex flex-col items-center gap-5">
+        {/* Vertical line behind the dots */}
+        <div className="absolute top-2 bottom-2 w-px bg-stone-600 left-1/2 -translate-x-1/2" />
 
-          {/* Dots */}
-          {Array.from({ length: NUM_SECTIONS }).map((_, i) => {
-            const isActive = i === currentSection;
-            return (
-              <button
-                key={i}
-                onClick={() => onJump(i)}
-                className="relative flex items-center justify-center"
-                style={{ width: 36, height: 36 }}
-                aria-label={`Jump to section ${i + 1} of ${NUM_SECTIONS}`}
-              >
-                {isActive ? (
-                  <span
-                    className="rounded-full"
-                    style={{
-                      width: 16,
-                      height: 16,
-                      backgroundColor: '#22c55e',
-                      border: '2.5px solid #22c55e',
-                    }}
-                  />
-                ) : (
-                  <span
-                    className="rounded-full transition-colors duration-150 hover:bg-stone-400"
-                    style={{
-                      width: 8,
-                      height: 8,
-                      backgroundColor: '#78716c',
-                    }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {sections.map((i) => (
+          <button
+            key={i}
+            onClick={() => onJump(i)}
+            className={`relative z-10 rounded-full border-2 transition-all duration-200 ${
+              i === currentSection
+                ? 'w-4 h-4 bg-green-500 border-green-500'
+                : 'w-3 h-3 bg-gray-900 border-stone-500 hover:border-green-500'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
