@@ -1082,7 +1082,7 @@ export function Sidebar() {
         <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800">
           {!isExpanded && <div
             onClick={(e) => { e.stopPropagation(); setShowVideo(true); }}
-            className="w-full cursor-pointer group"
+            className="w-full cursor-pointer group relative"
             role="button"
             tabIndex={0}
           >
@@ -1091,8 +1091,17 @@ export function Sidebar() {
               alt="Why we built minai"
               className="w-full aspect-video object-cover group-hover:brightness-110 transition-all"
             />
-            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors text-center">
-              Why we built minai ❤️
+            {/* Play button overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-black/60 group-hover:bg-black/80 flex items-center justify-center transition-colors">
+                <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </div>
+            {/* Title overlay on top of thumbnail */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+              <div className="text-[11px] text-white/90 font-medium">Why we built minai ❤️</div>
             </div>
           </div>}
           <div className="px-3 pb-2">
