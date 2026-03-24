@@ -117,6 +117,9 @@ export function useSectionSkipper(
   }, [isStreaming, update]);
 
   const scrollToSection = useCallback((section: number) => {
+    // Immediately update the active dot
+    setCurrentSection(section);
+
     const container = scrollContainerRef.current;
     const msg = activeMessageRef.current;
     if (!container || !msg) return;

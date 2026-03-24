@@ -15,42 +15,66 @@ export const SectionSkipper = memo(function SectionSkipper({
   visible,
   onJump,
 }: SectionSkipperProps) {
+  if (!visible) return null;
+
   return (
     <div
-      className="absolute left-2 sm:left-4 z-30 flex flex-col items-center transition-opacity duration-300"
+      className="absolute z-30 transition-opacity duration-300"
       style={{
-        bottom: 80,
+        // Position alongside the message bubble's left edge
+        left: 52, // after avatar (w-6 + mr-1.5 + some padding)
+        top: '50%',
+        transform: 'translateY(-50%) translateX(-20px)',
         opacity: visible ? 1 : 0,
-        pointerEvents: visible ? 'auto' : 'none',
       }}
     >
-      <div className="flex flex-col items-center">
+      {/* Continuous vertical line behind the dots */}
+      <div className="relative flex flex-col items-center">
+        {/* The line */}
+        <div
+          className="absolute w-px bg-stone-600"
+          style={{
+            top: 18, // half of first dot area
+            bottom: 18, // half of last dot area
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        />
+
+        {/* Dots */}
         {Array.from({ length: NUM_SECTIONS }).map((_, i) => {
           const isActive = i === currentSection;
           return (
-            <div key={i} className="flex flex-col items-center">
-              {/* Connecting line */}
-              {i > 0 && (
-                <div className="w-px bg-stone-600" style={{ height: 16 }} />
-              )}
-              {/* Tap target — generous padding around the dot */}
-              <button
-                onClick={() => onJump(i)}
-                className="flex items-center justify-center transition-all duration-200"
-                style={{ width: 36, height: 36 }}
-                aria-label={`Jump to section ${i + 1} of ${NUM_SECTIONS}`}
-              >
+            <button
+              key={i}
+              onClick={() => onJump(i)}
+              className="relative flex items-center justify-center"
+              style={{ width: 36, height: 36 }}
+              aria-label={`Jump to section ${i + 1} of ${NUM_SECTIONS}`}
+            >
+              {isActive ? (
+                // Active: larger ring with colored border, semi-transparent fill
                 <span
-                  className="rounded-full transition-all duration-200 block"
+                  className="rounded-full"
                   style={{
-                    width: isActive ? 14 : 10,
-                    height: isActive ? 14 : 10,
-                    backgroundColor: isActive ? 'var(--color-minai-500, #22c55e)' : '#1c1917',
-                    border: `2px solid ${isActive ? 'var(--color-minai-500, #22c55e)' : '#78716c'}`,
+                    width: 16,
+                    height: 16,
+                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                    border: '2.5px solid #22c55e',
                   }}
                 />
-              </button>
-            </div>
+              ) : (
+                // Inactive: small solid dot
+                <span
+                  className="rounded-full transition-colors duration-150 hover:bg-stone-400"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    backgroundColor: '#78716c',
+                  }}
+                />
+              )}
+            </button>
           );
         })}
       </div>
