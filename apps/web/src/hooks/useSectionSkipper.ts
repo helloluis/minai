@@ -44,23 +44,6 @@ export function useSectionSkipper(
       return;
     }
 
-    // Count how many assistant avatars are visible in viewport
-    const avatars = container.querySelectorAll<HTMLElement>('.minai-logo-avatar');
-    let visibleAvatars = 0;
-    for (const avatar of avatars) {
-      const r = avatar.getBoundingClientRect();
-      if (r.top < containerRect.bottom && r.bottom > containerRect.top) {
-        visibleAvatars++;
-      }
-    }
-
-    // If multiple assistant messages are visible, hide skipper
-    if (visibleAvatars > 1) {
-      setSkipperVisible(false);
-      activeMessageRef.current = null;
-      return;
-    }
-
     // Find the best qualifying message: taller than viewport, most overlap
     let bestMessage: HTMLElement | null = null;
     let bestOverlap = 0;
@@ -79,8 +62,8 @@ export function useSectionSkipper(
       }
     }
 
-    // Need at least 40% viewport coverage
-    if (!bestMessage || bestOverlap < viewportHeight * 0.4) {
+    // Need the long message to fill almost all of the viewport
+    if (!bestMessage || bestOverlap < viewportHeight * 0.85) {
       setSkipperVisible(false);
       activeMessageRef.current = null;
       return;
