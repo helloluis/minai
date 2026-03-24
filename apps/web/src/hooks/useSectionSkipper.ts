@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 interface SectionSkipperState {
   currentSection: number;
   skipperVisible: boolean;
-  skipperLeft: number;
   scrollToSection: (section: number) => void;
 }
 
@@ -17,7 +16,6 @@ export function useSectionSkipper(
 ): SectionSkipperState {
   const [currentSection, setCurrentSection] = useState(0);
   const [skipperVisible, setSkipperVisible] = useState(false);
-  const [skipperLeft, setSkipperLeft] = useState(0);
   const rafRef = useRef<number>(0);
   const activeMessageRef = useRef<HTMLElement | null>(null);
 
@@ -66,21 +64,6 @@ export function useSectionSkipper(
       return;
     }
 
-    // Count visible assistant avatars — if more than 1 visible, hide
-    // (means multiple messages in view, not a single long one)
-    const avatars = container.querySelectorAll<HTMLElement>('[data-role="assistant"] .minai-logo-avatar');
-    let visibleAvatarCount = 0;
-    for (const avatar of avatars) {
-      const aRect = avatar.getBoundingClientRect();
-      if (aRect.top < containerRect.bottom && aRect.bottom > containerRect.top) {
-        visibleAvatarCount++;
-      }
-    }
-    if (visibleAvatarCount > 1) {
-      setSkipperVisible(false);
-      return;
-    }
-
     activeMessageRef.current = bestMessage;
 
     // Calculate scroll progress within this message
@@ -96,13 +79,6 @@ export function useSectionSkipper(
 
     setCurrentSection(section);
     setSkipperVisible(true);
-
-    // Calculate horizontal position: center on the assistant's avatar
-    const msgAvatar = bestMessage.querySelector('.minai-logo-avatar');
-    if (msgAvatar) {
-      const avatarRect = msgAvatar.getBoundingClientRect();
-      setSkipperLeft(avatarRect.left + avatarRect.width / 2);
-    }
   }, [scrollContainerRef, isStreaming]);
 
   // Scroll listener with rAF throttling
@@ -156,5 +132,5 @@ export function useSectionSkipper(
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
 
-  return { currentSection, skipperVisible, skipperLeft, scrollToSection };
+  return { currentSection, skipperVisible, scrollToSection };
 }
