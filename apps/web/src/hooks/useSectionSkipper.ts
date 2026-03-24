@@ -62,11 +62,23 @@ export function useSectionSkipper(
       }
     }
 
-    // Need the long message to fill almost all of the viewport
-    if (!bestMessage || bestOverlap < viewportHeight * 0.85) {
+    if (!bestMessage) {
       setSkipperVisible(false);
       activeMessageRef.current = null;
       return;
+    }
+
+    // Check if ANY other message is visible — if so, we're at the edge, hide skipper
+    const allMessages = container.querySelectorAll<HTMLElement>('[data-role]');
+    for (const msg of allMessages) {
+      if (msg === bestMessage) continue;
+      const rect = msg.getBoundingClientRect();
+      // If any part of another message is visible in the viewport, hide
+      if (rect.bottom > containerRect.top + 10 && rect.top < containerRect.bottom - 10) {
+        setSkipperVisible(false);
+        activeMessageRef.current = null;
+        return;
+      }
     }
 
     activeMessageRef.current = bestMessage;
