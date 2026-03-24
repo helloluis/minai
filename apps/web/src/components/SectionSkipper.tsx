@@ -27,20 +27,20 @@ export const SectionSkipper = memo(function SectionSkipper({
         opacity: visible ? 1 : 0,
       }}
     >
-      {/* Offset to align with avatar center: px-4 (16px) + w-6/2 (12px) = 28px, minus half component width */}
       <div
-        className="pointer-events-auto"
-        style={{ marginLeft: 20, width: 16 }}
+        className="pointer-events-auto flex flex-col items-center"
+        style={{ width: 16, marginLeft: -8 }}
       >
         <div className="relative flex flex-col items-center">
           {/* Continuous vertical line */}
           <div
-            className="absolute w-px bg-stone-600"
+            className="absolute bg-stone-600"
             style={{
               top: 18,
               bottom: 18,
               left: '50%',
-              transform: 'translateX(-50%)',
+              width: 1,
+              marginLeft: -0.5,
             }}
           />
 
@@ -52,7 +52,7 @@ export const SectionSkipper = memo(function SectionSkipper({
                 key={i}
                 onClick={() => onJump(i)}
                 className="relative flex items-center justify-center"
-                style={{ width: 36, height: 36, marginLeft: -10 }}
+                style={{ width: 36, height: 36 }}
                 aria-label={`Jump to section ${i + 1} of ${NUM_SECTIONS}`}
               >
                 {isActive ? (
