@@ -116,19 +116,29 @@ export function useSectionSkipper(
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
-    // Initial check
-    requestAnimationFrame(update);
+    // Also listen for resize
+    window.addEventListener('resize', onScroll, { passive: true });
+    // Initial check with a delay to let messages render
+    const timer = setTimeout(() => requestAnimationFrame(update), 500);
 
     return () => {
       container.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
       cancelAnimationFrame(rafRef.current);
+      clearTimeout(timer);
     };
   }, [scrollContainerRef, update]);
 
-  // Hide during streaming
+  // Hide during streaming, re-check when streaming ends
   useEffect(() => {
-    if (isStreaming) setSkipperVisible(false);
-  }, [isStreaming]);
+    if (isStreaming) {
+      setSkipperVisible(false);
+    } else {
+      // Re-check after streaming ends and messages settle
+      const timer = setTimeout(() => requestAnimationFrame(update), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, update]);
 
   const scrollToSection = useCallback((section: number) => {
     const container = scrollContainerRef.current;
