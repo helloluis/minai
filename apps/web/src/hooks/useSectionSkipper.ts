@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 interface SectionSkipperState {
   currentSection: number;
   skipperVisible: boolean;
-  avatarCenterX: number; // px from left edge of scroll container
   scrollToSection: (section: number) => void;
 }
 
@@ -17,7 +16,6 @@ export function useSectionSkipper(
 ): SectionSkipperState {
   const [currentSection, setCurrentSection] = useState(0);
   const [skipperVisible, setSkipperVisible] = useState(false);
-  const [avatarCenterX, setAvatarCenterX] = useState(0);
   const rafRef = useRef<number>(0);
   const activeMessageRef = useRef<HTMLElement | null>(null);
 
@@ -77,13 +75,6 @@ export function useSectionSkipper(
 
     setCurrentSection(section);
     setSkipperVisible(true);
-
-    // Find the avatar position relative to the scroll container
-    const avatar = bestMessage.querySelector('.minai-logo-avatar');
-    if (avatar) {
-      const avatarRect = avatar.getBoundingClientRect();
-      setAvatarCenterX(avatarRect.left - containerRect.left + avatarRect.width / 2);
-    }
   }, [scrollContainerRef, isStreaming]);
 
   // Scroll listener — fires on every scroll event via rAF
@@ -136,5 +127,5 @@ export function useSectionSkipper(
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
 
-  return { currentSection, skipperVisible, avatarCenterX, scrollToSection };
+  return { currentSection, skipperVisible, scrollToSection };
 }
