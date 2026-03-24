@@ -49,17 +49,6 @@ export function useSectionSkipper(
 
       activeMessageRef.current = bestEl;
 
-      // DEBUG — remove after fixing
-      if (typeof window !== 'undefined' && (window as any).__SKIPPER_DEBUG) {
-        console.log('[skipper]', {
-          assistantCount: assistantEls.length,
-          visibleAvatarCount,
-          bestEl: bestEl ? bestEl.id : null,
-          bestOverlap,
-          containerHeight: containerRect.height,
-        });
-      }
-
       if (!bestEl) {
         setSkipperVisible(false);
         return;
@@ -111,11 +100,17 @@ export function useSectionSkipper(
 
     container.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
+
+    // Watch for layout changes (e.g. sidebar open/close shifts content)
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(container);
+
     rafId = requestAnimationFrame(update);
 
     return () => {
       container.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, [scrollContainerRef, isStreaming, messageCount]);
@@ -125,9 +120,12 @@ export function useSectionSkipper(
     const el = activeMessageRef.current;
     if (!container || !el) return;
     const containerRect = container.getBoundingClientRect();
-    const scrollableRange = el.offsetHeight - containerRect.height;
+    const msgRect = el.getBoundingClientRect();
+    const scrollableRange = msgRect.height - containerRect.height;
+    if (scrollableRange <= 0) return;
     const targetProgress = index / (SECTION_COUNT - 1);
-    const targetScrollTop = el.offsetTop - container.offsetTop + targetProgress * scrollableRange;
+    // Current offset of message top from container top, plus target progress
+    const targetScrollTop = container.scrollTop + (msgRect.top - containerRect.top) + targetProgress * scrollableRange;
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
 
