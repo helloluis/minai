@@ -1,0 +1,10 @@
+{
+  "name": "@minai/tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node smoke.js",
+    "test:verbose": "VERBOSE=1 node smoke.js"
+  }
+}
