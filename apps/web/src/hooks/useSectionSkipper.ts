@@ -54,7 +54,8 @@ export function useSectionSkipper(
       }
     }
 
-    if (!bestMessage) {
+    if (!bestMessage || bestOverlap < viewportHeight * 0.5) {
+      // Hide if no qualifying message or less than 50% of viewport is covered by it
       setSkipperVisible(false);
       activeMessageRef.current = null;
       return;
@@ -66,6 +67,7 @@ export function useSectionSkipper(
     const scrollableDistance = msgRect.height - viewportHeight;
     if (scrollableDistance <= 0) {
       setSkipperVisible(false);
+      activeMessageRef.current = null;
       return;
     }
 
@@ -109,19 +111,25 @@ export function useSectionSkipper(
   }, [isStreaming, update]);
 
   const scrollToSection = useCallback((section: number) => {
-    setCurrentSection(section);
-
     const container = scrollContainerRef.current;
     const msg = activeMessageRef.current;
     if (!container || !msg) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const msgRect = msg.getBoundingClientRect();
-    const scrollableDistance = msgRect.height - containerRect.height;
+    // Verify the message is still substantially in view before scrolling
+    const cRect = container.getBoundingClientRect();
+    const mRect = msg.getBoundingClientRect();
+    const overlapTop = Math.max(mRect.top, cRect.top);
+    const overlapBottom = Math.min(mRect.bottom, cRect.bottom);
+    const overlap = Math.max(0, overlapBottom - overlapTop);
+    if (overlap < cRect.height * 0.5) return;
+
+    setCurrentSection(section);
+
+    const scrollableDistance = mRect.height - cRect.height;
     if (scrollableDistance <= 0) return;
 
     const targetProgress = section / (NUM_SECTIONS - 1);
-    const targetScrollTop = container.scrollTop + (msgRect.top - containerRect.top) + targetProgress * scrollableDistance;
+    const targetScrollTop = container.scrollTop + (mRect.top - cRect.top) + targetProgress * scrollableDistance;
 
     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
   }, [scrollContainerRef]);
