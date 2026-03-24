@@ -18,10 +18,12 @@ export function useSectionSkipper(
   const [skipperVisible, setSkipperVisible] = useState(false);
   const rafRef = useRef<number>(0);
   const activeMessageRef = useRef<HTMLElement | null>(null);
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
 
   const update = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container || isStreaming) {
+    if (!container || isStreamingRef.current) {
       setSkipperVisible(false);
       return;
     }
@@ -29,14 +31,12 @@ export function useSectionSkipper(
     const viewportHeight = container.clientHeight;
     const containerRect = container.getBoundingClientRect();
 
-    // Find all assistant messages
     const assistantMessages = container.querySelectorAll<HTMLElement>('[data-role="assistant"]');
     if (assistantMessages.length === 0) {
       setSkipperVisible(false);
       return;
     }
 
-    // Find the assistant message with the largest viewport overlap that is taller than viewport
     let bestMessage: HTMLElement | null = null;
     let bestOverlap = 0;
 
@@ -62,7 +62,6 @@ export function useSectionSkipper(
 
     activeMessageRef.current = bestMessage;
 
-    // Calculate scroll progress
     const msgRect = bestMessage.getBoundingClientRect();
     const scrollableDistance = msgRect.height - viewportHeight;
     if (scrollableDistance <= 0) {
@@ -75,9 +74,9 @@ export function useSectionSkipper(
 
     setCurrentSection(section);
     setSkipperVisible(true);
-  }, [scrollContainerRef, isStreaming]);
+  }, [scrollContainerRef]);
 
-  // Scroll listener — fires on every scroll event via rAF
+  // Scroll listener — stable reference, reads isStreaming from ref
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
