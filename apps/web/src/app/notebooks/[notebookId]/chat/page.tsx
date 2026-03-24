@@ -12,6 +12,8 @@ import { WelcomeMessage } from '@/components/WelcomeMessage';
 import { PinnedMessagesMenu } from '@/components/PinnedMessagesMenu';
 import { GuestBanner } from '@/components/GuestBanner';
 import { FileViewer } from '@/components/FileViewer';
+import { SectionSkipper } from '@/components/SectionSkipper';
+import { useSectionSkipper } from '@/hooks/useSectionSkipper';
 import * as api from '@/lib/api';
 
 function AnimatedDots() {
@@ -66,6 +68,9 @@ export default function NotebookChatPage() {
   const [viewingFile, setViewingFile] = useState<api.NotebookFile | null>(null);
   // Track whether user has manually scrolled away from bottom
   const isNearBottomRef = useRef(true);
+
+  // Section skipper for long messages
+  const { currentSection, skipperVisible, skipperLeft, scrollToSection } = useSectionSkipper(scrollContainerRef, isStreaming);
 
   // Check auth
   useEffect(() => {
@@ -276,6 +281,14 @@ export default function NotebookChatPage() {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Section skipper for long messages */}
+      <SectionSkipper
+        currentSection={currentSection}
+        visible={skipperVisible}
+        left={skipperLeft}
+        onJump={scrollToSection}
+      />
 
       {/* Scroll-to-bottom floating button */}
       {showScrollDown && (

@@ -262,11 +262,12 @@ export function MessageBubble({ message, prevMessage, previousUserMessage, onDel
     )}
     <div
       id={`message-${message.id}`}
+      data-role={message.role}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group transition-colors duration-500`}
     >
       {/* Logo for assistant messages */}
       {!isUser && (
-        <div className="flex-shrink-0 mr-1.5 self-start mt-1">
+        <div className="flex-shrink-0 mr-1.5 self-start mt-1 minai-logo-avatar">
           <MinaiLogo className="w-6 h-6" />
         </div>
       )}
