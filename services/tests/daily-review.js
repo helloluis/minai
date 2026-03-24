@@ -38,7 +38,7 @@ try {
 const DATABASE_URL = process.env.DATABASE_URL;
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const EMAIL_TO = process.env.REVIEW_EMAIL || 'lbuenaventura2@gmail.com';
+const EMAIL_TO = process.env.REVIEW_EMAIL || 'lb@minai.work';
 const ADMIN_EMAIL = 'lbuenaventura2@gmail.com';
 const SENTRY_DSN = 'https://03c94e3a4e5ca9d7cd5bb1b2722e12b0@o4511097194414080.ingest.de.sentry.io/4511097210929232';
 
@@ -219,7 +219,7 @@ async function sendReport(analysis, sampleCount) {
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: 'minai <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM || 'minai <onboarding@resend.dev>',
       to: [EMAIL_TO],
       subject: `[minai] Daily review: ${sampleCount} conversations analyzed`,
       html,
