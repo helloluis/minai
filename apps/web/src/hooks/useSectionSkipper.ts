@@ -32,9 +32,11 @@ export function useSectionSkipper(
 
       for (const el of assistantEls) {
         const rect = el.getBoundingClientRect();
-        const isVisible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
-        if (isVisible) visibleAvatarCount++;
-        if (el.offsetHeight <= containerRect.height) continue;
+        // Require at least 60px visible to count as "in view"
+        const vTop = Math.max(rect.top, containerRect.top);
+        const vBot = Math.min(rect.bottom, containerRect.bottom);
+        if (vBot - vTop > 60) visibleAvatarCount++;
+        if (rect.height <= containerRect.height) continue;
         const top = Math.max(rect.top, containerRect.top);
         const bottom = Math.min(rect.bottom, containerRect.bottom);
         const overlap = Math.max(0, bottom - top);
@@ -45,6 +47,17 @@ export function useSectionSkipper(
       }
 
       activeMessageRef.current = bestEl;
+
+      // DEBUG — remove after fixing
+      if (typeof window !== 'undefined' && (window as any).__SKIPPER_DEBUG) {
+        console.log('[skipper]', {
+          assistantCount: assistantEls.length,
+          visibleAvatarCount,
+          bestEl: bestEl ? bestEl.id : null,
+          bestOverlap,
+          containerHeight: containerRect.height,
+        });
+      }
 
       if (!bestEl) {
         setSkipperVisible(false);
