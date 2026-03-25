@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.svg',
   },
+  other: {
+    'talentapp:project_verification': '57985bdf612fe4a4de7acf3dc04d6fbbd9082a2dffd14fd9352d3e6243a2d361a607dabca99aaa9656449ea1e6f0f26b46e3c46bcb0c65dab4e97c87eb5456ed',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
