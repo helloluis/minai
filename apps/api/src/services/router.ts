@@ -37,6 +37,11 @@ const OLLAMA_CLASSIFIER_PROMPT = `Classify: tools or chitchat
 "sure" tools
 "create event" tools
 "check calendar" tools
+"add a reminder" tools
+"schedule a meeting" tools
+"what's on my calendar" tools
+"add to my calendar" tools
+"remind me to" tools
 "summarize PDF" tools
 "make image" tools
 "bitcoin price" tools
