@@ -22,6 +22,11 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
+    // Auth expired — redirect to landing page instead of throwing
+    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/api/auth/')) {
+      window.location.href = '/';
+      return new Promise(() => {}); // never resolves — page is navigating away
+    }
     const error = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(error.error || `API error ${res.status}`);
   }
