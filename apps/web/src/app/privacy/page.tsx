@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         <a href="/" className="text-minai-600 text-sm hover:underline">&larr; Back to minai</a>
 
         <h1 className="text-3xl font-bold mt-6 mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-400 mb-8">Last updated: March 19, 2026</p>
+        <p className="text-sm text-gray-400 mb-8">Last updated: March 30, 2026</p>
 
         <div className="prose prose-gray dark:prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -57,12 +57,18 @@ export default function PrivacyPage() {
               <li>Session cookies are HTTP-only, secure, and SameSite-protected.</li>
               <li>Uploaded files are stored in user-isolated directories on the server filesystem.</li>
               <li>We do not sell, rent, or share your personal data with third parties for marketing purposes.</li>
+              <li>We do not use collected data for behavioral profiling, advertising targeting, or cross-service data aggregation. Usage data and technical data are used solely for billing, security, and service delivery.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold mb-2">5. Data Retention</h2>
-            <p>Your conversations, files, and account data are retained as long as your account is active. You can delete individual messages, files, or entire notebooks at any time. Deleted data is soft-deleted and permanently purged within 30 days.</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Conversations and messages in inactive notebooks are automatically purged after <strong>3 months</strong> of inactivity.</li>
+              <li>Uploaded files are retained as long as the notebook they belong to is active.</li>
+              <li>You can delete individual messages, files, or entire notebooks at any time. Deleted data is soft-deleted and permanently purged within 30 days.</li>
+              <li>Account data (email, display name) is retained as long as your account is active. Request full deletion by contacting us.</li>
+            </ul>
           </section>
 
           <section>
@@ -78,7 +84,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold mb-2">7. Contact</h2>
-            <p>For privacy questions or data requests, contact us at <a href="mailto:hello@buenaventura.ph" className="text-minai-600 hover:underline">hello@buenaventura.ph</a>.</p>
+            <p>For privacy questions or data requests, contact us at <a href="mailto:lb@minai.work" className="text-minai-600 hover:underline">lb@minai.work</a>.</p>
           </section>
         </div>
       </div>

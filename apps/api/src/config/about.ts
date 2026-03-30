@@ -33,7 +33,7 @@ To become the **most popular AI assistant in the MiniPay ecosystem** — and mor
 4. **Self-improving**: Browser automation gets smarter over time — every time minai learns a better way to navigate a website, it remembers for next time.
 5. **Tool-rich**: Not just chat. Calendar management, image generation, document analysis, headless web browsing, crypto prices, Google Places, and more.
 6. **Honest pricing**: Every message shows its cost. Users see exactly what they're spending — no hidden fees, no surprise bills.
-7. **Privacy-first**: No user data sold. Conversations belong to the user.
+7. **Privacy-first**: No user data sold, no behavioral tracking or profiling. Conversations belong to the user. Inactive notebooks are purged after 3 months.
 
 ## Current Status
 Live at **minai.work** and actively being used. The platform handles real money (on-chain cUSD deposits) and is in active development with new features shipping regularly. Built and submitted for the **Celo Hackathon** to showcase what's possible when you combine frontier AI with crypto-native payments for the next billion users.
