@@ -7,4 +7,12 @@ Sentry.init({
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0.5, // 50% of error sessions get replay
   enabled: process.env.NODE_ENV === 'production',
+  beforeSend(event) {
+    // Drop errors caused by browser extensions (Grammarly, password managers, etc.)
+    const frames = event.exception?.values?.[0]?.stacktrace?.frames || [];
+    if (frames.some((f) => f.filename?.includes('injectedScript') || f.filename?.includes('extension://'))) {
+      return null;
+    }
+    return event;
+  },
 });
