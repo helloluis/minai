@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         <a href="/" className="text-minai-600 text-sm hover:underline">&larr; Back to minai</a>
 
         <h1 className="text-3xl font-bold mt-6 mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-400 mb-8">Last updated: March 30, 2026</p>
+        <p className="text-sm text-gray-400 mb-8">Last updated: April 2, 2026</p>
 
         <div className="prose prose-gray dark:prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -44,9 +44,21 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold mb-2">3. Third-Party Services</h2>
             <p>We use the following third-party services to operate minai:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Alibaba Cloud (DashScope):</strong> AI model inference. Your messages are sent to their API for processing. See <a href="https://www.alibabacloud.com/help/en/model-studio/privacy-policy" className="text-minai-600 hover:underline" target="_blank" rel="noopener">Alibaba Cloud Privacy Policy</a>.</li>
+              <li><strong>Alibaba Cloud (DashScope):</strong> AI model inference. Your chat messages are sent to their API for processing and responses are returned in real-time. We do not use your data for AI model training. See <a href="https://www.alibabacloud.com/help/en/model-studio/privacy-policy" className="text-minai-600 hover:underline" target="_blank" rel="noopener">Alibaba Cloud Privacy Policy</a>.</li>
               <li><strong>Google:</strong> Authentication (Google Sign-In) and Calendar API access.</li>
               <li><strong>Celo blockchain:</strong> Payment processing. Deposit transactions are public on the Celo blockchain.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-2">3a. Google User Data</h2>
+            <p>minai&apos;s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" className="text-minai-600 hover:underline" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Google account data (email, display name, profile photo) is used <strong>solely</strong> for authentication and displaying your identity within the app.</li>
+              <li>Google Calendar data (event titles, times, locations, attendees) is accessed <strong>solely</strong> to provide calendar management features — listing events, creating events, updating events, and daily schedule briefings.</li>
+              <li>Calendar data is fetched on demand and is <strong>not</strong> stored permanently, sold, shared with third parties, or used for AI model training.</li>
+              <li>Google user data is <strong>not</strong> sent to the AI inference provider (DashScope). Only your chat messages and instructions are sent to the AI model — not your calendar data, email address, or profile information.</li>
+              <li>You can disconnect your Google account at any time from the Settings page, which immediately revokes minai&apos;s access to your Google data.</li>
             </ul>
           </section>
 
