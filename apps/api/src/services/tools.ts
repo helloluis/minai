@@ -1459,10 +1459,14 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       const browseActions = args.actions as { action: string; selector?: string; text?: string; value?: string; ms?: number }[] | undefined;
       const browseSelector = args.selector as string | undefined;
       const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
+      const KAMAI_API_KEY = process.env.KAMAI_API_KEY;
+      const browseEndpoint = KAMAI_API_KEY ? `${BROWSE_SERVICE_URL}/api/v1/browse` : `${BROWSE_SERVICE_URL}/browse`;
       try {
-        const resp = await fetch(`${BROWSE_SERVICE_URL}/browse`, {
+        const browseHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (KAMAI_API_KEY) browseHeaders['x-api-key'] = KAMAI_API_KEY;
+        const resp = await fetch(browseEndpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: browseHeaders,
           body: JSON.stringify({ url: browseUrl, actions: browseActions, selector: browseSelector, timeout: 15000 }),
           signal: AbortSignal.timeout(20000),
         });
@@ -1511,9 +1515,12 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       const learning = args.learning as string;
       const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
       try {
+        const memHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        const KAMAI_KEY = process.env.KAMAI_API_KEY;
+        if (KAMAI_KEY) memHeaders['x-api-key'] = KAMAI_KEY;
         const resp = await fetch(`${BROWSE_SERVICE_URL}/browse/memories`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: memHeaders,
           body: JSON.stringify({ domain, learning }),
           signal: AbortSignal.timeout(5000),
         });
