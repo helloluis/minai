@@ -939,7 +939,7 @@ async function imageSearch(args: { query: string }): Promise<string> {
   }
 
   try {
-    const params = new URLSearchParams({ q: args.query, count: '3', safesearch: 'moderate' });
+    const params = new URLSearchParams({ q: args.query, count: '3', safesearch: 'off' });
     const response = await fetch(
       `https://api.search.brave.com/res/v1/images/search?${params}`,
       {
