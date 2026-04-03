@@ -151,6 +151,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  {
+    name: 'image_search',
+    description: 'Search for an image of a public person, place, animal, object, or thing. Returns an image the user can see. Use this when the user asks to see what someone or something looks like, or asks for a photo/picture of something.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'What to search for (e.g., "Elon Musk", "pangolin", "Eiffel Tower")',
+        },
+      },
+      required: ['query'],
+    },
+  },
+
   // ─── Google Calendar tools ─────────────────────────────────────────────────
 
   {
@@ -917,6 +932,59 @@ async function webSearch(args: { query: string }): Promise<string> {
   }
 }
 
+async function imageSearch(args: { query: string }): Promise<string> {
+  const apiKey = process.env.BRAVE_API_KEY;
+  if (!apiKey) {
+    return `[Image search is not configured. Set BRAVE_API_KEY in .env.local]`;
+  }
+
+  try {
+    const params = new URLSearchParams({ q: args.query, count: '3', safesearch: 'moderate' });
+    const response = await fetch(
+      `https://api.search.brave.com/res/v1/images/search?${params}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip',
+          'X-Subscription-Token': apiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`[Tools] Brave Image Search error: ${response.status}`);
+      return `Image search failed (${response.status}).`;
+    }
+
+    const data = (await response.json()) as {
+      results?: Array<{
+        title: string;
+        url: string;
+        thumbnail?: { src: string };
+        properties?: { url: string };
+        source?: string;
+      }>;
+    };
+
+    const results = data.results;
+    if (!results || results.length === 0) {
+      return `No images found for "${args.query}".`;
+    }
+
+    // Return top results with both thumbnail and full-size URLs
+    return results
+      .map((r, i) => {
+        const imageUrl = r.properties?.url || r.thumbnail?.src || r.url;
+        const thumbUrl = r.thumbnail?.src || imageUrl;
+        return `${i + 1}. **${r.title}**\n   Image: ${imageUrl}\n   Thumbnail: ${thumbUrl}\n   Source: ${r.url}`;
+      })
+      .join('\n\n');
+  } catch (err) {
+    console.error('[Tools] image_search error:', err);
+    return `Image search failed. Please try again.`;
+  }
+}
+
 async function minipayInfo(args: { topic: string }): Promise<string> {
   // Static knowledge base about MiniPay
   const kb: Record<string, string> = {
@@ -1236,6 +1304,9 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       break;
     case 'web_search':
       content = await webSearch(args as { query: string });
+      break;
+    case 'image_search':
+      content = await imageSearch(args as { query: string });
       break;
 
     case 'search_places': {
