@@ -42,6 +42,7 @@ export function TopUpModal({ onClose }: Props) {
   // Wallet detection
   const [walletType, setWalletType] = useState<WalletType | null>(null);
   const [tab, setTab] = useState<Tab>('manual');
+  const isMiniPay = walletType === 'minipay';
 
   // Wallet pay state
   const [amount, setAmount] = useState('');
@@ -73,6 +74,7 @@ export function TopUpModal({ onClose }: Props) {
   // ─── Wallet Pay ──────────────────────────────────────────────────────────
 
   const walletLabel = walletType === 'minipay' ? 'MiniPay' : walletType === 'metamask' ? 'MetaMask' : 'Wallet';
+  const walletTabLabel = walletType ? `Pay with ${walletLabel}` : 'Pay with MiniPay';
 
   const handleWalletPay = async () => {
     if (!addressInfo || !amount) return;
@@ -172,7 +174,7 @@ export function TopUpModal({ onClose }: Props) {
           {/* Ready — tabs */}
           {(step === 'ready' || step === 'verifying') && addressInfo && (
             <>
-              {/* Tab switcher */}
+              {/* Tab switcher — hide Manual tab inside MiniPay */}
               <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <button
                   onClick={() => { setTab('wallet'); setErrorMsg(''); }}
@@ -182,18 +184,20 @@ export function TopUpModal({ onClose }: Props) {
                       : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
-                  Pay with MiniPay
+                  {walletTabLabel}
                 </button>
-                <button
-                  onClick={() => { setTab('manual'); setErrorMsg(''); }}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                    tab === 'manual'
-                      ? 'bg-minai-600 text-white'
-                      : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  Manual Deposit
-                </button>
+                {!isMiniPay && (
+                  <button
+                    onClick={() => { setTab('manual'); setErrorMsg(''); }}
+                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                      tab === 'manual'
+                        ? 'bg-minai-600 text-white'
+                        : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    Manual Deposit
+                  </button>
+                )}
                 <button
                   onClick={() => { setTab('coupon'); setErrorMsg(''); }}
                   className={`flex-1 py-2 text-sm font-medium transition-colors ${
@@ -205,7 +209,7 @@ export function TopUpModal({ onClose }: Props) {
                   Coupon Code
                 </button>
               </div>
-              {tab === 'wallet' && (
+              {tab === 'wallet' && !isMiniPay && (
                 <div className="flex justify-center">
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">
                     All crypto wallets supported
@@ -235,8 +239,11 @@ export function TopUpModal({ onClose }: Props) {
               {tab === 'wallet' && walletType && (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Send <strong className="text-gray-700 dark:text-gray-200">cUSD or USDC</strong> directly
-                    from your wallet on <span className="text-minai-600 font-medium">Celo</span>.
+                    {isMiniPay ? (
+                      <>Pay from your <strong className="text-gray-700 dark:text-gray-200">MiniPay</strong> balance. No gas fees — instant.</>
+                    ) : (
+                      <>Send stablecoins directly from your wallet on <span className="text-minai-600 font-medium">Celo</span>.</>
+                    )}
                   </p>
 
                   {/* Amount */}

@@ -38,9 +38,20 @@ export function detectWallet(): WalletType | null {
   return 'evm';
 }
 
-/** Request wallet connection, returns the connected address */
+/** Request wallet connection, returns the connected address.
+ * Inside MiniPay, connection is implicit — try eth_accounts first to avoid
+ * a redundant permission flash. Fall back to eth_requestAccounts if needed.
+ */
 export async function connectWallet(): Promise<string> {
   if (!window.ethereum) throw new Error('No wallet detected');
+
+  if (window.ethereum.isMiniPay) {
+    const existing = (await window.ethereum.request({
+      method: 'eth_accounts',
+    })) as string[];
+    if (existing.length) return existing[0];
+  }
+
   const accounts = (await window.ethereum.request({
     method: 'eth_requestAccounts',
   })) as string[];
