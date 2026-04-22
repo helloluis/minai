@@ -25,7 +25,7 @@ export function calculateCost(
   inputTokens: number,
   outputTokens: number
 ): number {
-  const isDeep = model === 'qwen3.5-plus';
+  const isDeep = model === 'qwen3.5-plus' || model === 'qwen3.6-plus';
   const inputPrice = isDeep
     ? PRICING.input_token_price_per_mil_deep
     : PRICING.input_token_price_per_mil_fast;

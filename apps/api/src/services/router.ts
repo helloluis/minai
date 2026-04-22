@@ -17,7 +17,7 @@ import type { ContextImage } from './tools.js';
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
 
 const MODEL_FAST: ModelId = 'qwen3.5-flash';
-const MODEL_DEEP: ModelId = 'qwen3.5-plus';
+const MODEL_DEEP: ModelId = 'qwen3.6-plus';
 const MAX_TOOL_ITERATIONS = 50;
 
 // Classifier config — switch via env vars
