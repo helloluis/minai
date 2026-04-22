@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { LLMMode, SendMessageRequest } from '@minai/shared';
 import * as db from '../services/db.js';
 import { streamResponse } from '../services/router.js';
+import { stripHallucinatedUploads } from '../services/image-store.js';
 
 export async function messageRoutes(fastify: FastifyInstance) {
   // Get messages for a conversation
@@ -80,11 +81,14 @@ export async function messageRoutes(fastify: FastifyInstance) {
           reply.raw.write(`event: ${chunk.type}\ndata: ${JSON.stringify(chunk)}\n\n`);
         }
 
-        // Update the assistant message with full content, model, and actual timestamp
+        // Update the assistant message with full content, model, and actual timestamp.
+        // Strip any fabricated /api/uploads URLs before persisting so reloaded
+        // messages don't render as broken images.
         if (fullContent) {
+          const cleanedContent = stripHallucinatedUploads(fullContent);
           await db.pool.query(
             'UPDATE messages SET content = $2, created_at = NOW(), model = $3 WHERE id = $1',
-            [assistantMsg.id, fullContent, usedModel]
+            [assistantMsg.id, cleanedContent, usedModel]
           );
         }
 
