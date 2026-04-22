@@ -154,10 +154,16 @@ export function renderMarkdown(text: string): string {
     // Empty line
     if (!line.trim()) { result.push(''); continue; }
 
-    // Block-level image: a line that is just ![alt](url)
-    const blockImg = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
-    if (blockImg) {
+    // Block-level image: a line that is just ![alt](url), [alt](url) pointing to
+    // an image, or a bare image URL. Catches cases where the LLM forgets the `!`.
+    const blockImg = line.trim().match(/^!?\[([^\]]*)\]\(([^)]+)\)$/);
+    if (blockImg && (blockImg[0].startsWith('!') || isImageUrl(blockImg[2]))) {
       result.push(`<img src="${escapeHtml(blockImg[2])}" alt="${escapeHtml(blockImg[1] || 'Generated image')}" class="generated-image" />`);
+      continue;
+    }
+    const bareImgUrl = line.trim().match(/^(https?:\/\/\S+)$/);
+    if (bareImgUrl && isImageUrl(bareImgUrl[1])) {
+      result.push(`<img src="${escapeHtml(bareImgUrl[1])}" alt="Generated image" class="generated-image" />`);
       continue;
     }
 
@@ -187,12 +193,18 @@ function inlineMarkdown(text: string): string {
     return `\x00INLINEIMG${idx}\x00`;
   });
 
-  // 2b. Extract markdown links [text](url) before escaping
+  // 2b. Extract markdown links [text](url) before escaping.
+  // If the URL points to an image, render as an image instead of a link.
   const links: string[] = [];
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, linkText, url) => {
-    const idx = links.length;
+    const idx = inlineImages.length;
+    if (isImageUrl(url)) {
+      inlineImages.push(`<img src="${escapeHtml(url)}" alt="${escapeHtml(linkText || 'Generated image')}" class="generated-image" />`);
+      return `\x00INLINEIMG${idx}\x00`;
+    }
+    const lIdx = links.length;
     links.push(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(linkText)}</a>`);
-    return `\x00LINK${idx}\x00`;
+    return `\x00LINK${lIdx}\x00`;
   });
 
   // 3. Now escape the remaining text
@@ -202,10 +214,12 @@ function inlineMarkdown(text: string): string {
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // 5. Auto-link bare URLs (only in the escaped text, not inside placeholders)
+  // 5. Auto-link bare URLs (or auto-embed bare image URLs)
   html = html.replace(
     /https?:\/\/[^\s<&\x00]+/g,
-    (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+    (url) => isImageUrl(url)
+      ? `<img src="${url}" alt="Generated image" class="generated-image" />`
+      : `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
   );
 
   // 6. Restore inline code, links, and images
@@ -214,6 +228,15 @@ function inlineMarkdown(text: string): string {
   html = html.replace(/\x00INLINEIMG(\d+)\x00/g, (_match, idx) => inlineImages[parseInt(idx)]);
 
   return html;
+}
+
+function isImageUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(pathname);
+  } catch {
+    return false;
+  }
 }
 
 function escapeHtml(text: string): string {
