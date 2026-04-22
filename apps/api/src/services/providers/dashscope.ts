@@ -15,8 +15,8 @@ import type { TokenUsage } from '@minai/shared';
 // DashScope pricing per million tokens (Alibaba's actual cost — we mark up in pricing.ts)
 const DASHSCOPE_PRICING: Record<string, { input: number; output: number }> = {
   'qwen3.5-flash': { input: 0.10, output: 0.50 },
-  'qwen3.5-plus': { input: 0.50, output: 2.50 },
-  'qwen3.6-plus': { input: 0.50, output: 2.50 },
+  'qwen3.5-plus': { input: 0.40, output: 2.40 },
+  'qwen3.6-plus': { input: 0.50, output: 3.00 },
 };
 
 const CACHE_HIT_MULTIPLIER = 0.1;
