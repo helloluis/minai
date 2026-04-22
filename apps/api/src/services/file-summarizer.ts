@@ -11,7 +11,7 @@ import { calculateCost } from '../config/pricing.js';
 import * as db from './db.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
-const MODEL = 'qwen3.5-flash';
+const MODEL = 'qwen3.6-flash';
 const MAX_INPUT_CHARS = 6000; // limit input to keep cost low
 
 const SUMMARIZE_PROMPT = `You are a document analysis assistant. Given the text content of a document, produce a structured summary that captures ALL key information in a compact format.

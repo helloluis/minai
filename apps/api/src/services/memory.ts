@@ -8,7 +8,7 @@ import { DashScopeProvider } from './providers/dashscope.js';
 import * as db from './db.js';
 
 const provider = new DashScopeProvider(process.env.DASHSCOPE_API_KEY!);
-const MODEL = 'qwen3.5-flash';
+const MODEL = 'qwen3.6-flash';
 
 const MEMORY_EXTRACTION_PROMPT = `You extract user preferences and facts from messages. Given a user message, identify any personal facts worth remembering for future conversations.
 

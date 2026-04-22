@@ -1,11 +1,11 @@
 import { FREE_CREDIT_INITIAL_USD } from '@minai/shared';
 
 export const PRICING = {
-  // USD per million tokens (100% markup on Alibaba Cloud pricing)
+  // USD per million tokens — 100% markup on input, 67% on output (matches qwen3.6 cost/margin shape)
   input_token_price_per_mil_deep: 1,
   output_token_price_per_mil_deep: 5,
-  input_token_price_per_mil_fast: 0.2,
-  output_token_price_per_mil_fast: 1,
+  input_token_price_per_mil_fast: 0.5,
+  output_token_price_per_mil_fast: 2.5,
 
   // Free USD credit granted to every new user
   free_credit_initial_usd: FREE_CREDIT_INITIAL_USD,
@@ -26,6 +26,7 @@ export function calculateCost(
   outputTokens: number
 ): number {
   const isDeep = model === 'qwen3.5-plus' || model === 'qwen3.6-plus';
+  // (Fast tier: qwen3.5-flash, qwen3.6-flash)
   const inputPrice = isDeep
     ? PRICING.input_token_price_per_mil_deep
     : PRICING.input_token_price_per_mil_fast;

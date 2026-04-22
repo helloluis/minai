@@ -6,7 +6,7 @@ export const FREE_CREDIT_INITIAL_USD = 1.00; // $1.00 free credit for every new 
 
 export type LLMMode = 'auto' | 'fast' | 'balanced' | 'deep';
 export type LLMClassification = 'simple' | 'balanced' | 'deep';
-export type ModelId = 'qwen3.5-flash' | 'qwen3.5-plus' | 'qwen3.6-plus';
+export type ModelId = 'qwen3.5-flash' | 'qwen3.5-plus' | 'qwen3.6-plus' | 'qwen3.6-flash';
 export type MessageRole = 'user' | 'assistant' | 'system';
 
 // ─── Database Entities ───

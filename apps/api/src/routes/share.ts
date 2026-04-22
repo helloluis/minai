@@ -72,7 +72,7 @@ export async function shareRoutes(fastify: FastifyInstance) {
       try {
         let llmOutput = '';
         for await (const chunk of provider.stream({
-          model: 'qwen3.5-flash',
+          model: 'qwen3.6-flash',
           messages: [
             { role: 'system', content: RECOMPOSE_PROMPT },
             { role: 'user', content: message.content },
