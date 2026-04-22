@@ -207,6 +207,14 @@ function inlineMarkdown(text: string): string {
     return `\x00LINK${lIdx}\x00`;
   });
 
+  // 2c. Catch malformed markdown where the opening [ is missing: ](imageUrl)
+  html = html.replace(/\]\((https?:\/\/[^)\s]+)\)/g, (match, url) => {
+    if (!isImageUrl(url)) return match;
+    const idx = inlineImages.length;
+    inlineImages.push(`<img src="${escapeHtml(url)}" alt="Generated image" class="generated-image" />`);
+    return `\x00INLINEIMG${idx}\x00`;
+  });
+
   // 3. Now escape the remaining text
   html = escapeHtml(html);
 
@@ -232,7 +240,9 @@ function inlineMarkdown(text: string): string {
 
 function isImageUrl(url: string): boolean {
   try {
-    const pathname = new URL(url).pathname.toLowerCase();
+    // Strip trailing punctuation (e.g., URL that got auto-captured with a trailing `)` or `.`)
+    const cleaned = url.replace(/[.,!?)\]}>]+$/, '');
+    const pathname = new URL(cleaned).pathname.toLowerCase();
     return /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(pathname);
   } catch {
     return false;
