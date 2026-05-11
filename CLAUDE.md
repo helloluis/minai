@@ -1,8 +1,31 @@
 # Minai — Claude Notes
 
-## VPS / SSH
+## Two-Server Architecture
 
-- SSH alias: `ssh minai` (dedicated server, 192.248.144.62, port 2222) — **always use this**
+We manage **two separate VPS instances**:
+
+| Server | IP | SSH | Purpose | PM2 processes |
+|--------|-----|-----|---------|---------------|
+| **minai** | 192.248.144.62 | `ssh minai` (port 2222) | Web app + API + PostgreSQL | `minai-api`, `minai-web` |
+| **Browse box** | 45.76.180.229 | `ssh browse` | kamai browse API (headless browser) + dashboard | `kamai`, `kamai-dashboard` |
+
+### Classifier retired — 2026-05-11
+
+The GPU box (78.141.226.70) that ran the Ollama classifier on port 11434 has been decommissioned. The classifier was the largest consumer of that VPS's resources, so we downsized. 
+
+**What changed:**
+- The Ollama classifier is gone. Auto/Fast/Balanced modes are grayed out in the UI and map to Deep on the server (`apps/api/src/services/router.ts` — all modes route to `MODEL_DEEP` with thinking enabled).
+- The original design used a binary classifier for ~400ms smart routing between Qwen Flash/Plus. Now everything goes straight to Qwen Plus with extended reasoning.
+- The UI keeps the mode buttons visible but disabled, as a reminder of the original architecture.
+- The classifier code in `router.ts` is still present but unreachable — kept for potential future re-enablement.
+- Env vars `CLASSIFIER_PROVIDER`, `CLASSIFIER_COMPARE`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL` are dead config.
+- `apps/api/src/config/about.ts` was updated to reflect this.
+
+**Browse service migration (completed 2026-05-11):** The browse API moved to 45.76.180.229. DNS for `kamai.minai.work` points there. `apps/api/src/services/tools.ts` has the hardcoded fallback updated to `http://45.76.180.229:3100`.
+
+## VPS: minai (192.248.144.62)
+
+- SSH alias: `ssh minai` (port 2222) — **always use this**
 - App directory: `/var/www/minai`
 - PM2 processes: `minai-api` (id 0), `minai-web` (id 1)
 - Git remote: `git@github.com:helloluis/minai.git` (deploy key: `~/.ssh/id_minai` on server, configured in `~/.ssh/config`)
@@ -40,6 +63,23 @@ If you get banned (connection refused / timeout), wait or ask the user to run `f
 - Run load tests or parallel curl against the server
 
 See `VULTR-VPS-GUIDE.md` for full setup documentation.
+
+## VPS: Browse box / kamai (45.76.180.229)
+
+- **Migrated from:** 78.141.226.70 (decommissioned 2026-05-11). Browse service + DBs moved here, classifier retired.
+- SSH: `ssh browse` (alias for `root@45.76.180.229`)
+- App directory: `/opt/kamai`
+- PM2 processes: `kamai` (Express API on port 3100), `kamai-dashboard` (Next.js dashboard on port 3200)
+- Public URL: `https://kamai.minai.work` (nginx + SSL via Let's Encrypt, proxied to port 3100/3200)
+- Git remote: `https://github.com/helloluis/kamai.git` (public repo, cloned via HTTPS)
+- **Deploy workflow:**
+  ```
+  ssh browse "cd /opt/kamai && git pull origin main && npm install && npm run build && pm2 restart kamai"
+  ```
+- **Legacy compat:** minai calls `/browse` and `/browse/memories` directly (no auth, no payment). New public API is at `/api/v1/browse` with wallet/key auth + credit system.
+- **Firewall:** ports 80/443 open to all (nginx), port 3100 restricted to sister VPS IPs
+- **SQLite DBs:** `credits.db` (accounts/deposits/usage), `browse_memories.db` (domain learnings) — both in `/opt/kamai/`
+- **Note:** This VPS hosts multiple apps (bcp-web, cryptoday, tsocs, earnest). Be careful not to affect other services.
 
 ## Post-Deploy Checklist
 

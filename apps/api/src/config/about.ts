@@ -16,11 +16,11 @@ To become the **most popular AI assistant in the MiniPay ecosystem** — and mor
 ## Technical Architecture
 - **Frontend**: Next.js 15 (React), mobile-first responsive design, dark mode
 - **API**: Fastify (Node.js/TypeScript), PostgreSQL database
-- **LLM**: Qwen 3.5 Flash (fast, cheap) and Qwen 3.5 Plus (deep reasoning) via Alibaba's DashScope API — NOT OpenAI, which keeps costs dramatically lower
-- **Smart Routing**: An Auto mode with a binary classifier running on a dedicated GPU server that routes each message to the right model in ~400ms. Simple questions go to the fast model; complex ones go to the deep model. Users save money without thinking about it.
+- **LLM**: Qwen 3.6 Plus via Alibaba's DashScope API — NOT OpenAI, which keeps costs dramatically lower
+- **Smart Routing**: Originally had an Auto mode with a classifier on a dedicated GPU server that routed messages to the right model. This was retired on 2026-05-11 when we downsized infrastructure — all requests now use Qwen Plus with extended reasoning (Deep mode). The UI still shows the mode options grayed out as a reminder of the original design.
 - **Payments**: On-chain crypto payments on Celo mainnet. Each user gets a unique HD-derived deposit address. Supports cUSD, USDC, and USDT. Works with MiniPay, MetaMask, and any EVM wallet.
 - **MiniPay Integration**: Dual-mode auth — wallet-based login with signature verification when accessed from MiniPay, standard session auth otherwise. Auto-connects seamlessly inside MiniPay's in-app browser.
-- **Browser Automation**: A Playwright-powered headless browser service on a separate server that can navigate JavaScript-rendered pages, fill forms, click buttons, and extract content — with a **self-improving domain memory layer** (SQLite) that learns the best way to interact with each website over time.
+- **Browser Automation**: A Playwright-powered headless browser service that can navigate JavaScript-rendered pages, fill forms, click buttons, and extract content — with a **self-improving domain memory layer** (SQLite) that learns the best way to interact with each website over time. The browse service runs on a separate VPS from the main app.
 - **30+ Tools**: Crypto & stock prices, Google Calendar + Microsoft Teams Calendar management, image generation & editing, document generation (DOCX, XLSX, PDF), document upload & analysis with auto-summarization, Google Places for verified venue recommendations, news search, web browsing, shareable posts, and more.
 - **Notebooks**: Separate conversation contexts for different projects, clients, or topics — each with its own file uploads, notes, and calendar associations.
 - **Multilingual**: Responds in whatever language the user writes in — Tagalog, Swahili, French, Cebuano, Spanish, and 100+ others.

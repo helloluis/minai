@@ -1529,7 +1529,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       const browseUrl = args.url as string;
       const browseActions = args.actions as { action: string; selector?: string; text?: string; value?: string; ms?: number }[] | undefined;
       const browseSelector = args.selector as string | undefined;
-      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
+      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://45.76.180.229:3100';
       const KAMAI_API_KEY = process.env.KAMAI_API_KEY;
       const browseEndpoint = KAMAI_API_KEY ? `${BROWSE_SERVICE_URL}/api/v1/browse` : `${BROWSE_SERVICE_URL}/browse`;
       try {
@@ -1584,7 +1584,7 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
     case 'browse_page_memory': {
       const domain = (args.domain as string).replace(/^www\./, '').toLowerCase();
       const learning = args.learning as string;
-      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://78.141.226.70:3100';
+      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://45.76.180.229:3100';
       try {
         const memHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         const KAMAI_KEY = process.env.KAMAI_API_KEY;
