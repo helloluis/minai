@@ -23,6 +23,16 @@ The GPU box (78.141.226.70) that ran the Ollama classifier on port 11434 has bee
 
 **Browse service migration (completed 2026-05-11):** The browse API moved to 45.76.180.229. DNS for `kamai.minai.work` points there. `apps/api/src/services/tools.ts` has the hardcoded fallback updated to `http://45.76.180.229:3100`.
 
+### Sister app keys (kamai)
+
+Sister apps have `SISTER_API_KEYS` in kamai's `.env` — these bypass payment, get 50% discount on `/api/v1/browse`, and can use legacy `/browse` without auth.
+
+| App | Key | Purpose |
+|-----|-----|---------|
+| minai | `0T2bn2DoqzrgU7igt-OeZpT09IfWX7Cy` | AI assistant browse |
+| beaniebot | `jPXIgZDZ-6NvhfQo5_6YdSQCgaor2vb4` | Personal AI assistant browse |
+| cryptoday news | `cd_news_qfEoOjTVpiPk95egewrfQneT` | News aggregator browse/search |
+
 ## VPS: minai (192.248.144.62)
 
 - SSH alias: `ssh minai` (port 2222) — **always use this**
