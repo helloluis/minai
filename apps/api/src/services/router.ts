@@ -458,7 +458,6 @@ export async function* streamResponse(
   let model: ModelId;
   let enableThinking: boolean;
   let classification: LLMClassification;
-  let classifierUsage: TokenUsage | null = null;
   if (mode === "fast" || mode === "balanced") {
     // Disabled modes — treat as deep
     model = MODEL_DEEP;
@@ -518,9 +517,7 @@ export async function* streamResponse(
 
   // Stream with tool-use loop
   const tools = getProviderTools();
-  let totalUsage: TokenUsage | null = classifierUsage
-    ? { ...classifierUsage }
-    : null;
+  let totalUsage: TokenUsage | null = null;
   let iterations = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {

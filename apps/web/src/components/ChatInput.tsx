@@ -10,7 +10,7 @@ const MODES: {
   value: LLMMode;
   label: string;
   description: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<{ size?: number; disabled?: boolean }>;
 }[] = [
   {
     value: "auto",

@@ -2,17 +2,18 @@
  * Tool System — provides external data to the LLM via function calling.
  */
 
-import * as gcal from './google-calendar.js';
-import * as mscal from './microsoft-calendar.js';
-import * as db from './db.js';
-import * as imageGen from './image-gen.js';
-import { PRICING } from '../config/pricing.js';
-import { searchPlaces, PLACES_COST_USD } from './places.js';
+import * as gcal from "./google-calendar.js";
+import * as mscal from "./microsoft-calendar.js";
+import * as db from "./db.js";
+import * as imageGen from "./image-gen.js";
+import { PRICING } from "../config/pricing.js";
+import { searchPlaces, PLACES_COST_USD } from "./places.js";
+import { searchWeb as braveSearch, isBraveConfigured } from "./brave.js";
 
 export interface ContextImage {
-  url: string;           // base64 data URL or https:// URL
-  source: 'user' | 'generated';
-  label: string;         // human-readable label for the LLM
+  url: string; // base64 data URL or https:// URL
+  source: "user" | "generated";
+  label: string; // human-readable label for the LLM
 }
 
 export interface ToolDefinition {
@@ -31,631 +32,727 @@ export interface ToolResult {
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
-    name: 'crypto_price',
-    description: 'Get the current price of a cryptocurrency in USD. Supports major coins like BTC, ETH, SOL, CELO, etc.',
+    name: "crypto_price",
+    description:
+      "Get the current price of a cryptocurrency in USD. Supports major coins like BTC, ETH, SOL, CELO, etc.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         symbol: {
-          type: 'string',
-          description: 'The cryptocurrency symbol (e.g., BTC, ETH, SOL, CELO)',
+          type: "string",
+          description: "The cryptocurrency symbol (e.g., BTC, ETH, SOL, CELO)",
         },
       },
-      required: ['symbol'],
+      required: ["symbol"],
     },
   },
   {
-    name: 'crypto_history',
-    description: 'Get price history for a cryptocurrency over a time period. Returns daily closing prices.',
+    name: "crypto_history",
+    description:
+      "Get price history for a cryptocurrency over a time period. Returns daily closing prices.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         symbol: {
-          type: 'string',
-          description: 'The cryptocurrency symbol (e.g., BTC, ETH)',
+          type: "string",
+          description: "The cryptocurrency symbol (e.g., BTC, ETH)",
         },
         days: {
-          type: 'number',
-          description: 'Number of days of history (default 7, max 30)',
+          type: "number",
+          description: "Number of days of history (default 7, max 30)",
         },
       },
-      required: ['symbol'],
+      required: ["symbol"],
     },
   },
   {
-    name: 'web_search',
-    description: 'Search the web for current information. Use this for recent news, events, or facts you are unsure about.',
+    name: "web_search",
+    description:
+      "Search the web for current information. Use for recent news, events, facts, or deep research.\n\n" +
+      "DEEP RESEARCH: When doing thorough research on a topic, use targeted site-scoped queries for richer results:\n" +
+      '• Real discussions/opinions: "site:reddit.com [topic]" — great for user experiences, reviews, honest takes\n' +
+      '• Developer/technical info: "site:github.com [project]" or "site:stackoverflow.com [topic]" — code, docs, issues\n' +
+      '• News/press: "site:techcrunch.com [topic]" or "site:reuters.com [topic]" — credible reporting\n' +
+      '• Academic: "site:arxiv.org [topic]" — research papers\n' +
+      '• Wikipedia: "site:wikipedia.org [topic]" — background context\n' +
+      'Combine multiple targeted searches for comprehensive answers. For "research [topic]" requests, run at least 2-3 site-scoped searches across different source types.',
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         query: {
-          type: 'string',
-          description: 'The search query',
+          type: "string",
+          description: "The search query",
         },
       },
-      required: ['query'],
+      required: ["query"],
     },
   },
   {
-    name: 'minipay_info',
-    description: 'Get information about MiniPay, the stablecoin wallet built into Opera Mini for emerging markets.',
+    name: "minipay_info",
+    description:
+      "Get information about MiniPay, the stablecoin wallet built into Opera Mini for emerging markets.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         topic: {
-          type: 'string',
-          description: 'The topic to look up (e.g., "how to send money", "supported countries", "stablecoins")',
+          type: "string",
+          description:
+            'The topic to look up (e.g., "how to send money", "supported countries", "stablecoins")',
         },
       },
-      required: ['topic'],
+      required: ["topic"],
     },
   },
   {
-    name: 'search_places',
-    description: 'Search for real businesses, restaurants, cafes, hotels, gyms, etc. using Google Places. Returns verified names, addresses, ratings, phone numbers, and Google Maps links. ALWAYS use this instead of guessing about local businesses. Results are real-time and accurate.',
+    name: "search_places",
+    description:
+      "Search for real businesses, restaurants, cafes, hotels, gyms, etc. using Google Places. Returns verified names, addresses, ratings, phone numbers, and Google Maps links. ALWAYS use this instead of guessing about local businesses. Results are real-time and accurate.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         query: {
-          type: 'string',
-          description: 'Search query including location. Examples: "quiet coffee shops in Quezon City", "fine dining restaurants near Trinoma Mall Manila", "gyms in BGC Taguig"',
+          type: "string",
+          description:
+            'Search query including location. Examples: "quiet coffee shops in Quezon City", "fine dining restaurants near Trinoma Mall Manila", "gyms in BGC Taguig"',
         },
         max_results: {
-          type: 'number',
-          description: 'Maximum results to return (1-10, default 5)',
+          type: "number",
+          description: "Maximum results to return (1-10, default 5)",
         },
       },
-      required: ['query'],
+      required: ["query"],
     },
   },
   {
-    name: 'url_fetch',
-    description: 'Fetch and read the text content of a web page URL. Use this when the user shares a link or asks about a specific webpage.',
+    name: "url_fetch",
+    description:
+      "Fetch and read the text content of a web page URL. Use this when the user shares a link or asks about a specific webpage.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         url: {
-          type: 'string',
-          description: 'The full URL to fetch (e.g., "https://example.com/page")',
+          type: "string",
+          description:
+            'The full URL to fetch (e.g., "https://example.com/page")',
         },
       },
-      required: ['url'],
+      required: ["url"],
     },
   },
   {
-    name: 'market_price',
-    description: 'Get the current price of any stock, ETF, index, commodity, or forex pair using Yahoo Finance symbols. Examples: AAPL, MSFT, TSLA, GOOGL, ^GSPC (S&P 500), ^DJI (Dow Jones), ^IXIC (Nasdaq), GC=F (gold), SI=F (silver), CL=F (WTI crude oil), BZ=F (Brent crude), EURUSD=X (EUR/USD forex). Use this for any non-crypto financial market data.',
+    name: "market_price",
+    description:
+      "Get the current price of any stock, ETF, index, commodity, or forex pair using Yahoo Finance symbols. Examples: AAPL, MSFT, TSLA, GOOGL, ^GSPC (S&P 500), ^DJI (Dow Jones), ^IXIC (Nasdaq), GC=F (gold), SI=F (silver), CL=F (WTI crude oil), BZ=F (Brent crude), EURUSD=X (EUR/USD forex). Use this for any non-crypto financial market data.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         symbol: {
-          type: 'string',
-          description: 'Yahoo Finance symbol (e.g., AAPL, ^GSPC, GC=F, BZ=F, EURUSD=X)',
+          type: "string",
+          description:
+            "Yahoo Finance symbol (e.g., AAPL, ^GSPC, GC=F, BZ=F, EURUSD=X)",
         },
       },
-      required: ['symbol'],
+      required: ["symbol"],
     },
   },
   {
-    name: 'news_search',
-    description: 'Search Google News for recent news articles on any topic. Returns headlines, sources, and publication dates. Use this when the user asks about current events, recent news, or wants to know what is happening with a topic.',
+    name: "news_search",
+    description:
+      "Search Google News for recent news articles on any topic. Returns headlines, sources, and publication dates. Use this when the user asks about current events, recent news, or wants to know what is happening with a topic.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         query: {
-          type: 'string',
-          description: 'The news search query (e.g., "Kenya elections", "Bitcoin regulation", "AI developments")',
+          type: "string",
+          description:
+            'The news search query (e.g., "Kenya elections", "Bitcoin regulation", "AI developments")',
         },
       },
-      required: ['query'],
+      required: ["query"],
     },
   },
 
   {
-    name: 'image_search',
-    description: 'Search for an image of a public person, place, animal, object, or thing. Returns an image the user can see. Use this when the user asks to see what someone or something looks like, or asks for a photo/picture of something.',
+    name: "image_search",
+    description:
+      "Search for an image of a public person, place, animal, object, or thing. Returns an image the user can see. Use this when the user asks to see what someone or something looks like, or asks for a photo/picture of something.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         query: {
-          type: 'string',
-          description: 'What to search for (e.g., "Elon Musk", "pangolin", "Eiffel Tower")',
+          type: "string",
+          description:
+            'What to search for (e.g., "Elon Musk", "pangolin", "Eiffel Tower")',
         },
       },
-      required: ['query'],
+      required: ["query"],
     },
   },
 
   // ─── Google Calendar tools ─────────────────────────────────────────────────
 
   {
-    name: 'calendar_list_calendars',
-    description: 'List all Google calendars the user has access to, including shared client calendars. Shows which calendar is associated with which notebook. Use this first to understand what calendars are available before performing other calendar operations.',
+    name: "calendar_list_calendars",
+    description:
+      "List all Google calendars the user has access to, including shared client calendars. Shows which calendar is associated with which notebook. Use this first to understand what calendars are available before performing other calendar operations.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {},
       required: [],
     },
   },
   {
-    name: 'calendar_get_events',
-    description: 'Get events from a Google calendar for a date range. Use this to check a schedule, find an event, or see what is happening on a given day or week.',
+    name: "calendar_get_events",
+    description:
+      "Get events from a Google calendar for a date range. Use this to check a schedule, find an event, or see what is happening on a given day or week.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_id: {
-          type: 'string',
-          description: 'The Google calendar ID (from calendar_list_calendars). Use "primary" for the user\'s own calendar.',
+          type: "string",
+          description:
+            'The Google calendar ID (from calendar_list_calendars). Use "primary" for the user\'s own calendar.',
         },
         start_date: {
-          type: 'string',
-          description: 'Start date/datetime in ISO format (e.g., "2026-03-20" or "2026-03-20T09:00:00")',
+          type: "string",
+          description:
+            'Start date/datetime in ISO format (e.g., "2026-03-20" or "2026-03-20T09:00:00")',
         },
         end_date: {
-          type: 'string',
-          description: 'End date/datetime in ISO format (e.g., "2026-03-21" or "2026-03-20T17:00:00")',
+          type: "string",
+          description:
+            'End date/datetime in ISO format (e.g., "2026-03-21" or "2026-03-20T17:00:00")',
         },
         max_results: {
-          type: 'number',
-          description: 'Maximum number of events to return (default 20)',
+          type: "number",
+          description: "Maximum number of events to return (default 20)",
         },
         query: {
-          type: 'string',
-          description: 'Optional text search within event titles and descriptions',
+          type: "string",
+          description:
+            "Optional text search within event titles and descriptions",
         },
       },
-      required: ['calendar_id', 'start_date', 'end_date'],
+      required: ["calendar_id", "start_date", "end_date"],
     },
   },
   {
-    name: 'calendar_create_event',
-    description: 'Create a new event on a Google calendar. Always use the client\'s timezone (from the notebook), not the user\'s local timezone. After creating, show the event link to the user.',
+    name: "calendar_create_event",
+    description:
+      "Create a new event on a Google calendar. Always use the client's timezone (from the notebook), not the user's local timezone. After creating, show the event link to the user.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_id: {
-          type: 'string',
-          description: 'The Google calendar ID to create the event on',
+          type: "string",
+          description: "The Google calendar ID to create the event on",
         },
         title: {
-          type: 'string',
-          description: 'Event title',
+          type: "string",
+          description: "Event title",
         },
         start: {
-          type: 'string',
-          description: 'Start datetime in ISO format (e.g., "2026-03-20T14:00:00")',
+          type: "string",
+          description:
+            'Start datetime in ISO format (e.g., "2026-03-20T14:00:00")',
         },
         end: {
-          type: 'string',
-          description: 'End datetime in ISO format (e.g., "2026-03-20T15:00:00")',
+          type: "string",
+          description:
+            'End datetime in ISO format (e.g., "2026-03-20T15:00:00")',
         },
         timezone: {
-          type: 'string',
-          description: 'IANA timezone for the event, e.g. "Africa/Nairobi", "Asia/Manila", "America/New_York". Use the client\'s timezone.',
+          type: "string",
+          description:
+            'IANA timezone for the event, e.g. "Africa/Nairobi", "Asia/Manila", "America/New_York". Use the client\'s timezone.',
         },
         description: {
-          type: 'string',
-          description: 'Optional event description or agenda',
+          type: "string",
+          description: "Optional event description or agenda",
         },
         location: {
-          type: 'string',
-          description: 'Optional location (address or meeting link)',
+          type: "string",
+          description: "Optional location (address or meeting link)",
         },
         attendees: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional list of attendee email addresses',
+          type: "array",
+          items: { type: "string" },
+          description: "Optional list of attendee email addresses",
         },
         notebook_id: {
-          type: 'string',
-          description: 'Optional notebook (conversation) ID — if provided, the notebook\'s timezone is used automatically',
+          type: "string",
+          description:
+            "Optional notebook (conversation) ID — if provided, the notebook's timezone is used automatically",
         },
       },
-      required: ['calendar_id', 'title', 'start', 'end'],
+      required: ["calendar_id", "title", "start", "end"],
     },
   },
   {
-    name: 'calendar_update_event',
-    description: 'Update an existing calendar event. Only include fields you want to change.',
+    name: "calendar_update_event",
+    description:
+      "Update an existing calendar event. Only include fields you want to change.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_id: {
-          type: 'string',
-          description: 'The Google calendar ID containing the event',
+          type: "string",
+          description: "The Google calendar ID containing the event",
         },
         event_id: {
-          type: 'string',
-          description: 'The event ID to update',
+          type: "string",
+          description: "The event ID to update",
         },
-        title: { type: 'string', description: 'New event title' },
-        start: { type: 'string', description: 'New start datetime (ISO format)' },
-        end: { type: 'string', description: 'New end datetime (ISO format)' },
-        timezone: { type: 'string', description: 'IANA timezone if changing times' },
-        description: { type: 'string', description: 'New description' },
-        location: { type: 'string', description: 'New location' },
+        title: { type: "string", description: "New event title" },
+        start: {
+          type: "string",
+          description: "New start datetime (ISO format)",
+        },
+        end: { type: "string", description: "New end datetime (ISO format)" },
+        timezone: {
+          type: "string",
+          description: "IANA timezone if changing times",
+        },
+        description: { type: "string", description: "New description" },
+        location: { type: "string", description: "New location" },
         attendees: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Full replacement attendee list (email addresses)',
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement attendee list (email addresses)",
         },
       },
-      required: ['calendar_id', 'event_id'],
+      required: ["calendar_id", "event_id"],
     },
   },
   {
-    name: 'calendar_delete_event',
-    description: 'Delete or cancel a calendar event. Attendees will be notified.',
+    name: "calendar_delete_event",
+    description:
+      "Delete or cancel a calendar event. Attendees will be notified.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_id: {
-          type: 'string',
-          description: 'The Google calendar ID containing the event',
+          type: "string",
+          description: "The Google calendar ID containing the event",
         },
         event_id: {
-          type: 'string',
-          description: 'The event ID to delete',
+          type: "string",
+          description: "The event ID to delete",
         },
       },
-      required: ['calendar_id', 'event_id'],
+      required: ["calendar_id", "event_id"],
     },
   },
   {
-    name: 'calendar_find_free_slots',
-    description: 'Find available time slots across one or more calendars on a given day. Use this to schedule meetings — checks all specified calendars for conflicts.',
+    name: "calendar_find_free_slots",
+    description:
+      "Find available time slots across one or more calendars on a given day. Use this to schedule meetings — checks all specified calendars for conflicts.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_ids: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'List of Google calendar IDs to check for conflicts',
+          type: "array",
+          items: { type: "string" },
+          description: "List of Google calendar IDs to check for conflicts",
         },
         date: {
-          type: 'string',
-          description: 'The date to find slots on (ISO format, e.g., "2026-03-20")',
+          type: "string",
+          description:
+            'The date to find slots on (ISO format, e.g., "2026-03-20")',
         },
         duration_minutes: {
-          type: 'number',
-          description: 'Required meeting duration in minutes (e.g., 30, 60, 90)',
+          type: "number",
+          description:
+            "Required meeting duration in minutes (e.g., 30, 60, 90)",
         },
         timezone: {
-          type: 'string',
-          description: 'IANA timezone for interpreting working hours (use the client\'s timezone)',
+          type: "string",
+          description:
+            "IANA timezone for interpreting working hours (use the client's timezone)",
         },
         workday_start: {
-          type: 'string',
-          description: 'Working hours start time (e.g., "09:00"), default "09:00"',
+          type: "string",
+          description:
+            'Working hours start time (e.g., "09:00"), default "09:00"',
         },
         workday_end: {
-          type: 'string',
-          description: 'Working hours end time (e.g., "17:00"), default "17:00"',
+          type: "string",
+          description:
+            'Working hours end time (e.g., "17:00"), default "17:00"',
         },
       },
-      required: ['calendar_ids', 'date', 'duration_minutes', 'timezone'],
+      required: ["calendar_ids", "date", "duration_minutes", "timezone"],
     },
   },
   {
-    name: 'calendar_associate_notebook',
-    description: 'Associate a Google calendar with a notebook (client). Call this when the user tells you which calendar belongs to which client, or when you can infer the match from the calendar name. Once associated, events created for that notebook will use the right timezone automatically.',
+    name: "calendar_associate_notebook",
+    description:
+      "Associate a Google calendar with a notebook (client). Call this when the user tells you which calendar belongs to which client, or when you can infer the match from the calendar name. Once associated, events created for that notebook will use the right timezone automatically.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         calendar_id: {
-          type: 'string',
-          description: 'The Google calendar ID to associate',
+          type: "string",
+          description: "The Google calendar ID to associate",
         },
         notebook_id: {
-          type: 'string',
-          description: 'The notebook (conversation) ID to associate the calendar with',
+          type: "string",
+          description:
+            "The notebook (conversation) ID to associate the calendar with",
         },
         calendar_name: {
-          type: 'string',
-          description: 'The display name of the calendar',
+          type: "string",
+          description: "The display name of the calendar",
         },
       },
-      required: ['calendar_id', 'notebook_id', 'calendar_name'],
+      required: ["calendar_id", "notebook_id", "calendar_name"],
     },
   },
   {
-    name: 'set_preferred_name',
-    description: "Save the user's preferred name so it appears throughout the app. Call this as soon as the user shares their first name. If the user declines to share their name, call this with name=\"boss\".",
+    name: "set_preferred_name",
+    description:
+      'Save the user\'s preferred name so it appears throughout the app. Call this as soon as the user shares their first name. If the user declines to share their name, call this with name="boss".',
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         name: {
-          type: 'string',
-          description: "The user's first name, or \"boss\" if they declined to share it",
+          type: "string",
+          description:
+            'The user\'s first name, or "boss" if they declined to share it',
         },
       },
-      required: ['name'],
+      required: ["name"],
     },
   },
   {
-    name: 'update_user_memory',
-    description: "Append a fact about the user to their personal memory. Call this when the user shares something about themselves that would be useful to remember in future conversations — dietary restrictions, travel preferences, family details, health conditions, work habits, etc. Do NOT store client/project info here — only facts about the user themselves.",
+    name: "update_user_memory",
+    description:
+      "Append a fact about the user to their personal memory. Call this when the user shares something about themselves that would be useful to remember in future conversations — dietary restrictions, travel preferences, family details, health conditions, work habits, etc. Do NOT store client/project info here — only facts about the user themselves.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         fact: {
-          type: 'string',
-          description: 'A concise fact about the user. Example: "Vegan — no animal products", "Prefers window seats on flights", "Has a daughter named Sofia (age 7)"',
+          type: "string",
+          description:
+            'A concise fact about the user. Example: "Vegan — no animal products", "Prefers window seats on flights", "Has a daughter named Sofia (age 7)"',
         },
       },
-      required: ['fact'],
+      required: ["fact"],
     },
   },
   {
-    name: 'suggest_feature',
-    description: "Submit a feature suggestion from the user to the Minai team. The user can earn up to $10 in app credits if their suggestion is accepted. Use this when a user describes a feature they'd like to see, a tool they'd find useful, or an improvement to Minai.",
+    name: "suggest_feature",
+    description:
+      "Submit a feature suggestion from the user to the Minai team. The user can earn up to $10 in app credits if their suggestion is accepted. Use this when a user describes a feature they'd like to see, a tool they'd find useful, or an improvement to Minai.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         title: {
-          type: 'string',
-          description: 'A short title for the feature suggestion (max 100 characters)',
+          type: "string",
+          description:
+            "A short title for the feature suggestion (max 100 characters)",
         },
         description: {
-          type: 'string',
-          description: "The user's detailed description of the feature they want",
+          type: "string",
+          description:
+            "The user's detailed description of the feature they want",
         },
       },
-      required: ['title', 'description'],
+      required: ["title", "description"],
     },
   },
   {
-    name: 'create_notebook',
-    description: "Create a new notebook for the user. Use this when the user asks to start a new project, client, or topic area. A notebook organizes all related chat, notes, and files together.",
+    name: "create_notebook",
+    description:
+      "Create a new notebook for the user. Use this when the user asks to start a new project, client, or topic area. A notebook organizes all related chat, notes, and files together.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         title: {
-          type: 'string',
-          description: 'The name of the notebook (e.g. the client name, project name, or topic)',
+          type: "string",
+          description:
+            "The name of the notebook (e.g. the client name, project name, or topic)",
         },
       },
-      required: ['title'],
+      required: ["title"],
     },
   },
   {
-    name: 'create_note',
-    description: "Create a note inside a notebook. Use this to save structured information — a client profile, meeting notes, a summary, extracted data from a screenshot, etc.",
+    name: "create_note",
+    description:
+      "Create a note inside a notebook. Use this to save structured information — a client profile, meeting notes, a summary, extracted data from a screenshot, etc.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         notebook_id: {
-          type: 'string',
-          description: 'The ID of the notebook to create the note in',
+          type: "string",
+          description: "The ID of the notebook to create the note in",
         },
         title: {
-          type: 'string',
-          description: 'A short title for the note',
+          type: "string",
+          description: "A short title for the note",
         },
         content: {
-          type: 'string',
-          description: 'The note content in plain text or markdown',
+          type: "string",
+          description: "The note content in plain text or markdown",
         },
       },
-      required: ['notebook_id', 'title', 'content'],
+      required: ["notebook_id", "title", "content"],
     },
   },
   {
-    name: 'open_sidebar',
-    description: "Signal the user's interface to open the sidebar so they can see their notebooks and notes.",
-    parameters: { type: 'object', properties: {} },
+    name: "open_sidebar",
+    description:
+      "Signal the user's interface to open the sidebar so they can see their notebooks and notes.",
+    parameters: { type: "object", properties: {} },
   },
 
   // ─── Image tools ──────────────────────────────────────────────────────────
 
   {
-    name: 'generate_image',
-    description: "Generate an original image from a text description. Use for creating illustrations, backgrounds, concepts, logos, scenes, etc. Do NOT use if the user has uploaded a photo they want edited — use edit_image instead.",
+    name: "generate_image",
+    description:
+      "Generate an original image from a text description. Use for creating illustrations, backgrounds, concepts, logos, scenes, etc. Do NOT use if the user has uploaded a photo they want edited — use edit_image instead.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         prompt: {
-          type: 'string',
-          description: 'Detailed description of the image to generate. Be specific about style, lighting, composition, colors.',
+          type: "string",
+          description:
+            "Detailed description of the image to generate. Be specific about style, lighting, composition, colors.",
         },
         size: {
-          type: 'string',
-          description: 'Output dimensions as WIDTHxHEIGHT. Common sizes: "1024*1024" (square), "1792*1024" (landscape), "1024*1792" (portrait). Default: "1024*1024".',
+          type: "string",
+          description:
+            'Output dimensions as WIDTHxHEIGHT. Common sizes: "1024*1024" (square), "1792*1024" (landscape), "1024*1792" (portrait). Default: "1024*1024".',
         },
       },
-      required: ['prompt'],
+      required: ["prompt"],
     },
   },
   {
-    name: 'edit_image',
-    description: "Edit or transform an image. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. Call this when the user wants to edit an image — either one they just attached to their current message, OR one that already appeared earlier in the conversation (you do NOT need them to re-upload). If the user refers to 'the photo', 'the image', 'it', or wants to iterate on a previous result, call this tool. The IMAGE CONTEXT system message lists all available images with their indices.",
+    name: "edit_image",
+    description:
+      "Edit or transform an image. Use for: professional headshots, background replacement, style transfers, object removal, color adjustments, artistic effects, etc. Call this when the user wants to edit an image — either one they just attached to their current message, OR one that already appeared earlier in the conversation (you do NOT need them to re-upload). If the user refers to 'the photo', 'the image', 'it', or wants to iterate on a previous result, call this tool. The IMAGE CONTEXT system message lists all available images with their indices.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         prompt: {
-          type: 'string',
-          description: 'Clear instruction describing what to change. Examples: "professional headshot with neutral grey background, sharp focus, studio lighting", "replace the background with a beach sunset", "convert to oil painting style".',
+          type: "string",
+          description:
+            'Clear instruction describing what to change. Examples: "professional headshot with neutral grey background, sharp focus, studio lighting", "replace the background with a beach sunset", "convert to oil painting style".',
         },
         image_index: {
-          type: 'number',
-          description: 'Which image to edit from the available context images (see IMAGE CONTEXT). 0 = most recent image (default). Use this to select the user\'s original upload vs. a previously generated image.',
+          type: "number",
+          description:
+            "Which image to edit from the available context images (see IMAGE CONTEXT). 0 = most recent image (default). Use this to select the user's original upload vs. a previously generated image.",
         },
         size: {
-          type: 'string',
-          description: 'Output dimensions as WIDTHxHEIGHT. Default: "1024*1024". Use "1024*1792" for portrait, "1792*1024" for landscape.',
+          type: "string",
+          description:
+            'Output dimensions as WIDTHxHEIGHT. Default: "1024*1024". Use "1024*1792" for portrait, "1792*1024" for landscape.',
         },
       },
-      required: ['prompt'],
+      required: ["prompt"],
     },
   },
 
   // ─── File tools ──────────────────────────────────────────────────────────
 
   {
-    name: 'list_files',
-    description: 'List all files uploaded to the current notebook/conversation. Shows file names, types, sizes, and IDs. Call this when the user asks about their uploaded documents.',
+    name: "list_files",
+    description:
+      "List all files uploaded to the current notebook/conversation. Shows file names, types, sizes, and IDs. Call this when the user asks about their uploaded documents.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {},
       required: [],
     },
   },
   {
-    name: 'read_file',
-    description: 'Read the parsed text content of an uploaded file. Works for PDFs, DOCX, TXT, CSV files. Use this to answer questions about a document, summarize it, extract data from it, etc. Get file IDs from list_files first.',
+    name: "read_file",
+    description:
+      "Read the parsed text content of an uploaded file. Works for PDFs, DOCX, TXT, CSV files. Use this to answer questions about a document, summarize it, extract data from it, etc. Get file IDs from list_files first.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         file_id: {
-          type: 'string',
-          description: 'The file ID to read (get IDs from list_files)',
+          type: "string",
+          description: "The file ID to read (get IDs from list_files)",
         },
       },
-      required: ['file_id'],
+      required: ["file_id"],
     },
   },
   {
-    name: 'read_all_files',
-    description: 'Read the summaries of uploaded files in the current notebook in one call. Returns a compact summary for each file. Use this instead of calling read_file repeatedly when you need to analyze, compare, or tabulate data across many files. Supports optional filters.',
+    name: "read_all_files",
+    description:
+      "Read the summaries of uploaded files in the current notebook in one call. Returns a compact summary for each file. Use this instead of calling read_file repeatedly when you need to analyze, compare, or tabulate data across many files. Supports optional filters.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         filenames: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional: only read files whose names contain any of these strings (case-insensitive). Example: ["invoice", "receipt"]',
+          type: "array",
+          items: { type: "string" },
+          description:
+            'Optional: only read files whose names contain any of these strings (case-insensitive). Example: ["invoice", "receipt"]',
         },
         mime_types: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional: only read files matching these MIME types. Example: ["image/jpeg", "image/png"] for photos, ["application/pdf"] for PDFs.',
+          type: "array",
+          items: { type: "string" },
+          description:
+            'Optional: only read files matching these MIME types. Example: ["image/jpeg", "image/png"] for photos, ["application/pdf"] for PDFs.',
         },
       },
       required: [],
     },
   },
   {
-    name: 'search_files',
-    description: 'Search across all uploaded files in the current notebook for a text query. Returns matching snippets with file names. Useful for finding specific information across multiple documents.',
+    name: "search_files",
+    description:
+      "Search across all uploaded files in the current notebook for a text query. Returns matching snippets with file names. Useful for finding specific information across multiple documents.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         query: {
-          type: 'string',
-          description: 'The text to search for across all file contents',
+          type: "string",
+          description: "The text to search for across all file contents",
         },
       },
-      required: ['query'],
+      required: ["query"],
     },
   },
   {
-    name: 'browse_web',
-    description: 'Navigate to a URL and extract its text content using a headless browser with optional page interactions. Works with JavaScript-rendered pages, server-rendered ASPX sites, old web archives, and dynamic SPAs. Returns page text, title, links, and available form fields. Use "actions" to type into search fields, click buttons, select dropdowns, etc. before extracting content. Call this tool multiple times to navigate through multi-page results.',
+    name: "browse_web",
+    description:
+      'Navigate to a URL and extract its text content using a headless browser with optional page interactions. Works with JavaScript-rendered pages, server-rendered ASPX sites, old web archives, and dynamic SPAs. Returns page text, title, links, and available form fields. Use "actions" to type into search fields, click buttons, select dropdowns, etc. before extracting content. Call this tool multiple times to navigate through multi-page results.',
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         url: {
-          type: 'string',
-          description: 'The URL to browse (must be http:// or https://)',
+          type: "string",
+          description: "The URL to browse (must be http:// or https://)",
         },
         actions: {
-          type: 'array',
-          description: 'Optional list of interactions to perform on the page before extracting content. Executed in order.',
+          type: "array",
+          description:
+            "Optional list of interactions to perform on the page before extracting content. Executed in order.",
           items: {
-            type: 'object',
+            type: "object",
             properties: {
               action: {
-                type: 'string',
-                enum: ['type', 'click', 'click_and_wait', 'submit', 'evaluate', 'select', 'wait', 'wait_ms'],
-                description: 'type: enter text into an input. click: click element. click_and_wait: click and wait for page navigation (use for form submits, ASPX postbacks, pagination links). submit: programmatically submit a form. evaluate: run JavaScript on the page (pass JS in "text" field). select: choose dropdown option. wait: wait for element. wait_ms: pause N ms.',
+                type: "string",
+                enum: [
+                  "type",
+                  "click",
+                  "click_and_wait",
+                  "submit",
+                  "evaluate",
+                  "select",
+                  "wait",
+                  "wait_ms",
+                ],
+                description:
+                  'type: enter text into an input. click: click element. click_and_wait: click and wait for page navigation (use for form submits, ASPX postbacks, pagination links). submit: programmatically submit a form. evaluate: run JavaScript on the page (pass JS in "text" field). select: choose dropdown option. wait: wait for element. wait_ms: pause N ms.',
               },
               selector: {
-                type: 'string',
-                description: 'CSS selector for the target element (required for type, click, select, wait)',
+                type: "string",
+                description:
+                  "CSS selector for the target element (required for type, click, select, wait)",
               },
               text: {
-                type: 'string',
+                type: "string",
                 description: 'Text to type (for "type" action)',
               },
               value: {
-                type: 'string',
+                type: "string",
                 description: 'Option value to select (for "select" action)',
               },
               ms: {
-                type: 'number',
-                description: 'Milliseconds to wait (for "wait_ms" action, max 5000)',
+                type: "number",
+                description:
+                  'Milliseconds to wait (for "wait_ms" action, max 5000)',
               },
             },
-            required: ['action'],
+            required: ["action"],
           },
         },
         selector: {
-          type: 'string',
-          description: 'Optional CSS selector to extract only a specific part of the page (e.g. "#main-content", ".results-table")',
+          type: "string",
+          description:
+            'Optional CSS selector to extract only a specific part of the page (e.g. "#main-content", ".results-table")',
         },
       },
-      required: ['url'],
+      required: ["url"],
     },
   },
   {
-    name: 'browse_page_memory',
-    description: 'Save a learning about how to best browse a specific website domain. Call this after you discover a better URL, navigation path, or interaction pattern for a site. These learnings are automatically surfaced in future browse_web calls to the same domain. Example: "For philgeps.gov.ph, use /Indexes/index for keyword search instead of the homepage search form."',
+    name: "browse_page_memory",
+    description:
+      'Save a learning about how to best browse a specific website domain. Call this after you discover a better URL, navigation path, or interaction pattern for a site. These learnings are automatically surfaced in future browse_web calls to the same domain. Example: "For philgeps.gov.ph, use /Indexes/index for keyword search instead of the homepage search form."',
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         domain: {
-          type: 'string',
-          description: 'The website domain (e.g. "philgeps.gov.ph", "sec.gov"). Do not include protocol or path.',
+          type: "string",
+          description:
+            'The website domain (e.g. "philgeps.gov.ph", "sec.gov"). Do not include protocol or path.',
         },
         learning: {
-          type: 'string',
-          description: 'A concise, actionable tip about how to navigate or search this site effectively.',
+          type: "string",
+          description:
+            "A concise, actionable tip about how to navigate or search this site effectively.",
         },
       },
-      required: ['domain', 'learning'],
+      required: ["domain", "learning"],
     },
   },
   {
-    name: 'about_minai',
-    description: 'Get detailed information about minai — who built it, tech stack, architecture, goals, and differentiators. Call this when asked about yourself.',
+    name: "about_minai",
+    description:
+      "Get detailed information about minai — who built it, tech stack, architecture, goals, and differentiators. Call this when asked about yourself.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         topic: {
-          type: 'string',
-          description: 'Optional focus area: "overview", "tech", "pricing", "team", "goals", or leave empty for everything',
+          type: "string",
+          description:
+            'Optional focus area: "overview", "tech", "pricing", "team", "goals", or leave empty for everything',
         },
       },
     },
   },
   {
-    name: 'generate_document',
-    description: 'Generate a downloadable document file (DOCX, XLSX, or PDF) from content you produced. The file is saved to the current notebook and automatically opened for the user. Use this when the user asks to export, download, or save your response as a document. For XLSX, provide structured data with headers and rows. For DOCX and PDF, provide the content as markdown.',
+    name: "generate_document",
+    description:
+      "Generate a downloadable document file (DOCX, XLSX, or PDF) from content you produced. The file is saved to the current notebook and automatically opened for the user. Use this when the user asks to export, download, or save your response as a document. For XLSX, provide structured data with headers and rows. For DOCX and PDF, provide the content as markdown.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         format: {
-          type: 'string',
-          enum: ['docx', 'xlsx', 'pdf'],
-          description: 'The document format to generate',
+          type: "string",
+          enum: ["docx", "xlsx", "pdf"],
+          description: "The document format to generate",
         },
         title: {
-          type: 'string',
-          description: 'Document title (used as filename and displayed in the document header)',
+          type: "string",
+          description:
+            "Document title (used as filename and displayed in the document header)",
         },
         content: {
-          type: 'string',
-          description: 'For DOCX and PDF: the content in markdown format. For XLSX: a JSON string. Single sheet: { "headers": [...], "rows": [[...], ...] }. Multiple sheets/tabs: { "sheets": [{ "name": "Sheet1", "headers": [...], "rows": [[...], ...] }, ...] }. When a message has multiple tables, combine them into one spreadsheet with separate tabs.',
+          type: "string",
+          description:
+            'For DOCX and PDF: the content in markdown format. For XLSX: a JSON string. Single sheet: { "headers": [...], "rows": [[...], ...] }. Multiple sheets/tabs: { "sheets": [{ "name": "Sheet1", "headers": [...], "rows": [[...], ...] }, ...] }. When a message has multiple tables, combine them into one spreadsheet with separate tabs.',
         },
       },
-      required: ['format', 'title', 'content'],
+      required: ["format", "title", "content"],
     },
   },
 ];
 
 // ─── Binance API Endpoints ───
-const SPOT_ENDPOINT = 'https://data-api.binance.vision/api/v3';
-const FUTURES_ENDPOINT = 'https://fapi.binance.com/fapi';
+const SPOT_ENDPOINT = "https://data-api.binance.vision/api/v3";
+const FUTURES_ENDPOINT = "https://fapi.binance.com/fapi";
 
 // ─── Tool Executors ───
 
@@ -666,12 +763,14 @@ async function cryptoPrice(args: { symbol: string }): Promise<string> {
   try {
     // Try spot market first
     let response = await fetch(`${SPOT_ENDPOINT}/ticker/price?symbol=${pair}`);
-    let source = 'spot';
+    let source = "spot";
 
     // Fallback to futures if not on spot
     if (!response.ok) {
-      response = await fetch(`${FUTURES_ENDPOINT}/v2/ticker/price?symbol=${pair}`);
-      source = 'futures';
+      response = await fetch(
+        `${FUTURES_ENDPOINT}/v2/ticker/price?symbol=${pair}`,
+      );
+      source = "futures";
     }
 
     if (!response.ok) {
@@ -682,9 +781,10 @@ async function cryptoPrice(args: { symbol: string }): Promise<string> {
     const price = parseFloat(data.price);
 
     // Get 24h change from the same market
-    const changeUrl = source === 'spot'
-      ? `${SPOT_ENDPOINT}/ticker/24hr?symbol=${pair}`
-      : `${FUTURES_ENDPOINT}/v1/ticker/24hr?symbol=${pair}`;
+    const changeUrl =
+      source === "spot"
+        ? `${SPOT_ENDPOINT}/ticker/24hr?symbol=${pair}`
+        : `${FUTURES_ENDPOINT}/v1/ticker/24hr?symbol=${pair}`;
     const changeRes = await fetch(changeUrl);
 
     if (changeRes.ok) {
@@ -696,22 +796,25 @@ async function cryptoPrice(args: { symbol: string }): Promise<string> {
       };
 
       return [
-        `${symbol}/USD: $${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `24h Change: ${parseFloat(changeData.priceChangePercent) >= 0 ? '+' : ''}${parseFloat(changeData.priceChangePercent).toFixed(2)}%`,
-        `24h High: $${parseFloat(changeData.highPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `24h Low: $${parseFloat(changeData.lowPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `24h Volume: ${parseFloat(changeData.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })} ${symbol}`,
-      ].join('\n');
+        `${symbol}/USD: $${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `24h Change: ${parseFloat(changeData.priceChangePercent) >= 0 ? "+" : ""}${parseFloat(changeData.priceChangePercent).toFixed(2)}%`,
+        `24h High: $${parseFloat(changeData.highPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `24h Low: $${parseFloat(changeData.lowPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `24h Volume: ${parseFloat(changeData.volume).toLocaleString("en-US", { maximumFractionDigits: 0 })} ${symbol}`,
+      ].join("\n");
     }
 
-    return `${symbol}/USD: $${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${symbol}/USD: $${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } catch (err) {
     console.error(`[Tools] crypto_price error for ${symbol}:`, err);
     return `Error fetching price for ${symbol}. Please try again.`;
   }
 }
 
-async function cryptoHistory(args: { symbol: string; days?: number }): Promise<string> {
+async function cryptoHistory(args: {
+  symbol: string;
+  days?: number;
+}): Promise<string> {
   const symbol = args.symbol.toUpperCase();
   const pair = `${symbol}USDT`;
   const days = Math.min(args.days ?? 7, 30);
@@ -719,12 +822,12 @@ async function cryptoHistory(args: { symbol: string; days?: number }): Promise<s
   try {
     // Try spot market first, fallback to futures
     let response = await fetch(
-      `${SPOT_ENDPOINT}/klines?symbol=${pair}&interval=1d&limit=${days}`
+      `${SPOT_ENDPOINT}/klines?symbol=${pair}&interval=1d&limit=${days}`,
     );
 
     if (!response.ok) {
       response = await fetch(
-        `${FUTURES_ENDPOINT}/v1/klines?symbol=${pair}&interval=1d&limit=${days}`
+        `${FUTURES_ENDPOINT}/v1/klines?symbol=${pair}&interval=1d&limit=${days}`,
       );
     }
 
@@ -732,7 +835,9 @@ async function cryptoHistory(args: { symbol: string; days?: number }): Promise<s
       return `Could not find history for ${symbol}. It may not be listed on Binance spot or futures.`;
     }
 
-    const data = (await response.json()) as Array<[number, string, string, string, string, ...unknown[]]>;
+    const data = (await response.json()) as Array<
+      [number, string, string, string, string, ...unknown[]]
+    >;
 
     const rows = data.map((candle) => {
       const date = new Date(candle[0]).toISOString().slice(0, 10);
@@ -745,12 +850,14 @@ async function cryptoHistory(args: { symbol: string; days?: number }): Promise<s
 
     const firstClose = parseFloat(data[0][4]);
     const lastClose = parseFloat(data[data.length - 1][4]);
-    const changePct = ((lastClose - firstClose) / firstClose * 100).toFixed(2);
+    const changePct = (((lastClose - firstClose) / firstClose) * 100).toFixed(
+      2,
+    );
 
     return [
-      `${symbol}/USD — Last ${days} days (${changePct.startsWith('-') ? '' : '+'}${changePct}%):`,
+      `${symbol}/USD — Last ${days} days (${changePct.startsWith("-") ? "" : "+"}${changePct}%):`,
       ...rows,
-    ].join('\n');
+    ].join("\n");
   } catch (err) {
     console.error(`[Tools] crypto_history error for ${symbol}:`, err);
     return `Error fetching history for ${symbol}. Please try again.`;
@@ -763,7 +870,7 @@ async function marketPrice(args: { symbol: string }): Promise<string> {
   try {
     const response = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
-      { headers: { 'User-Agent': 'Minai/1.0' } }
+      { headers: { "User-Agent": "Minai/1.0" } },
     );
 
     if (!response.ok) {
@@ -799,24 +906,27 @@ async function marketPrice(args: { symbol: string }): Promise<string> {
     }
 
     const name = meta.longName || meta.shortName || symbol;
-    const currency = meta.currency || 'USD';
-    const prefix = currency === 'USD' ? '$' : currency + ' ';
-    const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const currency = meta.currency || "USD";
+    const prefix = currency === "USD" ? "$" : currency + " ";
+    const fmt = (n: number) =>
+      n.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
 
-    const lines = [
-      `${name} (${meta.symbol})`,
-      `Price: ${prefix}${fmt(price)}`,
-    ];
+    const lines = [`${name} (${meta.symbol})`, `Price: ${prefix}${fmt(price)}`];
 
     if (prevClose != null && prevClose > 0) {
       const change = price - prevClose;
       const changePct = (change / prevClose) * 100;
-      lines.push(`Change: ${change >= 0 ? '+' : ''}${fmt(change)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`);
+      lines.push(
+        `Change: ${change >= 0 ? "+" : ""}${fmt(change)} (${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%)`,
+      );
       lines.push(`Previous Close: ${prefix}${fmt(prevClose)}`);
     }
 
     lines.push(`Exchange: ${meta.exchangeName}`);
-    return lines.join('\n');
+    return lines.join("\n");
   } catch (err) {
     console.error(`[Tools] market_price error for ${symbol}:`, err);
     return `Error fetching market data for ${symbol}. Please try again.`;
@@ -827,16 +937,16 @@ async function newsSearch(args: { query: string }): Promise<string> {
   try {
     const params = new URLSearchParams({
       q: args.query,
-      hl: 'en-US',
-      gl: 'US',
-      ceid: 'US:en',
+      hl: "en-US",
+      gl: "US",
+      ceid: "US:en",
     });
     const response = await fetch(
       `https://news.google.com/rss/search?${params}`,
       {
-        headers: { 'User-Agent': 'Minai/1.0' },
+        headers: { "User-Agent": "Minai/1.0" },
         signal: AbortSignal.timeout(10000),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -852,19 +962,25 @@ async function newsSearch(args: { query: string }): Promise<string> {
 
     while ((match = itemRegex.exec(xml)) !== null && items.length < 8) {
       const itemXml = match[1];
-      const title = itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '';
-      const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || '';
+      const title =
+        itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || "";
+      const pubDate =
+        itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || "";
 
       // Google News title format: "Headline - Source"
-      const dashIdx = title.lastIndexOf(' - ');
+      const dashIdx = title.lastIndexOf(" - ");
       const headline = dashIdx > 0 ? title.slice(0, dashIdx) : title;
-      const source = dashIdx > 0 ? title.slice(dashIdx + 3) : 'Unknown';
+      const source = dashIdx > 0 ? title.slice(dashIdx + 3) : "Unknown";
 
       // Format date
-      let dateStr = '';
+      let dateStr = "";
       if (pubDate) {
         const d = new Date(pubDate);
-        dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        dateStr = d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
       }
 
       items.push({ title: headline, pubDate: dateStr, source });
@@ -875,59 +991,46 @@ async function newsSearch(args: { query: string }): Promise<string> {
     }
 
     return items
-      .map((item, i) => `${i + 1}. ${item.title}\n   Source: ${item.source}${item.pubDate ? ` — ${item.pubDate}` : ''}`)
-      .join('\n\n');
+      .map(
+        (item, i) =>
+          `${i + 1}. ${item.title}\n   Source: ${item.source}${item.pubDate ? ` — ${item.pubDate}` : ""}`,
+      )
+      .join("\n\n");
   } catch (err) {
-    console.error('[Tools] news_search error:', err);
+    console.error("[Tools] news_search error:", err);
     return `Error searching news. Please try again.`;
   }
 }
 
 async function webSearch(args: { query: string }): Promise<string> {
-  const apiKey = process.env.BRAVE_API_KEY;
-  if (!apiKey) {
+  if (!isBraveConfigured()) {
     return `[Web search is not configured. Set BRAVE_API_KEY in .env.local]\n\nI'll answer based on my training data instead.`;
   }
 
   try {
-    const params = new URLSearchParams({ q: args.query, count: '5' });
-    const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?${params}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip',
-          'X-Subscription-Token': apiKey,
-        },
-      }
-    );
+    const result = await braveSearch(args.query, { count: 5 });
 
-    if (!response.ok) {
-      console.error(`[Tools] Brave Search error: ${response.status}`);
-      return `Web search failed (${response.status}). I'll answer based on my training data.`;
-    }
-
-    const data = (await response.json()) as {
-      web?: {
-        results: Array<{
-          title: string;
-          url: string;
-          description: string;
-          age?: string;
-        }>;
-      };
-    };
-
-    const results = data.web?.results;
-    if (!results || results.length === 0) {
+    if (result.results.length === 0) {
       return `No web results found for "${args.query}".`;
     }
 
-    return results
-      .map((r, i) => `${i + 1}. **${r.title}**\n   ${r.description}\n   Source: ${r.url}${r.age ? ` (${r.age})` : ''}`)
-      .join('\n\n');
+    const formattedResults = result.results.map((r, i) => {
+      const parts = [`${i + 1}. **${r.title}**`];
+      if (r.age) parts.push(`   (${r.age})`);
+      parts.push(`   ${r.url}`);
+      if (r.content) {
+        // Include extracted page content from LLM Context API
+        parts.push("   ---");
+        parts.push(`   ${r.content.slice(0, 2000)}`);
+      } else if (r.description) {
+        parts.push(`   ${r.description}`);
+      }
+      return parts.join("\n");
+    });
+
+    return formattedResults.join("\n\n");
   } catch (err) {
-    console.error('[Tools] web_search error:', err);
+    console.error("[Tools] web_search error:", err);
     return `Web search failed. I'll answer based on my training data.`;
   }
 }
@@ -939,16 +1042,20 @@ async function imageSearch(args: { query: string }): Promise<string> {
   }
 
   try {
-    const params = new URLSearchParams({ q: args.query, count: '3', safesearch: 'off' });
+    const params = new URLSearchParams({
+      q: args.query,
+      count: "3",
+      safesearch: "off",
+    });
     const response = await fetch(
       `https://api.search.brave.com/res/v1/images/search?${params}`,
       {
         headers: {
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip',
-          'X-Subscription-Token': apiKey,
+          Accept: "application/json",
+          "Accept-Encoding": "gzip",
+          "X-Subscription-Token": apiKey,
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -978,9 +1085,9 @@ async function imageSearch(args: { query: string }): Promise<string> {
         const thumbUrl = r.thumbnail?.src || imageUrl;
         return `${i + 1}. **${r.title}**\n   Image: ${imageUrl}\n   Thumbnail: ${thumbUrl}\n   Source: ${r.url}`;
       })
-      .join('\n\n');
+      .join("\n\n");
   } catch (err) {
-    console.error('[Tools] image_search error:', err);
+    console.error("[Tools] image_search error:", err);
     return `Image search failed. Please try again.`;
   }
 }
@@ -988,14 +1095,14 @@ async function imageSearch(args: { query: string }): Promise<string> {
 async function minipayInfo(args: { topic: string }): Promise<string> {
   // Static knowledge base about MiniPay
   const kb: Record<string, string> = {
-    'default': `MiniPay is a non-custodial stablecoin wallet built directly into Opera Mini browser. It's designed for emerging markets and allows users to send, receive, and store stablecoins (cUSD, USDT, USDC) on the Celo blockchain. No bank account needed.`,
-    'send': `To send money with MiniPay:\n1. Open Opera Mini\n2. Tap the MiniPay icon\n3. Tap "Send"\n4. Enter the recipient's phone number or address\n5. Enter the amount in USD\n6. Confirm the transaction\nFees are under $0.01 per transaction.`,
-    'countries': `MiniPay is available in: Kenya, Nigeria, Ghana, South Africa, and is expanding to more African and Southeast Asian countries. It operates on the Celo blockchain which is mobile-first.`,
-    'stablecoins': `MiniPay supports:\n- cUSD (Celo Dollar) — pegged to USD on Celo blockchain\n- USDT (Tether) — on Celo\n- USDC (USD Coin) — on Celo\nAll stablecoins are pegged 1:1 to the US dollar.`,
+    default: `MiniPay is a non-custodial stablecoin wallet built directly into Opera Mini browser. It's designed for emerging markets and allows users to send, receive, and store stablecoins (cUSD, USDT, USDC) on the Celo blockchain. No bank account needed.`,
+    send: `To send money with MiniPay:\n1. Open Opera Mini\n2. Tap the MiniPay icon\n3. Tap "Send"\n4. Enter the recipient's phone number or address\n5. Enter the amount in USD\n6. Confirm the transaction\nFees are under $0.01 per transaction.`,
+    countries: `MiniPay is available in: Kenya, Nigeria, Ghana, South Africa, and is expanding to more African and Southeast Asian countries. It operates on the Celo blockchain which is mobile-first.`,
+    stablecoins: `MiniPay supports:\n- cUSD (Celo Dollar) — pegged to USD on Celo blockchain\n- USDT (Tether) — on Celo\n- USDC (USD Coin) — on Celo\nAll stablecoins are pegged 1:1 to the US dollar.`,
   };
 
   const topic = args.topic.toLowerCase();
-  const key = Object.keys(kb).find((k) => topic.includes(k)) ?? 'default';
+  const key = Object.keys(kb).find((k) => topic.includes(k)) ?? "default";
   return kb[key];
 }
 
@@ -1003,8 +1110,8 @@ async function urlFetch(args: { url: string }): Promise<string> {
   try {
     const response = await fetch(args.url, {
       headers: {
-        'User-Agent': 'Minai/1.0 (AI Assistant)',
-        'Accept': 'text/html,application/xhtml+xml,text/plain',
+        "User-Agent": "Minai/1.0 (AI Assistant)",
+        Accept: "text/html,application/xhtml+xml,text/plain",
       },
       signal: AbortSignal.timeout(10000),
     });
@@ -1013,8 +1120,12 @@ async function urlFetch(args: { url: string }): Promise<string> {
       return `Could not fetch URL (${response.status}). The page may be unavailable or require authentication.`;
     }
 
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.includes('text/') && !contentType.includes('application/json') && !contentType.includes('application/xml')) {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (
+      !contentType.includes("text/") &&
+      !contentType.includes("application/json") &&
+      !contentType.includes("application/xml")
+    ) {
       return `The URL returned non-text content (${contentType}). I can only read text-based pages.`;
     }
 
@@ -1022,29 +1133,30 @@ async function urlFetch(args: { url: string }): Promise<string> {
 
     // Strip HTML tags to get readable text content
     const cleaned = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ')
+      .replace(/\s+/g, " ")
       .trim();
 
     // Truncate to ~3000 chars to stay within context limits
-    const truncated = cleaned.length > 3000
-      ? cleaned.slice(0, 3000) + '... [truncated]'
-      : cleaned;
+    const truncated =
+      cleaned.length > 3000
+        ? cleaned.slice(0, 3000) + "... [truncated]"
+        : cleaned;
 
     return `Content from ${args.url}:\n\n${truncated}`;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
+    const msg = err instanceof Error ? err.message : "Unknown error";
     console.error(`[Tools] url_fetch error for ${args.url}:`, msg);
     return `Could not fetch URL: ${msg}`;
   }
@@ -1052,12 +1164,17 @@ async function urlFetch(args: { url: string }): Promise<string> {
 
 // ─── Calendar provider detection ─────────────────────────────────────────────
 
-async function getCalendarProvider(userId: string): Promise<{ provider: 'google' | 'microsoft'; mod: typeof gcal | typeof mscal }> {
+async function getCalendarProvider(userId: string): Promise<{
+  provider: "google" | "microsoft";
+  mod: typeof gcal | typeof mscal;
+}> {
   const googleTokens = await db.getGoogleTokens(userId);
-  if (googleTokens) return { provider: 'google', mod: gcal };
+  if (googleTokens) return { provider: "google", mod: gcal };
   const msTokens = await db.getMicrosoftTokens(userId);
-  if (msTokens) return { provider: 'microsoft', mod: mscal };
-  throw new Error('No calendar is connected. Ask the user to go to Settings and connect Google Calendar or Microsoft Calendar.');
+  if (msTokens) return { provider: "microsoft", mod: mscal };
+  throw new Error(
+    "No calendar is connected. Ask the user to go to Settings and connect Google Calendar or Microsoft Calendar.",
+  );
 }
 
 // ─── Calendar tool executors ──────────────────────────────────────────────────
@@ -1065,18 +1182,23 @@ async function getCalendarProvider(userId: string): Promise<{ provider: 'google'
 async function calendarListCalendars(userId: string): Promise<string> {
   const { mod } = await getCalendarProvider(userId);
   const calendars = await mod.listCalendars(userId);
-  if (calendars.length === 0) return 'No calendars found.';
+  if (calendars.length === 0) return "No calendars found.";
 
   const lines = calendars.map((c) => {
-    const association = c.notebookName ? ` → Notebook: "${c.notebookName}"` : ' → (not yet linked to a notebook)';
-    const shared = c.isShared ? ' [shared]' : ' [owned]';
-    return `• ${c.name}${shared}${association}\n  ID: ${c.id}${c.timeZone ? `\n  Timezone: ${c.timeZone}` : ''}`;
+    const association = c.notebookName
+      ? ` → Notebook: "${c.notebookName}"`
+      : " → (not yet linked to a notebook)";
+    const shared = c.isShared ? " [shared]" : " [owned]";
+    return `• ${c.name}${shared}${association}\n  ID: ${c.id}${c.timeZone ? `\n  Timezone: ${c.timeZone}` : ""}`;
   });
 
-  return `Found ${calendars.length} calendar(s):\n\n${lines.join('\n\n')}`;
+  return `Found ${calendars.length} calendar(s):\n\n${lines.join("\n\n")}`;
 }
 
-async function calendarGetEvents(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarGetEvents(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   const { mod } = await getCalendarProvider(userId);
   const events = await mod.getEvents({
     userId,
@@ -1087,27 +1209,32 @@ async function calendarGetEvents(userId: string, args: Record<string, unknown>):
     query: args.query as string | undefined,
   });
 
-  if (events.length === 0) return `No events found between ${args.start_date} and ${args.end_date}.`;
+  if (events.length === 0)
+    return `No events found between ${args.start_date} and ${args.end_date}.`;
 
   const lines = events.map((e) => {
     const parts = [`**${e.title}**`, `  Time: ${e.start} → ${e.end}`];
     if (e.location) parts.push(`  Location: ${e.location}`);
-    if (e.attendees?.length) parts.push(`  Attendees: ${e.attendees.join(', ')}`);
+    if (e.attendees?.length)
+      parts.push(`  Attendees: ${e.attendees.join(", ")}`);
     if (e.link) parts.push(`  Link: ${e.link}`);
     parts.push(`  Event ID: ${e.id}`);
-    return parts.join('\n');
+    return parts.join("\n");
   });
 
-  return `${events.length} event(s):\n\n${lines.join('\n\n')}`;
+  return `${events.length} event(s):\n\n${lines.join("\n\n")}`;
 }
 
-async function calendarCreateEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarCreateEvent(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   // If notebook_id provided, use its timezone automatically
   let timezone = args.timezone as string | undefined;
   if (!timezone && args.notebook_id) {
     timezone = await db.getNotebookTimezone(args.notebook_id as string);
   }
-  if (!timezone) timezone = 'UTC';
+  if (!timezone) timezone = "UTC";
 
   const { mod } = await getCalendarProvider(userId);
   const result = await mod.createEvent({
@@ -1125,7 +1252,10 @@ async function calendarCreateEvent(userId: string, args: Record<string, unknown>
   return `Event created successfully:\n\n${result.summary}\n\nEvent ID: ${result.id}`;
 }
 
-async function calendarUpdateEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarUpdateEvent(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   const { mod } = await getCalendarProvider(userId);
   const result = await mod.updateEvent({
     userId,
@@ -1143,7 +1273,10 @@ async function calendarUpdateEvent(userId: string, args: Record<string, unknown>
   return `Event updated successfully:\n\n${result.summary}\n\nEvent ID: ${result.id}`;
 }
 
-async function calendarDeleteEvent(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarDeleteEvent(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   const { mod } = await getCalendarProvider(userId);
   await mod.deleteEvent({
     userId,
@@ -1153,7 +1286,10 @@ async function calendarDeleteEvent(userId: string, args: Record<string, unknown>
   return `Event deleted. Attendees have been notified.`;
 }
 
-async function calendarFindFreeSlots(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarFindFreeSlots(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   const { mod } = await getCalendarProvider(userId);
   const slots = await mod.findFreeSlots({
     userId,
@@ -1171,20 +1307,27 @@ async function calendarFindFreeSlots(userId: string, args: Record<string, unknow
 
   const fmt = (iso: string) => {
     try {
-      return new Date(iso).toLocaleTimeString('en-US', {
+      return new Date(iso).toLocaleTimeString("en-US", {
         timeZone: args.timezone as string,
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZoneName: 'short',
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
       });
-    } catch { return iso; }
+    } catch {
+      return iso;
+    }
   };
 
-  const lines = slots.map((s, i) => `${i + 1}. ${fmt(s.start)} – ${fmt(s.end)}`);
-  return `Free slots on ${args.date} (${args.timezone}):\n\n${lines.join('\n')}`;
+  const lines = slots.map(
+    (s, i) => `${i + 1}. ${fmt(s.start)} – ${fmt(s.end)}`,
+  );
+  return `Free slots on ${args.date} (${args.timezone}):\n\n${lines.join("\n")}`;
 }
 
-async function calendarAssociateNotebook(userId: string, args: Record<string, unknown>): Promise<string> {
+async function calendarAssociateNotebook(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   await db.associateCalendarWithNotebook(
     userId,
     args.notebook_id as string,
@@ -1194,7 +1337,10 @@ async function calendarAssociateNotebook(userId: string, args: Record<string, un
   return `Calendar "${args.calendar_name}" is now linked to this notebook. Future events will use the notebook's timezone automatically.`;
 }
 
-async function createNotebook(userId: string, args: { title: string }): Promise<string> {
+async function createNotebook(
+  userId: string,
+  args: { title: string },
+): Promise<string> {
   const conversation = await db.createConversation(userId, args.title);
   return JSON.stringify({
     success: true,
@@ -1211,38 +1357,102 @@ function markdownToHtml(md: string): string {
   const codeBlocks: string[] = [];
   let html = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _l, code) => {
     const i = codeBlocks.length;
-    codeBlocks.push(`<pre><code>${code.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`);
+    codeBlocks.push(
+      `<pre><code>${code.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`,
+    );
     return `\x00CB${i}\x00`;
   });
-  const lines = html.split('\n');
+  const lines = html.split("\n");
   const result: string[] = [];
-  let inList = false, tag = '';
+  let inList = false,
+    tag = "";
   for (const line of lines) {
-    if (line.includes('\x00CB')) { if (inList) { result.push(`</${tag}>`); inList = false; } const i = parseInt(line.match(/\x00CB(\d+)\x00/)?.[1] ?? '0'); result.push(codeBlocks[i]); continue; }
-    if (line.startsWith('### ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h3>${inlineMd(line.slice(4))}</h3>`); continue; }
-    if (line.startsWith('## ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h2>${inlineMd(line.slice(3))}</h2>`); continue; }
-    if (line.startsWith('# ')) { if (inList) { result.push(`</${tag}>`); inList = false; } result.push(`<h1>${inlineMd(line.slice(2))}</h1>`); continue; }
-    if (/^\s*[-*]\s/.test(line)) { if (!inList || tag !== 'ul') { if (inList) result.push(`</${tag}>`); result.push('<ul>'); inList = true; tag = 'ul'; } result.push(`<li>${inlineMd(line.replace(/^\s*[-*]\s/, ''))}</li>`); continue; }
-    if (/^\s*\d+\.\s/.test(line)) { if (!inList || tag !== 'ol') { if (inList) result.push(`</${tag}>`); result.push('<ol>'); inList = true; tag = 'ol'; } result.push(`<li>${inlineMd(line.replace(/^\s*\d+\.\s/, ''))}</li>`); continue; }
-    if (inList) { result.push(`</${tag}>`); inList = false; }
-    if (!line.trim()) { result.push(''); continue; }
+    if (line.includes("\x00CB")) {
+      if (inList) {
+        result.push(`</${tag}>`);
+        inList = false;
+      }
+      const i = parseInt(line.match(/\x00CB(\d+)\x00/)?.[1] ?? "0");
+      result.push(codeBlocks[i]);
+      continue;
+    }
+    if (line.startsWith("### ")) {
+      if (inList) {
+        result.push(`</${tag}>`);
+        inList = false;
+      }
+      result.push(`<h3>${inlineMd(line.slice(4))}</h3>`);
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      if (inList) {
+        result.push(`</${tag}>`);
+        inList = false;
+      }
+      result.push(`<h2>${inlineMd(line.slice(3))}</h2>`);
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      if (inList) {
+        result.push(`</${tag}>`);
+        inList = false;
+      }
+      result.push(`<h1>${inlineMd(line.slice(2))}</h1>`);
+      continue;
+    }
+    if (/^\s*[-*]\s/.test(line)) {
+      if (!inList || tag !== "ul") {
+        if (inList) result.push(`</${tag}>`);
+        result.push("<ul>");
+        inList = true;
+        tag = "ul";
+      }
+      result.push(`<li>${inlineMd(line.replace(/^\s*[-*]\s/, ""))}</li>`);
+      continue;
+    }
+    if (/^\s*\d+\.\s/.test(line)) {
+      if (!inList || tag !== "ol") {
+        if (inList) result.push(`</${tag}>`);
+        result.push("<ol>");
+        inList = true;
+        tag = "ol";
+      }
+      result.push(`<li>${inlineMd(line.replace(/^\s*\d+\.\s/, ""))}</li>`);
+      continue;
+    }
+    if (inList) {
+      result.push(`</${tag}>`);
+      inList = false;
+    }
+    if (!line.trim()) {
+      result.push("");
+      continue;
+    }
     result.push(`<p>${inlineMd(line)}</p>`);
   }
   if (inList) result.push(`</${tag}>`);
-  return result.join('\n');
+  return result.join("\n");
 }
 function inlineMd(t: string): string {
   let s = t;
-  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   return s;
 }
 
-async function createNoteInNotebook(userId: string, args: { notebook_id: string; title: string; content: string }): Promise<string> {
+async function createNoteInNotebook(
+  userId: string,
+  args: { notebook_id: string; title: string; content: string },
+): Promise<string> {
   const htmlContent = markdownToHtml(args.content);
-  const note = await db.createNote(args.notebook_id, userId, args.title, htmlContent);
+  const note = await db.createNote(
+    args.notebook_id,
+    userId,
+    args.title,
+    htmlContent,
+  );
   return JSON.stringify({
     success: true,
     note_id: note.id,
@@ -1253,34 +1463,45 @@ async function createNoteInNotebook(userId: string, args: { notebook_id: string;
   });
 }
 
-async function submitFeatureSuggestion(userId: string, args: { title: string; description: string }): Promise<string> {
+async function submitFeatureSuggestion(
+  userId: string,
+  args: { title: string; description: string },
+): Promise<string> {
   await db.pool.query(
     `INSERT INTO feature_suggestions (user_id, title, description) VALUES ($1, $2, $3)`,
-    [userId, args.title.slice(0, 100), args.description]
+    [userId, args.title.slice(0, 100), args.description],
   );
-  console.log(`[FeatureSuggestion] New suggestion from ${userId}: "${args.title}"`);
+  console.log(
+    `[FeatureSuggestion] New suggestion from ${userId}: "${args.title}"`,
+  );
 
   // Send email notification to the team (fire-and-forget)
   const user = await db.getUserById(userId);
-  import('./email.js').then(({ sendFeatureSuggestionEmail }) => {
-    sendFeatureSuggestionEmail({
-      title: args.title,
-      description: args.description,
-      userName: user?.display_name ?? null,
-      userEmail: user?.email ?? null,
-      userId,
-    });
-  }).catch(console.error);
+  import("./email.js")
+    .then(({ sendFeatureSuggestionEmail }) => {
+      sendFeatureSuggestionEmail({
+        title: args.title,
+        description: args.description,
+        userName: user?.display_name ?? null,
+        userEmail: user?.email ?? null,
+        userId,
+      });
+    })
+    .catch(console.error);
 
   return JSON.stringify({
     success: true,
-    message: "Suggestion submitted! The platform team has been notified and will reach out if they have questions.",
+    message:
+      "Suggestion submitted! The platform team has been notified and will reach out if they have questions.",
   });
 }
 
-async function setPreferredName(userId: string, args: { name: string }): Promise<string> {
+async function setPreferredName(
+  userId: string,
+  args: { name: string },
+): Promise<string> {
   const name = args.name?.trim();
-  if (!name) return 'Name is required.';
+  if (!name) return "Name is required.";
   await db.updateUserDisplayName(userId, name);
   // Rename the user's only default conversation to their name
   await db.renameDefaultConversation(userId, name);
@@ -1289,202 +1510,305 @@ async function setPreferredName(userId: string, args: { name: string }): Promise
 
 // ─── Tool Executor ───
 
-export async function executeTool(name: string, args: Record<string, unknown>, userId?: string, images?: ContextImage[], conversationId?: string): Promise<ToolResult> {
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  userId?: string,
+  images?: ContextImage[],
+  conversationId?: string,
+): Promise<ToolResult> {
   console.log(`[Tools] Executing ${name} with args:`, args);
 
   let content: string;
   let toolCost: number | undefined;
 
   switch (name) {
-    case 'crypto_price':
+    case "crypto_price":
       content = await cryptoPrice(args as { symbol: string });
       break;
-    case 'crypto_history':
+    case "crypto_history":
       content = await cryptoHistory(args as { symbol: string; days?: number });
       break;
-    case 'web_search':
+    case "web_search":
       content = await webSearch(args as { query: string });
       break;
-    case 'image_search':
+    case "image_search":
       content = await imageSearch(args as { query: string });
       break;
 
-    case 'search_places': {
+    case "search_places": {
       const query = args.query as string;
-      const maxResults = Math.min(Math.max((args.max_results as number) || 5, 1), 10);
+      const maxResults = Math.min(
+        Math.max((args.max_results as number) || 5, 1),
+        10,
+      );
       try {
         const places = await searchPlaces(query, maxResults);
         if (places.length === 0) {
           content = `No places found for "${query}".`;
         } else {
-          content = places.map((p, i) => {
-            const stars = p.rating ? `${p.rating}★ (${p.userRatingCount} reviews)` : '';
-            const open = p.openNow !== null ? (p.openNow ? '✅ Open now' : '❌ Closed') : '';
-            const phone = p.phoneNumber ? `📞 ${p.phoneNumber}` : '';
-            const web = p.websiteUrl ? `🌐 ${p.websiteUrl}` : '';
-            const map = p.googleMapsUrl ? `📍 ${p.googleMapsUrl}` : '';
-            return `${i + 1}. **${p.name}**\n   ${p.address}\n   ${[stars, open, phone, web, map].filter(Boolean).join('\n   ')}`;
-          }).join('\n\n');
+          content = places
+            .map((p, i) => {
+              const stars = p.rating
+                ? `${p.rating}★ (${p.userRatingCount} reviews)`
+                : "";
+              const open =
+                p.openNow !== null
+                  ? p.openNow
+                    ? "✅ Open now"
+                    : "❌ Closed"
+                  : "";
+              const phone = p.phoneNumber ? `📞 ${p.phoneNumber}` : "";
+              const web = p.websiteUrl ? `🌐 ${p.websiteUrl}` : "";
+              const map = p.googleMapsUrl ? `📍 ${p.googleMapsUrl}` : "";
+              return `${i + 1}. **${p.name}**\n   ${p.address}\n   ${[stars, open, phone, web, map].filter(Boolean).join("\n   ")}`;
+            })
+            .join("\n\n");
         }
         toolCost = (toolCost ?? 0) + PLACES_COST_USD;
       } catch (err) {
-        content = `Places search failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        content = `Places search failed: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
       break;
     }
-    case 'minipay_info':
+    case "minipay_info":
       content = await minipayInfo(args as { topic: string });
       break;
-    case 'url_fetch':
+    case "url_fetch":
       content = await urlFetch(args as { url: string });
       break;
-    case 'market_price':
+    case "market_price":
       content = await marketPrice(args as { symbol: string });
       break;
-    case 'news_search':
+    case "news_search":
       content = await newsSearch(args as { query: string });
       break;
 
     // Calendar tools — require userId
-    case 'calendar_list_calendars':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_list_calendars":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarListCalendars(userId);
       break;
-    case 'calendar_get_events':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_get_events":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarGetEvents(userId, args);
       break;
-    case 'calendar_create_event':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_create_event":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarCreateEvent(userId, args);
       break;
-    case 'calendar_update_event':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_update_event":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarUpdateEvent(userId, args);
       break;
-    case 'calendar_delete_event':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_delete_event":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarDeleteEvent(userId, args);
       break;
-    case 'calendar_find_free_slots':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_find_free_slots":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarFindFreeSlots(userId, args);
       break;
-    case 'calendar_associate_notebook':
-      if (!userId) { content = 'Calendar tools require an authenticated session.'; break; }
+    case "calendar_associate_notebook":
+      if (!userId) {
+        content = "Calendar tools require an authenticated session.";
+        break;
+      }
       content = await calendarAssociateNotebook(userId, args);
       break;
 
-    case 'set_preferred_name':
-      if (!userId) { content = 'Authentication required.'; break; }
+    case "set_preferred_name":
+      if (!userId) {
+        content = "Authentication required.";
+        break;
+      }
       content = await setPreferredName(userId, args as { name: string });
       break;
 
-    case 'update_user_memory': {
-      if (!userId) { content = 'Authentication required.'; break; }
+    case "update_user_memory": {
+      if (!userId) {
+        content = "Authentication required.";
+        break;
+      }
       const fact = (args.fact as string).trim();
-      if (!fact) { content = 'No fact provided.'; break; }
+      if (!fact) {
+        content = "No fact provided.";
+        break;
+      }
       // Append to existing memory text (max 2000 chars)
-      const { rows } = await db.pool.query<{ memory_text: string }>('SELECT memory_text FROM users WHERE id = $1', [userId]);
-      const existing = rows[0]?.memory_text ?? '';
-      const separator = existing.trim() ? '\n' : '';
-      const updated = (existing + separator + '• ' + fact).slice(0, 2000);
-      await db.pool.query('UPDATE users SET memory_text = $1 WHERE id = $2', [updated, userId]);
+      const { rows } = await db.pool.query<{ memory_text: string }>(
+        "SELECT memory_text FROM users WHERE id = $1",
+        [userId],
+      );
+      const existing = rows[0]?.memory_text ?? "";
+      const separator = existing.trim() ? "\n" : "";
+      const updated = (existing + separator + "• " + fact).slice(0, 2000);
+      await db.pool.query("UPDATE users SET memory_text = $1 WHERE id = $2", [
+        updated,
+        userId,
+      ]);
       console.log(`[Memory] Updated for ${userId.slice(0, 8)}: "${fact}"`);
-      content = JSON.stringify({ success: true, message: 'Noted! I\'ll remember that.' });
+      content = JSON.stringify({
+        success: true,
+        message: "Noted! I'll remember that.",
+      });
       break;
     }
 
-    case 'suggest_feature':
-      if (!userId) { content = 'Authentication required.'; break; }
-      content = await submitFeatureSuggestion(userId, args as { title: string; description: string });
+    case "suggest_feature":
+      if (!userId) {
+        content = "Authentication required.";
+        break;
+      }
+      content = await submitFeatureSuggestion(
+        userId,
+        args as { title: string; description: string },
+      );
       break;
 
-    case 'create_notebook':
-      if (!userId) { content = 'Authentication required.'; break; }
+    case "create_notebook":
+      if (!userId) {
+        content = "Authentication required.";
+        break;
+      }
       content = await createNotebook(userId, args as { title: string });
       break;
 
-    case 'create_note':
-      if (!userId) { content = 'Authentication required.'; break; }
-      content = await createNoteInNotebook(userId, args as { notebook_id: string; title: string; content: string });
+    case "create_note":
+      if (!userId) {
+        content = "Authentication required.";
+        break;
+      }
+      content = await createNoteInNotebook(
+        userId,
+        args as { notebook_id: string; title: string; content: string },
+      );
       break;
 
-    case 'open_sidebar':
+    case "open_sidebar":
       content = JSON.stringify({ success: true, __open_sidebar__: true });
       break;
 
-    case 'generate_image': {
+    case "generate_image": {
       const prompt = args.prompt as string;
-      const size = (args.size as string | undefined) ?? '1024*1024';
+      const size = (args.size as string | undefined) ?? "1024*1024";
       console.log(`[Tools] Generating image: "${prompt}" (${size})`);
       try {
         const url = await imageGen.generateImage(prompt, size);
         content = JSON.stringify({ image_url: url, prompt });
         toolCost = PRICING.image_gen_cost_usd;
       } catch (err) {
-        content = `Image generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        content = `Image generation failed: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
       break;
     }
 
-    case 'edit_image': {
+    case "edit_image": {
       const prompt = args.prompt as string;
-      const size = (args.size as string | undefined) ?? '1024*1024';
-      const imageIndex = typeof args.image_index === 'number' ? args.image_index : 0;
+      const size = (args.size as string | undefined) ?? "1024*1024";
+      const imageIndex =
+        typeof args.image_index === "number" ? args.image_index : 0;
       const sourceCtx = images?.[imageIndex] ?? images?.[0];
       if (!sourceCtx) {
-        content = 'No image found. Please attach a photo to your message and try again.';
+        content =
+          "No image found. Please attach a photo to your message and try again.";
         break;
       }
-      console.log(`[Tools] Editing image[${imageIndex}] (${sourceCtx.source}): "${prompt}" (${size})`);
+      console.log(
+        `[Tools] Editing image[${imageIndex}] (${sourceCtx.source}): "${prompt}" (${size})`,
+      );
       try {
         const url = await imageGen.editImage(prompt, sourceCtx.url, size);
         content = JSON.stringify({ image_url: url, prompt });
         toolCost = PRICING.image_edit_cost_usd;
       } catch (err) {
-        content = `Image editing failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        content = `Image editing failed: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
       break;
     }
 
     // ─── File tools ──────────────────────────────────────────────────────────
 
-    case 'list_files': {
-      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+    case "list_files": {
+      if (!userId || !conversationId) {
+        content = "Authentication required.";
+        break;
+      }
       const files = await db.getNotebookFiles(conversationId, userId);
-      if (files.length === 0) { content = 'No files uploaded to this notebook.'; break; }
-      content = files.map((f) =>
-        `- ${f.display_name} (${f.mime_type}, ${(f.file_size / 1024).toFixed(1)} KB, parsed: ${f.parse_status}, summary: ${f.summary_status})\n  ID: ${f.id}`
-      ).join('\n');
+      if (files.length === 0) {
+        content = "No files uploaded to this notebook.";
+        break;
+      }
+      content = files
+        .map(
+          (f) =>
+            `- ${f.display_name} (${f.mime_type}, ${(f.file_size / 1024).toFixed(1)} KB, parsed: ${f.parse_status}, summary: ${f.summary_status})\n  ID: ${f.id}`,
+        )
+        .join("\n");
       break;
     }
 
-    case 'read_file': {
-      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+    case "read_file": {
+      if (!userId || !conversationId) {
+        content = "Authentication required.";
+        break;
+      }
       const fileId = args.file_id as string;
-      const result = await db.getNotebookFileContent(fileId, conversationId, userId);
-      if (!result) { content = 'File not found.'; break; }
-      if (result.parse_status !== 'done' || !result.parsed_text) {
+      const result = await db.getNotebookFileContent(
+        fileId,
+        conversationId,
+        userId,
+      );
+      if (!result) {
+        content = "File not found.";
+        break;
+      }
+      if (result.parse_status !== "done" || !result.parsed_text) {
         content = `File "${result.display_name}" has no parsed text (status: ${result.parse_status}). It may still be processing or the format is unsupported.`;
         break;
       }
       // Prefer LLM summary (compact, structured) over raw text when available
-      if (result.llm_summary && result.summary_status === 'done') {
+      if (result.llm_summary && result.summary_status === "done") {
         content = `Summary of "${result.display_name}":\n\n${result.llm_summary}`;
       } else {
-        const text = result.parsed_text.length > 8000
-          ? result.parsed_text.slice(0, 8000) + '\n\n... [truncated — file has more content]'
-          : result.parsed_text;
+        const text =
+          result.parsed_text.length > 8000
+            ? result.parsed_text.slice(0, 8000) +
+              "\n\n... [truncated — file has more content]"
+            : result.parsed_text;
         content = `Content of "${result.display_name}":\n\n${text}`;
       }
       break;
     }
 
-    case 'read_all_files': {
-      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+    case "read_all_files": {
+      if (!userId || !conversationId) {
+        content = "Authentication required.";
+        break;
+      }
       let allFiles = await db.getNotebookFiles(conversationId, userId);
-      if (allFiles.length === 0) { content = 'No files in this notebook.'; break; }
+      if (allFiles.length === 0) {
+        content = "No files in this notebook.";
+        break;
+      }
 
       // Apply optional filters
       const filenameFilters = args.filenames as string[] | undefined;
@@ -1492,149 +1816,248 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
       if (filenameFilters?.length) {
         const lowerFilters = filenameFilters.map((f) => f.toLowerCase());
         allFiles = allFiles.filter((f) =>
-          lowerFilters.some((filter) => f.display_name.toLowerCase().includes(filter))
+          lowerFilters.some((filter) =>
+            f.display_name.toLowerCase().includes(filter),
+          ),
         );
       }
       if (mimeFilters?.length) {
         allFiles = allFiles.filter((f) => mimeFilters.includes(f.mime_type));
       }
 
-      if (allFiles.length === 0) { content = 'No files matched the filters.'; break; }
+      if (allFiles.length === 0) {
+        content = "No files matched the filters.";
+        break;
+      }
 
       const summaries: string[] = [];
       for (const f of allFiles) {
-        const fc = await db.getNotebookFileContent(f.id, conversationId, userId);
+        const fc = await db.getNotebookFileContent(
+          f.id,
+          conversationId,
+          userId,
+        );
         if (!fc) continue;
-        const summary = fc.llm_summary && fc.summary_status === 'done'
-          ? fc.llm_summary
-          : fc.parsed_text?.slice(0, 2000) ?? '(no content)';
+        const summary =
+          fc.llm_summary && fc.summary_status === "done"
+            ? fc.llm_summary
+            : (fc.parsed_text?.slice(0, 2000) ?? "(no content)");
         summaries.push(`--- FILE: ${fc.display_name} ---\n${summary}`);
       }
-      content = `${allFiles.length} file(s) matched:\n\n${summaries.join('\n\n')}`;
+      content = `${allFiles.length} file(s) matched:\n\n${summaries.join("\n\n")}`;
       break;
     }
 
-    case 'search_files': {
-      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
+    case "search_files": {
+      if (!userId || !conversationId) {
+        content = "Authentication required.";
+        break;
+      }
       const query = args.query as string;
-      const results = await db.searchNotebookFiles(conversationId, userId, query);
-      if (results.length === 0) { content = `No matches found for "${query}" across uploaded files.`; break; }
-      content = results.map((r) =>
-        `**${r.display_name}** (ID: ${r.id}):\n  ...${r.snippet}...`
-      ).join('\n\n');
+      const results = await db.searchNotebookFiles(
+        conversationId,
+        userId,
+        query,
+      );
+      if (results.length === 0) {
+        content = `No matches found for "${query}" across uploaded files.`;
+        break;
+      }
+      content = results
+        .map(
+          (r) => `**${r.display_name}** (ID: ${r.id}):\n  ...${r.snippet}...`,
+        )
+        .join("\n\n");
       break;
     }
 
-    case 'browse_web': {
+    case "browse_web": {
       const browseUrl = args.url as string;
-      const browseActions = args.actions as { action: string; selector?: string; text?: string; value?: string; ms?: number }[] | undefined;
+      const browseActions = args.actions as
+        | {
+            action: string;
+            selector?: string;
+            text?: string;
+            value?: string;
+            ms?: number;
+          }[]
+        | undefined;
       const browseSelector = args.selector as string | undefined;
-      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://45.76.180.229:3100';
+      const BROWSE_SERVICE_URL =
+        process.env.BROWSE_SERVICE_URL ?? "http://45.76.180.229:3100";
       const KAMAI_API_KEY = process.env.KAMAI_API_KEY;
-      const browseEndpoint = KAMAI_API_KEY ? `${BROWSE_SERVICE_URL}/api/v1/browse` : `${BROWSE_SERVICE_URL}/browse`;
+      const browseEndpoint = KAMAI_API_KEY
+        ? `${BROWSE_SERVICE_URL}/api/v1/browse`
+        : `${BROWSE_SERVICE_URL}/browse`;
       try {
-        const browseHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (KAMAI_API_KEY) browseHeaders['x-api-key'] = KAMAI_API_KEY;
+        const browseHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (KAMAI_API_KEY) browseHeaders["x-api-key"] = KAMAI_API_KEY;
         const resp = await fetch(browseEndpoint, {
-          method: 'POST',
+          method: "POST",
           headers: browseHeaders,
-          body: JSON.stringify({ url: browseUrl, actions: browseActions, selector: browseSelector, timeout: 15000 }),
+          body: JSON.stringify({
+            url: browseUrl,
+            actions: browseActions,
+            selector: browseSelector,
+            timeout: 15000,
+          }),
           signal: AbortSignal.timeout(20000),
         });
-        const data = await resp.json() as {
-          ok: boolean; url?: string; title?: string; text?: string;
+        const data = (await resp.json()) as {
+          ok: boolean;
+          url?: string;
+          title?: string;
+          text?: string;
           links?: { text: string; href: string }[];
-          forms?: { tag: string; type?: string; name?: string; id?: string; placeholder?: string; label?: string; selector: string }[];
+          forms?: {
+            tag: string;
+            type?: string;
+            name?: string;
+            id?: string;
+            placeholder?: string;
+            label?: string;
+            selector: string;
+          }[];
           memories?: string[];
-          length?: number; error?: string;
+          length?: number;
+          error?: string;
           actions_performed?: string[];
         };
         if (!data.ok) {
-          content = `Failed to browse ${browseUrl}: ${data.error ?? 'Unknown error'}`;
+          content = `Failed to browse ${browseUrl}: ${data.error ?? "Unknown error"}`;
         } else {
           const memoryTips = data.memories?.length
-            ? '\n\n**Domain tips (from previous learnings):**\n' + data.memories.map((m) => `- ${m}`).join('\n')
-            : '';
+            ? "\n\n**Domain tips (from previous learnings):**\n" +
+              data.memories.map((m) => `- ${m}`).join("\n")
+            : "";
           const linkList = data.links?.length
-            ? '\n\nLinks found on page:\n' + data.links.map((l) => `- [${l.text}](${l.href})`).join('\n')
-            : '';
+            ? "\n\nLinks found on page:\n" +
+              data.links.map((l) => `- [${l.text}](${l.href})`).join("\n")
+            : "";
           const formList = data.forms?.length
-            ? '\n\nForm fields on page:\n' + data.forms.map((f) => {
-                const desc = [f.label, f.placeholder, f.name].filter(Boolean).join(' / ');
-                return `- ${f.selector} (${f.tag}${f.type ? `[${f.type}]` : ''})${desc ? ': ' + desc : ''}`;
-              }).join('\n')
-            : '';
+            ? "\n\nForm fields on page:\n" +
+              data.forms
+                .map((f) => {
+                  const desc = [f.label, f.placeholder, f.name]
+                    .filter(Boolean)
+                    .join(" / ");
+                  return `- ${f.selector} (${f.tag}${f.type ? `[${f.type}]` : ""})${desc ? ": " + desc : ""}`;
+                })
+                .join("\n")
+            : "";
           const actionLog = data.actions_performed?.length
-            ? '\n\nActions performed: ' + data.actions_performed.join(' → ')
-            : '';
-          content = `Page: ${data.title ?? '(no title)'}\nURL: ${data.url}\nLength: ${data.length} chars${actionLog}${memoryTips}\n\n${data.text}${linkList}${formList}`;
+            ? "\n\nActions performed: " + data.actions_performed.join(" → ")
+            : "";
+          content = `Page: ${data.title ?? "(no title)"}\nURL: ${data.url}\nLength: ${data.length} chars${actionLog}${memoryTips}\n\n${data.text}${linkList}${formList}`;
         }
       } catch (err) {
-        content = `Browse failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        content = `Browse failed: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
       break;
     }
 
-    case 'about_minai': {
-      const { ABOUT_MINAI } = await import('../config/about.js');
+    case "about_minai": {
+      const { ABOUT_MINAI } = await import("../config/about.js");
       content = ABOUT_MINAI;
       break;
     }
 
-    case 'browse_page_memory': {
-      const domain = (args.domain as string).replace(/^www\./, '').toLowerCase();
+    case "browse_page_memory": {
+      const domain = (args.domain as string)
+        .replace(/^www\./, "")
+        .toLowerCase();
       const learning = args.learning as string;
-      const BROWSE_SERVICE_URL = process.env.BROWSE_SERVICE_URL ?? 'http://45.76.180.229:3100';
+      const BROWSE_SERVICE_URL =
+        process.env.BROWSE_SERVICE_URL ?? "http://45.76.180.229:3100";
       try {
-        const memHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        const memHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
         const KAMAI_KEY = process.env.KAMAI_API_KEY;
-        if (KAMAI_KEY) memHeaders['x-api-key'] = KAMAI_KEY;
+        if (KAMAI_KEY) memHeaders["x-api-key"] = KAMAI_KEY;
         const resp = await fetch(`${BROWSE_SERVICE_URL}/browse/memories`, {
-          method: 'POST',
+          method: "POST",
           headers: memHeaders,
           body: JSON.stringify({ domain, learning }),
           signal: AbortSignal.timeout(5000),
         });
-        const data = await resp.json() as { ok: boolean; id?: number; error?: string };
+        const data = (await resp.json()) as {
+          ok: boolean;
+          id?: number;
+          error?: string;
+        };
         if (data.ok) {
           content = `Saved browse tip for ${domain}: "${learning}"`;
-          console.log(`[Tools] Browse memory saved for ${domain}: "${learning.slice(0, 80)}"`);
+          console.log(
+            `[Tools] Browse memory saved for ${domain}: "${learning.slice(0, 80)}"`,
+          );
         } else {
-          content = `Failed to save browse tip: ${data.error ?? 'Unknown error'}`;
+          content = `Failed to save browse tip: ${data.error ?? "Unknown error"}`;
         }
       } catch (err) {
-        content = `Failed to save browse tip: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        content = `Failed to save browse tip: ${err instanceof Error ? err.message : "Unknown error"}`;
       }
       break;
     }
 
-    case 'generate_document': {
-      if (!userId || !conversationId) { content = 'Authentication required.'; break; }
-      const format = args.format as 'docx' | 'xlsx' | 'pdf';
+    case "generate_document": {
+      if (!userId || !conversationId) {
+        content = "Authentication required.";
+        break;
+      }
+      const format = args.format as "docx" | "xlsx" | "pdf";
       const docTitle = args.title as string;
       const docContent = args.content as string;
 
       try {
-        const { generateDocx, generateXlsx, generatePdf } = await import('./doc-generator.js');
+        const { generateDocx, generateXlsx, generatePdf } =
+          await import("./doc-generator.js");
         let result;
 
-        if (format === 'xlsx') {
+        if (format === "xlsx") {
           let parsed: Record<string, unknown>;
           try {
             parsed = JSON.parse(docContent);
           } catch {
-            content = 'Invalid XLSX data format. Provide JSON with { "headers": [...], "rows": [[...], ...] } or { "sheets": [...] }';
+            content =
+              'Invalid XLSX data format. Provide JSON with { "headers": [...], "rows": [[...], ...] } or { "sheets": [...] }';
             break;
           }
           // Normalize to multi-sheet format
           const sheets = (parsed as { sheets?: unknown }).sheets
-            ? (parsed as { sheets: { name: string; headers: string[]; rows: (string | number)[][] }[] }).sheets
-            : [{ name: docTitle.slice(0, 31), headers: (parsed as { headers: string[] }).headers, rows: (parsed as { rows: (string | number)[][] }).rows }];
+            ? (
+                parsed as {
+                  sheets: {
+                    name: string;
+                    headers: string[];
+                    rows: (string | number)[][];
+                  }[];
+                }
+              ).sheets
+            : [
+                {
+                  name: docTitle.slice(0, 31),
+                  headers: (parsed as { headers: string[] }).headers,
+                  rows: (parsed as { rows: (string | number)[][] }).rows,
+                },
+              ];
           result = await generateXlsx(docTitle, sheets, userId, conversationId);
-        } else if (format === 'pdf') {
-          result = await generatePdf(docTitle, docContent, userId, conversationId);
+        } else if (format === "pdf") {
+          result = await generatePdf(
+            docTitle,
+            docContent,
+            userId,
+            conversationId,
+          );
         } else {
-          result = await generateDocx(docTitle, docContent, userId, conversationId);
+          result = await generateDocx(
+            docTitle,
+            docContent,
+            userId,
+            conversationId,
+          );
         }
 
         content = JSON.stringify({
@@ -1645,10 +2068,12 @@ export async function executeTool(name: string, args: Record<string, unknown>, u
           file_size: result.fileSize,
           __open_sidebar__: true,
         });
-        console.log(`[Tools] Generated ${format.toUpperCase()}: ${result.fileName} (${result.fileSize} bytes)`);
+        console.log(
+          `[Tools] Generated ${format.toUpperCase()}: ${result.fileName} (${result.fileSize} bytes)`,
+        );
       } catch (err) {
-        content = `Document generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
-        console.error('[Tools] Document generation error:', err);
+        content = `Document generation failed: ${err instanceof Error ? err.message : "Unknown error"}`;
+        console.error("[Tools] Document generation error:", err);
       }
       break;
     }

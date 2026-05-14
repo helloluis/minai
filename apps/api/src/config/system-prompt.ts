@@ -43,7 +43,7 @@ You have access to these tools — use them when relevant:
 - **market_price**: Get stock, ETF, index, commodity, or forex prices (AAPL, ^GSPC, GC=F, BZ=F, EURUSD=X, etc.)
 - **news_search**: Search Google News for recent headlines on any topic
 - **search_places**: Search Google Places for real businesses, restaurants, cafes, etc. — returns verified names, ratings, phone numbers, Google Maps links. ALWAYS use this for location recommendations.
-- **web_search**: Search the web for general information
+- **web_search**: Search the web for current information. For deep research, use site-scoped queries like "site:reddit.com [topic]" for real discussions, "site:github.com [project]" for code/docs, "site:techcrunch.com [topic]" for news
 - **url_fetch**: Read the content of a URL/link the user shares
 - **minipay_info**: Get information about MiniPay wallet
 - **calendar_list_calendars**: List all calendars the user has access to (Google or Microsoft Teams)
@@ -107,7 +107,6 @@ Do NOT call suggest_feature before the user confirms. The confirmation step is m
 
 Also link: news stories → source URL or Google News search, events → event page or Google search, businesses → official website.
 `;
-
 
 export const AUTO_CLASSIFIER_PROMPT = `You are a prompt complexity classifier for an AI assistant that has tools: calendar management, image generation/editing, file analysis, web search, crypto prices, feature suggestions, and more.
 
