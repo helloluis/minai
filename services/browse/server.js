@@ -1,15 +1,23 @@
 /**
- * Browse Service — Playwright + Chromium + Domain Memories
+ * Browse Service — Playwright + Chromium + Domain Memories + MCP + OpenAI Tools
  *
- * Thin HTTP wrapper around a headless Chromium browser.
+ * Thin HTTP wrapper around a headless Chromium browser, with MCP and OpenAI-compatible
+ * tool APIs so external apps (Claude Code, Ollama, llama.cpp, etc.) can use these tools.
  *
- * Endpoints:
- *   POST /browse           — browse a URL with optional actions
- *   GET  /browse/memories   — get learnings for a domain
- *   POST /browse/memories   — save a learning for a domain
- *   GET  /health            — health check
+ * Core endpoints:
+ *   POST /browse              — browse a URL with optional actions
+ *   GET  /browse/memories     — get learnings for a domain
+ *   POST /browse/memories     — save a learning for a domain
+ *   GET  /health              — health check
  *
- * Actions let callers interact with the page before extracting content:
+ * MCP server (Streamable HTTP transport, spec 2025-03-26):
+ *   POST /mcp                 — JSON-RPC 2.0 endpoint (initialize / tools/list / tools/call)
+ *
+ * OpenAI-compatible tool API:
+ *   GET  /openai/tools        — tool schemas in OpenAI function format
+ *   POST /openai/execute      — execute a tool call ({ name, arguments })
+ *
+ * Actions (for browse):
  *   - { action: "type", selector, text }       — type into an input/textarea
  *   - { action: "click", selector }            — click a button/link/element
  *   - { action: "click_and_wait", selector }   — click and wait for navigation
@@ -23,6 +31,9 @@
  *   The service maintains a SQLite database of per-domain learnings.
  *   When /browse is called, any memories matching the URL's domain are
  *   automatically included in the response so the LLM can use them.
+ *
+ * web_search availability:
+ *   Set BRAVE_API_KEY in env to enable the web_search tool.
  */
 
 import http from 'node:http';
@@ -308,6 +319,269 @@ async function browse(url, actions, selector, timeout) {
   }
 }
 
+// ─── Tool definitions ───
+
+const TOOL_BROWSE_PAGE = {
+  name: 'browse_page',
+  description: 'Browse a URL using a headless Chromium browser. Returns the page text, title, links, and form fields. Optionally performs interactions (click, type, select, evaluate JS, etc.) before extracting content. Use this to read web pages, fill forms, or navigate dynamic sites.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: {
+        type: 'string',
+        description: 'URL to browse (must begin with http:// or https://)',
+      },
+      actions: {
+        type: 'array',
+        description: 'Ordered list of interactions to perform on the page before extracting content',
+        items: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: ['type', 'click', 'click_and_wait', 'submit', 'evaluate', 'select', 'wait', 'wait_ms'],
+              description: 'Action type',
+            },
+            selector: { type: 'string', description: 'CSS selector for the target element' },
+            text: { type: 'string', description: 'Text to type (for "type") or JS expression (for "evaluate")' },
+            value: { type: 'string', description: 'Option value to select (for "select")' },
+            ms: { type: 'number', description: 'Milliseconds to wait (for "wait_ms", max 5000)' },
+          },
+          required: ['action'],
+        },
+      },
+      selector: {
+        type: 'string',
+        description: 'CSS selector to extract only a specific section of the page instead of the full body',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Navigation timeout in milliseconds (default 15000)',
+      },
+    },
+    required: ['url'],
+  },
+};
+
+const TOOL_WEB_SEARCH = {
+  name: 'web_search',
+  description: 'Search the web using Brave Search. Returns relevant results with titles, URLs, and content excerpts. Prefer this over browse_page when you need to find information across multiple sources.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' },
+      count: { type: 'number', description: 'Number of results to return (default 5, max 10)' },
+    },
+    required: ['query'],
+  },
+};
+
+function getTools() {
+  return process.env.BRAVE_API_KEY
+    ? [TOOL_BROWSE_PAGE, TOOL_WEB_SEARCH]
+    : [TOOL_BROWSE_PAGE];
+}
+
+// ─── Web search (Brave) ───
+
+async function webSearch(query, count = 5) {
+  const key = process.env.BRAVE_API_KEY;
+  if (!key) throw new Error('web_search is not available (BRAVE_API_KEY not configured)');
+
+  const n = Math.min(count, 10);
+
+  // AI-optimised LLM context endpoint — returns pre-extracted content
+  try {
+    const r = await fetch(
+      `https://api.search.brave.com/res/v1/llm/context?q=${encodeURIComponent(query)}&count=${n}`,
+      { headers: { Accept: 'application/json', 'X-Subscription-Token': key } }
+    );
+    if (r.ok) {
+      const data = await r.json();
+      if (data.context) return data.context;
+    }
+  } catch { /* fall through to standard endpoint */ }
+
+  // Standard web search fallback
+  const r = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${n}`,
+    { headers: { Accept: 'application/json', 'X-Subscription-Token': key } }
+  );
+  if (!r.ok) throw new Error(`Brave search failed: ${r.status} ${r.statusText}`);
+
+  const data = await r.json();
+  const results = data.web?.results || [];
+  if (!results.length) return 'No results found.';
+
+  return results.map((item, i) => {
+    const age = item.age ? `\n   (${item.age})` : '';
+    return `${i + 1}. **${item.title}**${age}\n   ${item.url}\n   ${item.description || ''}`;
+  }).join('\n\n');
+}
+
+// ─── Tool execution ───
+
+async function executeTool(name, args) {
+  switch (name) {
+    case 'browse_page': {
+      if (!args?.url) throw new Error('Missing required parameter: url');
+      const result = await browse(
+        args.url,
+        args.actions || [],
+        args.selector || null,
+        args.timeout || DEFAULT_TIMEOUT
+      );
+      if (!result.ok) throw new Error(result.error || 'Browse failed');
+      return formatBrowseResult(result);
+    }
+    case 'web_search': {
+      if (!args?.query) throw new Error('Missing required parameter: query');
+      return webSearch(args.query, args.count ?? 5);
+    }
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+function formatBrowseResult(result) {
+  const parts = [
+    `Page: ${result.title}`,
+    `URL: ${result.url}`,
+    `Length: ${result.length} chars`,
+  ];
+
+  if (result.actions_performed?.length) {
+    parts.push(`Actions: ${result.actions_performed.join(' → ')}`);
+  }
+  if (result.memories?.length) {
+    parts.push(`\nDomain tips:\n${result.memories.map((m) => `- ${m}`).join('\n')}`);
+  }
+
+  parts.push('', result.text);
+
+  if (result.links?.length) {
+    const linkList = result.links.slice(0, 20).map((l) => `- [${l.text}](${l.href})`).join('\n');
+    parts.push(`\nLinks:\n${linkList}`);
+  }
+
+  return parts.join('\n');
+}
+
+// ─── MCP server (Streamable HTTP transport, spec 2025-03-26) ───
+
+const MCP_PROTOCOL_VERSION = '2025-03-26';
+
+function mcpOk(id, result) {
+  return { jsonrpc: '2.0', id, result };
+}
+
+function mcpErr(id, code, message) {
+  return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+async function handleMcp(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
+
+  const raw = await readBody(req);
+  let msg;
+  try { msg = JSON.parse(raw); } catch { return json(res, 400, mcpErr(null, -32700, 'Parse error')); }
+
+  if (msg.jsonrpc !== '2.0') {
+    return json(res, 400, mcpErr(msg.id ?? null, -32600, 'Invalid Request'));
+  }
+
+  const { id, method, params } = msg;
+  // MCP notifications have no id — acknowledge with 202, no body
+  const isNotification = id === undefined || id === null;
+
+  switch (method) {
+    case 'initialize':
+      return json(res, 200, mcpOk(id, {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: { tools: {} },
+        serverInfo: { name: 'kamai', version: '0.0.2' },
+      }));
+
+    case 'ping':
+      if (isNotification) { res.writeHead(202); return res.end(); }
+      return json(res, 200, mcpOk(id, {}));
+
+    case 'notifications/initialized':
+      res.writeHead(202);
+      return res.end();
+
+    case 'tools/list':
+      return json(res, 200, mcpOk(id, { tools: getTools() }));
+
+    case 'tools/call': {
+      const { name, arguments: args } = params || {};
+      try {
+        const text = await executeTool(name, args || {});
+        return json(res, 200, mcpOk(id, { content: [{ type: 'text', text }] }));
+      } catch (err) {
+        return json(res, 200, mcpOk(id, {
+          content: [{ type: 'text', text: `Error: ${err.message}` }],
+          isError: true,
+        }));
+      }
+    }
+
+    default:
+      if (isNotification) { res.writeHead(202); return res.end(); }
+      return json(res, 200, mcpErr(id, -32601, `Method not found: ${method}`));
+  }
+}
+
+// ─── OpenAI-compatible tool API ───
+
+function handleOpenAITools(_req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const tools = getTools().map((t) => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema,
+    },
+  }));
+  return json(res, 200, tools);
+}
+
+async function handleOpenAIExecute(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
+
+  const raw = await readBody(req);
+  let data;
+  try { data = JSON.parse(raw); } catch { return json(res, 400, { error: 'Invalid JSON' }); }
+
+  const { name } = data;
+  let args = data.arguments;
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args); } catch { return json(res, 400, { error: 'Invalid arguments JSON' }); }
+  }
+
+  try {
+    const content = await executeTool(name, args || {});
+    return json(res, 200, { content });
+  } catch (err) {
+    return json(res, 400, { error: err.message });
+  }
+}
+
 // ─── Route helpers ───
 
 function readBody(req) {
@@ -336,7 +610,21 @@ const server = http.createServer(async (req, res) => {
   // ── Health check ──
   if (req.method === 'GET' && path === '/health') {
     const memCount = db.prepare('SELECT COUNT(*) AS n FROM browse_page_memories').get();
-    return json(res, 200, { ok: true, engine: 'playwright-chromium', memories: memCount.n });
+    const tools = getTools().map((t) => t.name);
+    return json(res, 200, { ok: true, engine: 'playwright-chromium', memories: memCount.n, tools });
+  }
+
+  // ── MCP (Streamable HTTP transport) ──
+  if ((req.method === 'POST' || req.method === 'OPTIONS') && path === '/mcp') {
+    return handleMcp(req, res);
+  }
+
+  // ── OpenAI-compatible tool API ──
+  if (req.method === 'GET' && path === '/openai/tools') {
+    return handleOpenAITools(req, res);
+  }
+  if ((req.method === 'POST' || req.method === 'OPTIONS') && path === '/openai/execute') {
+    return handleOpenAIExecute(req, res);
   }
 
   // ── GET /browse/memories?domain=... ──
@@ -408,7 +696,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
+  const searchEnabled = process.env.BRAVE_API_KEY ? 'yes' : 'no (set BRAVE_API_KEY to enable)';
   console.log(`[Browse] HTTP server listening on port ${PORT} (Playwright + Chromium + Memories)`);
+  console.log(`[Browse] MCP endpoint:    POST /mcp`);
+  console.log(`[Browse] OpenAI endpoint: GET /openai/tools  POST /openai/execute`);
+  console.log(`[Browse] web_search:      ${searchEnabled}`);
 });
 
 // Graceful shutdown
