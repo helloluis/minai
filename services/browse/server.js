@@ -5,6 +5,8 @@
  * tool APIs so external apps (Claude Code, Ollama, llama.cpp, etc.) can use these tools.
  *
  * Core endpoints:
+ *   GET  /                    — landing page (agent documentation)
+ *   GET  /skill.md            — machine-readable agent skill file
  *   POST /browse              — browse a URL with optional actions
  *   GET  /browse/memories     — get learnings for a domain
  *   POST /browse/memories     — save a learning for a domain
@@ -37,6 +39,7 @@
  */
 
 import http from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -582,6 +585,211 @@ async function handleOpenAIExecute(req, res) {
   }
 }
 
+// ─── Landing page ───
+
+function getLandingPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kamai — tool service for AI agents</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080808;--surface:#111;--border:#1e1e1e;
+      --text:#c9c9c9;--dim:#555;--accent:#7ee787;--blue:#79c0ff;
+      --orange:#f0883e;--code:#0d1117;
+    }
+    body{font-family:'SF Mono','Fira Code','Cascadia Code',ui-monospace,monospace;background:var(--bg);color:var(--text);font-size:14px;line-height:1.75;padding:56px 24px 80px}
+    .page{max-width:740px;margin:0 auto}
+    header{margin-bottom:52px;padding-bottom:28px;border-bottom:1px solid var(--border)}
+    h1{font-size:26px;font-weight:700;color:#fff;letter-spacing:-.5px;margin-bottom:6px}
+    .sub{color:var(--dim);font-size:13px}
+    .sub a{color:var(--accent);text-decoration:none}
+    .sub a:hover{text-decoration:underline}
+    section{margin-bottom:44px}
+    h2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--dim);margin-bottom:18px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 22px;margin-bottom:10px}
+    .tool-name{color:var(--accent);font-weight:700;font-size:15px;margin-bottom:5px}
+    .tool-desc{color:var(--text);font-size:13px;margin-bottom:12px}
+    .params{font-size:12px;color:var(--dim)}
+    .params b{color:#c9d1d9;font-weight:400}
+    pre{background:var(--code);border:1px solid var(--border);border-radius:6px;padding:16px 18px;overflow-x:auto;font-size:12px;line-height:1.65;color:#c9d1d9;margin:10px 0 4px}
+    .row{display:flex;align-items:baseline;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+    .row:last-child{border-bottom:none}
+    .method{color:var(--accent);font-weight:700;font-size:11px;min-width:36px}
+    .url a,.url{color:var(--blue);text-decoration:none}
+    .url a:hover{text-decoration:underline}
+    .note{color:var(--dim);font-size:12px}
+    .box{background:var(--code);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:6px;padding:18px 22px}
+    .box p{font-size:13px;margin-bottom:10px}
+    .box p:last-child{margin-bottom:0}
+    code{background:var(--code);padding:2px 6px;border-radius:3px;font-size:12px;color:#f0a}
+    footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);color:var(--dim);font-size:12px}
+    footer a{color:var(--dim);text-decoration:none}
+    footer a:hover{color:var(--text)}
+    .sep{display:inline-block;margin:0 10px;opacity:.3}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>kamai</h1>
+    <p class="sub">
+      Tool service for AI agents
+      <span class="sep">|</span>
+      built by <a href="https://x.com/helloluis">@helloluis</a>
+      <span class="sep">|</span>
+      <a href="/skill.md">skill.md</a>
+      <span class="sep">|</span>
+      <a href="/health">health</a>
+    </p>
+  </header>
+
+  <section>
+    <h2>Tools</h2>
+    <div class="card">
+      <div class="tool-name">browse_page</div>
+      <div class="tool-desc">
+        Browse any URL with a headless Chromium browser. Returns page text, title, links, and
+        form fields. Optionally performs interactions before extraction — useful for JS-heavy
+        sites, SPAs, login-gated pages, and multi-step forms.
+      </div>
+      <div class="params">
+        <b>url</b> string · required
+        &nbsp;&nbsp;<b>actions</b> array · optional
+        &nbsp;&nbsp;<b>selector</b> string · optional
+        &nbsp;&nbsp;<b>timeout</b> ms · optional (default 15000)
+      </div>
+    </div>
+    <div class="card">
+      <div class="tool-name">web_search</div>
+      <div class="tool-desc">
+        Search the web via Brave Search. Returns titles, URLs, and content excerpts. Prefer
+        this over browse_page when you need to discover sources across the open web rather
+        than read a specific known URL.
+      </div>
+      <div class="params">
+        <b>query</b> string · required
+        &nbsp;&nbsp;<b>count</b> number · optional (default 5, max 10)
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>MCP — Streamable HTTP (spec 2025-03-26)</h2>
+    <div class="row">
+      <span class="method">POST</span>
+      <span class="url">https://kamai.minai.work/mcp</span>
+      <span class="note">initialize · tools/list · tools/call · ping</span>
+    </div>
+    <pre>// Claude Code — add to .mcp.json or claude_desktop_config.json:
+{
+  "mcpServers": {
+    "kamai": { "type": "http", "url": "https://kamai.minai.work/mcp" }
+  }
+}</pre>
+    <pre>// Handshake
+POST /mcp   {"jsonrpc":"2.0","id":1,"method":"initialize",
+             "params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"myapp","version":"1.0"}}}
+
+// List tools
+POST /mcp   {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+
+// Call a tool
+POST /mcp   {"jsonrpc":"2.0","id":3,"method":"tools/call",
+             "params":{"name":"browse_page","arguments":{"url":"https://example.com"}}}</pre>
+  </section>
+
+  <section>
+    <h2>OpenAI-compatible tool API</h2>
+    <div class="row">
+      <span class="method">GET</span>
+      <span class="url"><a href="/openai/tools">https://kamai.minai.work/openai/tools</a></span>
+      <span class="note">tool schemas in OpenAI function format</span>
+    </div>
+    <div class="row">
+      <span class="method">POST</span>
+      <span class="url">https://kamai.minai.work/openai/execute</span>
+      <span class="note">execute { name, arguments } → { content }</span>
+    </div>
+    <pre>// 1. Fetch schemas and inject into your LLM request:
+const tools = await fetch("https://kamai.minai.work/openai/tools").then(r => r.json());
+
+// 2. When LLM emits a tool call, forward it here:
+POST /openai/execute
+{ "name": "web_search", "arguments": "{\"query\": \"latest AI news\"}" }
+
+// → { "content": "1. **Title**\n   https://..." }</pre>
+    <p class="note" style="margin-top:8px">
+      arguments can be a JSON string (as the LLM emits it) or a pre-parsed object.
+      Works with llama.cpp, Ollama, LM Studio, and any OpenAI-API-compatible runtime.
+    </p>
+  </section>
+
+  <section>
+    <h2>Payment (x402)</h2>
+    <div class="box">
+      <p>
+        The authenticated public API at <code>/api/v1/browse</code> uses the
+        <strong style="color:#c9d1d9">x402 micropayment protocol</strong>.
+        When your credit balance reaches zero the server returns
+        <code>402 Payment Required</code> with machine-readable payment instructions
+        in the response headers — network, price, currency (USDC on Base), and recipient.
+      </p>
+      <p>
+        x402-compliant agents can read those headers, sign a payment transaction, and
+        retry the request autonomously — no human in the loop.
+        Sister-app keys bypass payment entirely; see
+        <a href="/skill.md" style="color:var(--accent)">skill.md</a> for key provisioning.
+      </p>
+      <p style="color:var(--dim);font-size:12px">
+        Protocol spec: <a href="https://x402.org" style="color:var(--accent)">x402.org</a>
+        &nbsp;·&nbsp;
+        Reference impl: <a href="https://github.com/coinbase/x402" style="color:var(--accent)">coinbase/x402</a>
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Browse actions reference</h2>
+    <pre>{ "action": "type",           "selector": "#q",       "text": "search term" }
+{ "action": "click",          "selector": "button.go" }
+{ "action": "click_and_wait", "selector": "a.next" }
+{ "action": "submit",         "selector": "form#login" }
+{ "action": "evaluate",       "text": "document.title" }
+{ "action": "select",         "selector": "#country",  "value": "PH" }
+{ "action": "wait",           "selector": ".results" }
+{ "action": "wait_ms",        "ms": 1500 }</pre>
+    <p class="note" style="margin-top:8px">
+      Max 20 actions · 30 000 char text cap · 15 s default timeout · blocks localhost and private IPs
+    </p>
+  </section>
+
+  <section>
+    <h2>Endpoints</h2>
+    <div class="row"><span class="method">POST</span><span class="url">https://kamai.minai.work/mcp</span><span class="note">MCP server</span></div>
+    <div class="row"><span class="method">GET</span><span class="url"><a href="/openai/tools">https://kamai.minai.work/openai/tools</a></span><span class="note">OpenAI tool schemas</span></div>
+    <div class="row"><span class="method">POST</span><span class="url">https://kamai.minai.work/openai/execute</span><span class="note">OpenAI tool execution</span></div>
+    <div class="row"><span class="method">POST</span><span class="url">https://kamai.minai.work/browse</span><span class="note">legacy browse (no auth)</span></div>
+    <div class="row"><span class="method">POST</span><span class="url">https://kamai.minai.work/api/v1/browse</span><span class="note">authenticated browse (x402)</span></div>
+    <div class="row"><span class="method">GET</span><span class="url"><a href="/skill.md">https://kamai.minai.work/skill.md</a></span><span class="note">machine-readable agent skill file</span></div>
+    <div class="row"><span class="method">GET</span><span class="url"><a href="/health">https://kamai.minai.work/health</a></span><span class="note">service status + active tools</span></div>
+  </section>
+
+  <footer>
+    kamai is part of the <a href="https://minai.work">minai</a> project
+    <span class="sep">·</span>
+    built by <a href="https://x.com/helloluis">@helloluis</a>
+  </footer>
+
+</div>
+</body>
+</html>`;
+}
+
 // ─── Route helpers ───
 
 function readBody(req) {
@@ -606,6 +814,23 @@ function parseUrl(reqUrl) {
 const server = http.createServer(async (req, res) => {
   const parsed = parseUrl(req.url);
   const path = parsed.pathname;
+
+  // ── Landing page ──
+  if (req.method === 'GET' && path === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(getLandingPage());
+  }
+
+  // ── Agent skill file ──
+  if (req.method === 'GET' && path === '/skill.md') {
+    try {
+      const content = await readFile(join(__dirname, 'skill.md'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
+      return res.end(content);
+    } catch {
+      return json(res, 404, { ok: false, error: 'skill.md not found' });
+    }
+  }
 
   // ── Health check ──
   if (req.method === 'GET' && path === '/health') {
